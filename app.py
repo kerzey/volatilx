@@ -16,10 +16,13 @@ def index():
 @app.route('/trade', methods=['POST'])
 def trade():
     data = request.json
+    print("Printing data: " + str(data))
     stock_symbol = data.get('stock_symbol')
+    print("Printing stock symbol: " + str(stock_symbol))
     agent = MultiSymbolDayTraderAgent(symbols=stock_symbol)
     try:
         result = agent.run_sequential()  # Call your agent's trade method
+        print("Printing result: " + str(result))
         return jsonify({'success': True, 'result': result})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
