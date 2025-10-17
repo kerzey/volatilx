@@ -1,0 +1,39 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Trading MVP</title>
+    <script>
+        async function tradeStock() {
+            const stockSymbol = document.getElementById('stockSymbol').value;
+            const response = await fetch('/trade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stock_symbol: stockSymbol })
+            });
+            const data = await response.json();
+            document.getElementById('result').innerText = JSON.stringify(data);
+        }
+
+        async function fetchIndicators() {
+            const stockSymbol = document.getElementById('stockSymbol').value;
+            const response = await fetch('/indicators', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stock_symbol: stockSymbol })
+            });
+            const data = await response.json();
+            document.getElementById('result').innerText = JSON.stringify(data);
+        }
+    </script>
+</head>
+<body>
+    <h1>Stock Trading MVP</h1>
+    <input type="text" id="stockSymbol" placeholder="Enter Stock Symbol">
+    <button onclick="tradeStock()">Trade</button>
+    <button onclick="fetchIndicators()">Fetch Indicators</button>
+    <pre id="result"></pre>
+</body>
+</html>
