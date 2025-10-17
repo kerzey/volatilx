@@ -151,15 +151,18 @@ class MultiSymbolDayTraderAgent:
                     print(f"  Decision: HOLD {symbol}")
 
     def run_sequential(self):
-        """Run analysis for all symbols sequentially."""
-        while self.running:
-            for symbol in self.symbols:
-                if not self.running:
-                    break
-                self.analyze_symbol(symbol)
+        # """Run analysis for all symbols sequentially continuously"""
+        # while self.running:
+        #     for symbol in self.symbols:
+        #         if not self.running:
+        #             break
+        #         self.analyze_symbol(symbol)
             
-            print(f"\nWaiting 60 seconds before next analysis cycle...")
-            time.sleep(60)
+        #     print(f"\nWaiting 60 seconds before next analysis cycle...")
+        #     time.sleep(60)
+        """Run analysis for all symbols one time."""
+        for symbol in self.symbols:
+            self.analyze_symbol(symbol)
 
     def run_parallel(self):
         """Run analysis for all symbols in parallel using threads."""
