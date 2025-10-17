@@ -108,22 +108,32 @@ class MultiSymbolDayTraderAgent:
         self.timeframes = timeframes
         self.analyzer = ComprehensiveMultiTimeframeAnalyzer()
         self.running = True
-
+    
     def analyze_symbol(self, symbol):
-        """Analyze a single symbol."""
+        """Analyze a single symbol and return the results."""
         try:
-            print(f"\n{'='*60}")
-            print(f"ANALYZING {symbol}")
-            print(f"{'='*60}")
+            analysis_output = {
+                "symbol": symbol,
+                "status": "success",
+                "analysis": [],
+                "error": None
+            }
+
+            analysis_output["analysis"].append(f"{'='*60}")
+            analysis_output["analysis"].append(f"ANALYZING {symbol}")
+            analysis_output["analysis"].append(f"{'='*60}")
             
             results = self.analyzer.analyze_comprehensive_multi_timeframe(symbol, self.timeframes)
-            self.make_decision(symbol, results)
+            decision_results = self.make_decision(symbol, results)
+            analysis_output["analysis"].extend(decision_results)  # Append decision results
         except Exception as e:
-            print(f"Error analyzing {symbol}: {e}")
-
+            analysis_output["status"] = "error"
+            analysis_output["error"] = str(e)
+        return analysis_output
+    
     def make_decision(self, symbol, analysis_results):
-        """Make buy/sell/hold decisions based on analysis results."""
-        print(f"\n--- ANALYSIS FOR {symbol} ---")
+        """Make buy/sell/hold decisions based on analysis results and return the results."""
+        decision_output = [f"\n--- ANALYSIS FOR {symbol} ---"]
         
         for timeframe, data in analysis_results.items():
             if 'indicators' in data and 'trading_signals' in data['indicators']:
@@ -135,22 +145,74 @@ class MultiSymbolDayTraderAgent:
                 fib_support = fib_analysis.get('nearest_support', {}).get('price')
                 fib_resistance = fib_analysis.get('nearest_resistance', {}).get('price')
 
-                print(f"  {timeframe}: Bias: {bias}, Confidence: {confidence}")
-                print(f"  Price: {current_price}, Support: {fib_support}, Resistance: {fib_resistance}")
+                decision_output.append(f"  {timeframe}: Bias: {bias}, Confidence: {confidence}")
+                decision_output.append(f"  Price: {current_price}, Support: {fib_support}, Resistance: {fib_resistance}")
 
                 # Decision logic
                 if bias == 'strong_bullish' and confidence == 'high':
-                    print(f"  Decision: BUY {symbol}")
+                    decision_output.append(f"  Decision: BUY {symbol}")
                 elif bias == 'strong_bearish' and confidence == 'high':
-                    print(f"  Decision: SELL {symbol}")
+                    decision_output.append(f"  Decision: SELL {symbol}")
                 elif fib_support and current_price <= fib_support:
-                    print(f"  Decision: BUY {symbol} (near Fibonacci support)")
+                    decision_output.append(f"  Decision: BUY {symbol} (near Fibonacci support)")
                 elif fib_resistance and current_price >= fib_resistance:
-                    print(f"  Decision: SELL {symbol} (near Fibonacci resistance)")
+                    decision_output.append(f"  Decision: SELL {symbol} (near Fibonacci resistance)")
                 else:
-                    print(f"  Decision: HOLD {symbol}")
-
+                    decision_output.append(f"  Decision: HOLD {symbol}")
+        return decision_output
+    
     def run_sequential(self):
+        """Run analysis for all symbols one time and return results."""
+        results = {}  # Dictionary to store results for each symbol
+        for symbol in self.symbols:
+            results[symbol] = self.analyze_symbol(symbol)  # Collect results for each symbol
+        return results
+
+
+
+
+    # def analyze_symbol(self, symbol):
+    #     """Analyze a single symbol."""
+    #     try:
+    #         print(f"\n{'='*60}")
+    #         print(f"ANALYZING {symbol}")
+    #         print(f"{'='*60}")
+            
+    #         results = self.analyzer.analyze_comprehensive_multi_timeframe(symbol, self.timeframes)
+    #         self.make_decision(symbol, results)
+    #     except Exception as e:
+    #         print(f"Error analyzing {symbol}: {e}")
+
+    # def make_decision(self, symbol, analysis_results):
+    #     """Make buy/sell/hold decisions based on analysis results."""
+    #     print(f"\n--- ANALYSIS FOR {symbol} ---")
+        
+    #     for timeframe, data in analysis_results.items():
+    #         if 'indicators' in data and 'trading_signals' in data['indicators']:
+    #             signals = data['indicators']['trading_signals']
+    #             fib_analysis = data['indicators'].get('fibonacci', {})
+    #             bias = signals['overall_bias']
+    #             confidence = signals['confidence']
+    #             current_price = data['current_price']
+    #             fib_support = fib_analysis.get('nearest_support', {}).get('price')
+    #             fib_resistance = fib_analysis.get('nearest_resistance', {}).get('price')
+
+    #             print(f"  {timeframe}: Bias: {bias}, Confidence: {confidence}")
+    #             print(f"  Price: {current_price}, Support: {fib_support}, Resistance: {fib_resistance}")
+
+    #             # Decision logic
+    #             if bias == 'strong_bullish' and confidence == 'high':
+    #                 print(f"  Decision: BUY {symbol}")
+    #             elif bias == 'strong_bearish' and confidence == 'high':
+    #                 print(f"  Decision: SELL {symbol}")
+    #             elif fib_support and current_price <= fib_support:
+    #                 print(f"  Decision: BUY {symbol} (near Fibonacci support)")
+    #             elif fib_resistance and current_price >= fib_resistance:
+    #                 print(f"  Decision: SELL {symbol} (near Fibonacci resistance)")
+    #             else:
+    #                 print(f"  Decision: HOLD {symbol}")
+
+    # def run_sequential(self):
         # """Run analysis for all symbols sequentially continuously"""
         # while self.running:
         #     for symbol in self.symbols:
@@ -202,7 +264,7 @@ if __name__ == "__main__":
     # thread = multi_trader.run_parallel()
     
     # Or run sequentially (slower but more stable)
-    multi_trader.run_sequential()
+    result = multi_trader.run_sequential()
 #######################################################################################################################################
 # Version with Fibonacci and Elliot Wave analysis
 #######################################################################################################################################
