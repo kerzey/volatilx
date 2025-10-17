@@ -18,20 +18,20 @@ def trade():
     data = request.json
     stock_symbol = data.get('stock_symbol')
     try:
-        result = agent.trade(stock_symbol)  # Call your agent's trade method
+        result = agent.run_sequential(stock_symbol)  # Call your agent's trade method
         return jsonify({'success': True, 'result': result})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/indicators', methods=['POST'])
-def fetch_indicators():
-    data = request.json
-    stock_symbol = data.get('stock_symbol')
-    try:
-        indicators = indicator_fetcher.fetch(stock_symbol)  # Call your fetcher
-        return jsonify({'success': True, 'indicators': indicators})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+# @app.route('/indicators', methods=['POST'])
+# def fetch_indicators():
+#     data = request.json
+#     stock_symbol = data.get('stock_symbol')
+#     try:
+#         indicators = indicator_fetcher.fetch(stock_symbol)  # Call your fetcher
+#         return jsonify({'success': True, 'indicators': indicators})
+#     except Exception as e:
+#         return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)
