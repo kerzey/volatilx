@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, json, render_template, request, jsonify
 from day_trading_agent import MultiSymbolDayTraderAgent  # Import your agent
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer  # Import your indicator fetcher
 
@@ -23,9 +23,27 @@ def trade():
     try:
         result = agent.run_sequential()  # Call your agent's trade method
         print("Printing result: " + str(result))
-        return jsonify({'success': True, 'result': result})
+        
+        # Pretty-print the result
+        response = {
+            'success': True,
+            'result': result
+        }
+        return app.response_class(
+            response=json.dumps(response, indent=4),  # Pretty-print JSON with 4 spaces
+            status=200,
+            mimetype='application/json'
+        )
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        error_response = {
+            'success': False,
+            'error': str(e)
+        }
+        return app.response_class(
+            response=json.dumps(error_response, indent=4),  # Pretty-print error response
+            status=500,
+            mimetype='application/json'
+        )
 
 # @app.route('/indicators', methods=['POST'])
 # def fetch_indicators():
