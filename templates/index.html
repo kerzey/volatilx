@@ -12,39 +12,113 @@
         .error { color: red; }
     </style>
     <script>
-        function renderResult(data) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = ''; // Clear previous output
+       function renderResult(data) {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '';
+    if (!data.success) {
+        resultDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+        return;
+    }
+    const result = data.result;
+    for (let symbol in result) {
+        const stock = result[symbol];
+        let analysisRows = [];
+        let timeframe = '';
+        let decision = '';
+        let bias = '';
+        let confidence = '';
+        let price = '', support = '', resistance = '';
+        let sections = [];
 
-            if (!data.success) {
-                resultDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+        stock.analysis.forEach(line => {
+            // Clean up separators and empty lines
+            if (line.startsWith('=') || line.trim() === '' || line.startsWith('---')) {
+                return;
+            }
+            
+            // Identify timeframe info (e.g., "5m: Bias: ...")
+            if (line.match(/^\s*\d+[mh]:/)) {
+                const match = line.match(/(\d+[mh]): Bias: ([^,]+), Confidence: ([^\s]+)/);
+                if (match) {
+                    timeframe = match[1];
+                    bias = match[2];
+                    confidence = match[3];
+                }
                 return;
             }
 
-            const result = data.result;
-            for (let symbol in result) {
-                const stock = result[symbol];
-                let analysisHtml = '<ul class="analysis-list">';
-                stock.analysis.forEach(line => {
-                    // Try to highlight decisions
-                    if (line.match(/Decision:/)) {
-                        analysisHtml += `<li class="decision">${line}</li>`;
-                    } else {
-                        analysisHtml += `<li>${line}</li>`;
-                    }
-                });
-                analysisHtml += '</ul>';
-
-                // Compose the card
-                resultDiv.innerHTML += `
-                    <div class="card">
-                        <h2>${symbol}: ${stock.status}</h2>
-                        ${analysisHtml}
-                        ${stock.error ? `<div class="error">${stock.error}</div>` : ''}
-                    </div>
-                `;
+            // Identify price/support/resistance
+            if (line.match(/Price:/)) {
+                const match = line.match(/Price: ([^,]+), Support: ([^,]+), Resistance: (.+)/);
+                if (match) {
+                    price = match[1];
+                    support = match[2];
+                    resistance = match[3];
+                }
+                return;
             }
-        }
+
+            // Identify decision
+            if (line.match(/Decision:/)) {
+                decision = line.split('Decision: ')[1];
+                // Add this timeframe's details in an object
+                sections.push({
+                    timeframe, bias, confidence, price, support, resistance, decision
+                });
+                // Reset for next block
+                decision = '';
+                bias = '';
+                confidence = '';
+                price = '';
+                support = '';
+                resistance = '';
+            }
+        });
+
+        // Render the parsed sections in a table
+        let tableHtml = `
+            <table style="width:100%;margin-top:10px;border-collapse:collapse;">
+                <thead><tr>
+                    <th>Timeframe</th>
+                    <th>Bias</th>
+                    <th>Confidence</th>
+                    <th>Price</th>
+                    <th>Support</th>
+                    <th>Resistance</th>
+                    <th>Action</th>
+                </tr></thead>
+                <tbody>
+        `;
+
+        sections.forEach(sec => {
+            let color = "black";
+            if (sec.decision.startsWith('BUY')) color = "green";
+            else if (sec.decision.startsWith('SELL')) color = "red";
+            else if (sec.decision.startsWith('HOLD')) color = "orange";
+            tableHtml += `
+            <tr>
+                <td>${sec.timeframe}</td>
+                <td>${sec.bias}</td>
+                <td>${sec.confidence}</td>
+                <td>${Number(sec.price).toFixed(2)}</td>
+                <td>${Number(sec.support).toFixed(2)}</td>
+                <td>${Number(sec.resistance).toFixed(2)}</td>
+                <td style="font-weight:bold;color:${color}">${sec.decision}</td>
+            </tr>
+            `;
+        });
+
+        tableHtml += '</tbody></table>';
+
+        resultDiv.innerHTML += `
+            <div class="card">
+                <h2>${symbol}: ${stock.status}</h2>
+                ${sections.length ? tableHtml : "<em>No actionable analysis found.</em>"}
+                ${stock.error ? `<div class="error">${stock.error}</div>` : ''}
+            </div>
+        `;
+    }
+}
 
         async function tradeStock() {
             const stockSymbol = document.getElementById('stockSymbol').value;
