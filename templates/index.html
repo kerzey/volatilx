@@ -1,11 +1,51 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Trading MVP</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f8fa; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #ddd; margin-bottom: 20px; padding: 16px; }
+        .analysis-list { list-style: none; padding: 0; }
+        .analysis-list li { padding: 6px 0; border-bottom: 1px solid #efefef; }
+        .decision { font-weight: bold; padding-left: 10px; color: #2362cd; }
+        .error { color: red; }
+    </style>
     <script>
+        function renderResult(data) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = ''; // Clear previous output
+
+            if (!data.success) {
+                resultDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                return;
+            }
+
+            const result = data.result;
+            for (let symbol in result) {
+                const stock = result[symbol];
+                let analysisHtml = '<ul class="analysis-list">';
+                stock.analysis.forEach(line => {
+                    // Try to highlight decisions
+                    if (line.match(/Decision:/)) {
+                        analysisHtml += `<li class="decision">${line}</li>`;
+                    } else {
+                        analysisHtml += `<li>${line}</li>`;
+                    }
+                });
+                analysisHtml += '</ul>';
+
+                // Compose the card
+                resultDiv.innerHTML += `
+                    <div class="card">
+                        <h2>${symbol}: ${stock.status}</h2>
+                        ${analysisHtml}
+                        ${stock.error ? `<div class="error">${stock.error}</div>` : ''}
+                    </div>
+                `;
+            }
+        }
+
         async function tradeStock() {
             const stockSymbol = document.getElementById('stockSymbol').value;
             const response = await fetch('/trade', {
@@ -14,7 +54,7 @@
                 body: JSON.stringify({ stock_symbol: stockSymbol })
             });
             const data = await response.json();
-            document.getElementById('result').innerText = JSON.stringify(data);
+            renderResult(data);
         }
 
         async function fetchIndicators() {
@@ -25,7 +65,7 @@
                 body: JSON.stringify({ stock_symbol: stockSymbol })
             });
             const data = await response.json();
-            document.getElementById('result').innerText = JSON.stringify(data);
+            renderResult(data);
         }
     </script>
 </head>
@@ -34,6 +74,6 @@
     <input type="text" id="stockSymbol" placeholder="Enter Stock Symbol">
     <button onclick="tradeStock()">Trade</button>
     <button onclick="fetchIndicators()">Fetch Indicators</button>
-    <pre id="result"></pre>
+    <div id="result"></div>
 </body>
 </html>
