@@ -4,9 +4,9 @@ from day_trading_agent import MultiSymbolDayTraderAgent  # Import your agent
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer  # Import your indicator fetcher
 
 app = Flask(__name__)
-symbols = ['DUOL', 'SPY', 'TQQQ', 'AMD', 'ASML','ORCL']
+# symbols = ['DUOL', 'SPY', 'TQQQ', 'AMD', 'ASML','ORCL']
 # Initialize your agent and indicator fetcher
-agent = MultiSymbolDayTraderAgent(symbols=symbols)
+
 indicator_fetcher = ComprehensiveMultiTimeframeAnalyzer()
 
 @app.route('/')
@@ -17,8 +17,9 @@ def index():
 def trade():
     data = request.json
     stock_symbol = data.get('stock_symbol')
+    agent = MultiSymbolDayTraderAgent(symbols=stock_symbol)
     try:
-        result = agent.run_sequential(stock_symbol)  # Call your agent's trade method
+        result = agent.run_sequential()  # Call your agent's trade method
         return jsonify({'success': True, 'result': result})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
