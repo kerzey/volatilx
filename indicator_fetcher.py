@@ -245,6 +245,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+import json
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -435,61 +436,9 @@ class ComprehensiveMultiTimeframeAnalyzer:
             '60d': 60, '730d': 730
         }
         
-        return period_map.get(period, None)
+        return period_map.get(period, None) 
     
-    def calculate_comprehensive_indicators(self, df, interval):
-        """Calculate all indicators including basic, Fibonacci, and Elliott Wave"""
-        indicators = {}
-        
-        # Adjust indicator periods based on timeframe
-        if interval in ['1m', '2m', '5m']:
-            # Faster settings for short timeframes
-            macd_fast, macd_slow, macd_signal = 6, 13, 4
-            adx_period = 7
-            rsi_period = 7
-        elif interval in ['15m', '30m']:
-            # Medium settings
-            macd_fast, macd_slow, macd_signal = 8, 17, 6
-            adx_period = 10
-            rsi_period = 10
-        elif interval in ['1h', '90m']:
-            # Standard settings
-            macd_fast, macd_slow, macd_signal = 12, 26, 9
-            adx_period = 14
-            rsi_period = 14
-        else:
-            # Daily+ settings
-            macd_fast, macd_slow, macd_signal = 12, 26, 9
-            adx_period = 14
-            rsi_period = 14
-        
-        try:
-            # Basic Technical Indicators
-            indicators['basic'] = self._calculate_basic_indicators(df, macd_fast, macd_slow, macd_signal, adx_period, rsi_period)
-            
-            # Fibonacci Analysis
-            fib_analysis = self.fib_analyzer.calculate_fibonacci_retracements(df)
-            indicators['fibonacci'] = fib_analysis if fib_analysis else {'error': 'Insufficient data for Fibonacci analysis'}
-            
-            # Elliott Wave Analysis
-            wave_analysis = self.wave_analyzer.detect_wave_structure(df)
-            indicators['elliott_wave'] = wave_analysis
-            
-            # Combined Trading Signals
-            indicators['trading_signals'] = self._generate_comprehensive_signals(
-                indicators['basic'], 
-                indicators['fibonacci'], 
-                indicators['elliott_wave'],
-                interval
-            )
-            
-        except Exception as e:
-            print(f"Error calculating indicators for {interval}: {e}")
-            indicators['error'] = str(e)
-        
-        return indicators
-    
-    def _calculate_basic_indicators(self, df, macd_fast, macd_slow, macd_signal, adx_period, rsi_period):
+    def _calculate_basic_indicators(self, df, macd_fast, macd_slow, macd_signal, adx_period, rsi_period, atr_period=14):
         """Calculate basic technical indicators with improved error handling"""
         basic_indicators = {}
         
@@ -531,7 +480,16 @@ class ComprehensiveMultiTimeframeAnalyzer:
                     'overbought': rsi_data.iloc[-1] > 70,
                     'oversold': rsi_data.iloc[-1] < 30
                 }
-            
+    
+            # ATR
+            atr_data = ta.atr(df['High'], df['Low'], df['Close'], length=atr_period)
+            if atr_data is not None and len(atr_data) > 0:
+                basic_indicators['ATR'] = {
+                    'value': atr_data.iloc[-1],
+                    'period': atr_period,
+                    'volatility_level': 'high' if atr_data.iloc[-1] > atr_data.mean() else 'low'
+                }
+
             # OBV
             obv_data = ta.obv(df['Close'], df['Volume'])
             if obv_data is not None and len(obv_data) > 1:
@@ -732,7 +690,8 @@ class ComprehensiveMultiTimeframeAnalyzer:
                 'fibonacci_score': 0,
                 'elliott_wave_score': 0,
                 'total_score': 0
-            }
+            },
+            'ATR_info': {}
         }
         
         # Scoring system
@@ -747,6 +706,15 @@ class ComprehensiveMultiTimeframeAnalyzer:
         signals['exit_signals'].extend(basic_signals['bearish'])
         signals['signal_breakdown']['basic_score'] = basic_bullish - basic_bearish
         
+        # ATR extraction for transparency
+        if 'ATR' in basic_indicators:
+            atr_data = basic_indicators['ATR']
+            signals['ATR_info'] = {
+                'value': atr_data.get('value'),
+                'volatility_level': atr_data.get('volatility_level'),
+                'period': atr_data.get('period')
+            }
+
         # Fibonacci Analysis Scoring
         if fib_analysis and 'error' not in fib_analysis:
             fib_bullish, fib_bearish, fib_signals = self._score_fibonacci_analysis(fib_analysis)
@@ -875,7 +843,27 @@ class ComprehensiveMultiTimeframeAnalyzer:
             else:
                 bearish_score += 2
                 signals['bearish'].append("Price below moving averages")
-        
+        # ATR scoring
+        if 'ATR' in basic_indicators:
+            atr_data = basic_indicators['ATR']
+            # Simplified example: identify volatility surge as a general "momentum strengthener"
+            if atr_data['volatility_level'] == 'high':
+                # If the current aggregate signal is already bullish or bearish, amplify accordingly
+                if bullish_score > bearish_score:
+                    bullish_score += 1
+                    signals['bullish'].append(f"High volatility (ATR: {atr_data['value']:.2f}) supports bullish scenario")
+                elif bearish_score > bullish_score:
+                    bearish_score += 1
+                    signals['bearish'].append(f"High volatility (ATR: {atr_data['value']:.2f}) supports bearish scenario")
+                else:
+                    # If undecided, nudge towards both (neutral momentum, or alert user)
+                    signals['bullish'].append(f"High volatility (ATR: {atr_data['value']:.2f}) - watch for breakout")
+                    signals['bearish'].append(f"High volatility (ATR: {atr_data['value']:.2f}) - watch for breakdown")
+            else:
+                # Low or average ATR usually means lack of conviction move; no points, but can signal sideways action
+                signals['bullish'].append(f"Low/normal volatility (ATR: {atr_data['value']:.2f})")
+                signals['bearish'].append(f"Low/normal volatility (ATR: {atr_data['value']:.2f})")
+
         # Bollinger Bands scoring
         if 'Bollinger_Bands' in basic_indicators:
             bb_data = basic_indicators['Bollinger_Bands']
@@ -963,6 +951,62 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return bullish_score, bearish_score, signals
     
+    def calculate_comprehensive_indicators(self, df, interval):
+        """Calculate all indicators including basic, Fibonacci, and Elliott Wave"""
+        indicators = {}
+        
+        # Adjust indicator periods based on timeframe
+        if interval in ['1m', '2m', '5m']:
+            # Faster settings for short timeframes
+            macd_fast, macd_slow, macd_signal = 6, 13, 4
+            adx_period = 7
+            rsi_period = 7
+            atr_period = 7 
+        elif interval in ['15m', '30m']:
+            # Medium settings
+            macd_fast, macd_slow, macd_signal = 8, 17, 6
+            adx_period = 10
+            rsi_period = 10
+            atr_period = 10
+        elif interval in ['1h', '90m']:
+            # Standard settings
+            macd_fast, macd_slow, macd_signal = 12, 26, 9
+            adx_period = 14
+            rsi_period = 14
+            atr_period = 14
+        else:
+            # Daily+ settings
+            macd_fast, macd_slow, macd_signal = 12, 26, 9
+            adx_period = 14
+            rsi_period = 14
+            atr_period = 14
+        
+        try:
+            # Basic Technical Indicators
+            indicators['basic'] = self._calculate_basic_indicators(df, macd_fast, macd_slow, macd_signal, adx_period, rsi_period,atr_period=atr_period)
+            
+            # Fibonacci Analysis
+            fib_analysis = self.fib_analyzer.calculate_fibonacci_retracements(df)
+            indicators['fibonacci'] = fib_analysis if fib_analysis else {'error': 'Insufficient data for Fibonacci analysis'}
+            
+            # Elliott Wave Analysis
+            wave_analysis = self.wave_analyzer.detect_wave_structure(df)
+            indicators['elliott_wave'] = wave_analysis
+            
+            # Combined Trading Signals
+            indicators['trading_signals'] = self._generate_comprehensive_signals(
+                indicators['basic'], 
+                indicators['fibonacci'], 
+                indicators['elliott_wave'],
+                interval
+            )
+            
+        except Exception as e:
+            print(f"Error calculating indicators for {interval}: {e}")
+            indicators['error'] = str(e)
+        
+        return indicators
+
     def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='6mo'):
         """Comprehensive analysis across multiple timeframes"""
         if timeframes is None:
@@ -1016,8 +1060,8 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         # Summary table
         print(f"\n📊 TIMEFRAME SUMMARY:")
-        print(f"{'TF':<6} {'Price':<10} {'Bias':<15} {'Strength':<8} {'Conf':<6} {'MACD':<8} {'ADX':<6} {'RSI':<6} {'Fib':<8} {'Wave':<12}")
-        print("-" * 100)
+        print(f"{'TF':<6} {'Price':<10} {'Bias':<15} {'Strength':<8} {'Conf':<6} {'MACD':<8} {'ADX':<6} {'RSI':<6} {'ATR':<8} {'Fib':<8} {'Wave':<12}")
+        print("-" * 108)
         
         for timeframe, data in results.items():
             if 'indicators' in data and 'trading_signals' in data['indicators']:
@@ -1035,11 +1079,12 @@ class ComprehensiveMultiTimeframeAnalyzer:
                 macd_status = "Bull" if basic.get('MACD', {}).get('crossover') == 'bullish' else "Bear" if basic.get('MACD', {}).get('crossover') == 'bearish' else "N/A"
                 adx_val = f"{basic.get('ADX', {}).get('adx', 0):.0f}" if 'ADX' in basic else "N/A"
                 rsi_val = f"{basic.get('RSI', {}).get('value', 0):.0f}" if 'RSI' in basic else "N/A"
+                atr_val = f"{basic.get('ATR', {}).get('value', 0):.2f}" if 'ATR' in basic else "N/A"
                 
                 fib_trend = fib.get('trend_direction', 'N/A')[:7] if 'error' not in fib else "N/A"
                 wave_pattern = f"{wave.get('pattern', 'N/A')[:4]}-{wave.get('confidence', 0):.0f}%" if wave.get('confidence', 0) > 0 else "N/A"
                 
-                print(f"{timeframe:<6} ${current_price:<9.2f} {bias:<15} {strength:<8} {confidence:<6} {macd_status:<8} {adx_val:<6} {rsi_val:<6} {fib_trend:<8} {wave_pattern:<12}")
+                print(f"{timeframe:<6} ${current_price:<9.2f} {bias:<15} {strength:<8} {confidence:<6} {macd_status:<8} {adx_val:<6} {rsi_val:<6} {atr_val:<8} {fib_trend:<8} {wave_pattern:<12}")
         
         # Detailed analysis for each timeframe
         for timeframe, data in results.items():
@@ -1083,6 +1128,12 @@ class ComprehensiveMultiTimeframeAnalyzer:
                 obv = basic['OBV']
                 print(f"  OBV: {obv.get('current', 0):,.0f} | Trend: {obv.get('trend', 'N/A')}")
             
+            if 'ATR' in basic:
+                atr = basic['ATR']
+                print(f"  ATR({atr.get('period', 14)}): {atr.get('value', 0):.2f} | Volatility: {atr.get('volatility_level', 'N/A').title()}")
+                comment = "High volatility – signs of breakout potential" if atr.get('volatility_level') == 'high' else "Normal volatility – range-bound or less risk"
+                print(f"    Comment: {comment}")
+                
             if 'Moving_Averages' in basic:
                 ma = basic['Moving_Averages']
                 print(f"  SMA20: ${ma.get('sma_20', 0):.2f} | SMA50: ${ma.get('sma_50', 0):.2f} | Trend: {ma.get('trend', 'N/A')}")
@@ -1326,6 +1377,239 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return consensus
     
+    def generate_comprehensive_analysis_json(self, symbol, results):
+        """
+        Capture full multi-timeframe analysis in JSON format for agent consumption and training.
+        """
+        output = {
+            "symbol": symbol,
+            "analysis_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "timeframes": {},
+            "consensus": {}
+        }
+
+        # Collect summary and details for each timeframe
+        for timeframe, data in results.items():
+            tf_entry = {
+                "price": data.get("current_price"),
+                "summary": {},
+                "details": {},
+            }
+            # --- Summary extraction
+            indicators = data.get("indicators", {})
+            signals = indicators.get("trading_signals", {})
+            basic = indicators.get("basic", {})
+            fib = indicators.get("fibonacci", {})
+            wave = indicators.get("elliott_wave", {})
+
+            tf_entry["summary"] = {
+                "bias": signals.get("overall_bias"),
+                "strength": signals.get("strength"),
+                "confidence": signals.get("confidence"),
+                "MACD": basic.get("MACD", {}).get("crossover"),
+                "ADX": basic.get("ADX", {}).get("adx"),
+                "RSI": basic.get("RSI", {}).get("value"),
+                "ATR": basic.get("ATR", {}).get("value"),
+                "Fib": fib.get("trend_direction", None) if "error" not in fib else None,
+                "Wave": None
+            }
+            wave_conf = wave.get("confidence", 0)
+            tf_entry["summary"]["Wave"] = f"{wave.get('pattern', '')}-{wave_conf}%" if wave_conf > 0 else None
+
+            # --- Details extraction
+            # Data points and price range
+            df = data.get("data", None)
+            if df is not None and hasattr(df, "shape"):
+                tf_entry["details"]["data_points"] = len(df)
+                tf_entry["details"]["price_range"] = {
+                    "low": float(df["Low"].min()),
+                    "high": float(df["High"].max())
+                }
+            else:
+                tf_entry["details"]["data_points"] = None
+                tf_entry["details"]["price_range"] = None
+
+            # --- Basic Indicators Details
+            tf_entry["details"]["basic"] = {}
+            if "MACD" in basic:
+                macd = basic["MACD"]
+                tf_entry["details"]["basic"]["MACD"] = {
+                    "settings": macd.get("settings"),
+                    "macd": macd.get("macd"),
+                    "signal": macd.get("signal"),
+                    "crossover": macd.get("crossover")
+                }
+            if "ADX" in basic:
+                adx = basic["ADX"]
+                tf_entry["details"]["basic"]["ADX"] = {
+                    "period": adx.get("period"),
+                    "adx": adx.get("adx"),
+                    "+DI": adx.get("di_plus"),
+                    "-DI": adx.get("di_minus"),
+                    "trend_strength": adx.get("trend_strength")
+                }
+            if "RSI" in basic:
+                rsi = basic["RSI"]
+                tf_entry["details"]["basic"]["RSI"] = {
+                    "period": rsi.get("period"),
+                    "value": rsi.get("value"),
+                    "status": "Overbought" if rsi.get("overbought") else "Oversold" if rsi.get("oversold") else "Normal"
+                }
+            if "OBV" in basic:
+                obv = basic["OBV"]
+                tf_entry["details"]["basic"]["OBV"] = {
+                    "current": obv.get("current"),
+                    "trend": obv.get("trend")
+                }
+            if "ATR" in basic:
+                atr = basic["ATR"]
+                tf_entry["details"]["basic"]["ATR"] = {
+                    "period": atr.get("period"),
+                    "value": atr.get("value"),
+                    "volatility_level": atr.get("volatility_level"),
+                    "comment": (
+                        "High volatility – signs of breakout potential" if atr.get("volatility_level") == "high"
+                        else "Normal volatility – range-bound or less risk"
+                    )
+                }
+            if "Moving_Averages" in basic:
+                ma = basic["Moving_Averages"]
+                tf_entry["details"]["basic"]["Moving_Averages"] = {
+                    "sma_20": ma.get("sma_20"),
+                    "sma_50": ma.get("sma_50"),
+                    "trend": ma.get("trend")
+                }
+            if "Bollinger_Bands" in basic:
+                bb = basic["Bollinger_Bands"]
+                if "error" in bb:
+                    tf_entry["details"]["basic"]["Bollinger_Bands"] = {
+                        "error": bb.get("error"),
+                        "available_columns": bb.get("available_columns")
+                    }
+                else:
+                    bb_details = {
+                        "upper": bb.get("upper"),
+                        "middle": bb.get("middle"),
+                        "lower": bb.get("lower")
+                    }
+                    position = bb.get("position", "N/A")
+                    if isinstance(position, dict):
+                        bb_details["position"] = {
+                            "category": position.get("category"),
+                            "percentage": position.get("percentage"),
+                            "distance_from_middle": position.get("distance_from_middle")
+                        }
+                    else:
+                        bb_details["position"] = position
+                    tf_entry["details"]["basic"]["Bollinger_Bands"] = bb_details
+
+            # --- Fibonacci Analysis Details
+            tf_entry["details"]["fibonacci"] = {}
+            if "error" not in fib and fib:
+                tf_entry["details"]["fibonacci"] = {
+                    "trend_direction": fib.get("trend_direction"),
+                    "price_range": {
+                        "low": fib.get("low_price"),
+                        "high": fib.get("high_price")
+                    },
+                    "key_levels": fib.get("key_levels", {}),
+                    "nearest_support": fib.get("nearest_support"),
+                    "nearest_resistance": fib.get("nearest_resistance"),
+                }
+
+            # --- Elliott Wave Details
+            tf_entry["details"]["elliott_wave"] = {}
+            if wave:
+                tf_entry["details"]["elliott_wave"] = {
+                    "pattern": wave.get("pattern"),
+                    "trend": wave.get("trend"),
+                    "confidence": wave.get("confidence"),
+                    "next_expectation": wave.get("next_expectation"),
+                    "wave_points_count": len(wave.get("wave_points")) if wave.get("wave_points") else 0
+                }
+
+            # --- Trading Signals Details
+            tf_entry["details"]["trading_signals"] = {
+                "overall_bias": signals.get("overall_bias"),
+                "strength": signals.get("strength"),
+                "confidence": signals.get("confidence"),
+                "signal_breakdown": signals.get("signal_breakdown"),
+                "entry_signals": signals.get("entry_signals", [])[:3],
+                "exit_signals": signals.get("exit_signals", [])[:3],
+                "risk_reward": signals.get("risk_reward", {}),
+            }
+
+            output["timeframes"][timeframe] = tf_entry
+
+        # --- Consensus Extraction ---
+        all_biases = []
+        all_strengths = []
+        all_confidences = []
+        timeframe_recommendations = {}
+
+        for timeframe, data in results.items():
+            indicators = data.get("indicators", {})
+            signals = indicators.get("trading_signals", {})
+            bias = signals.get("overall_bias")
+            strength = signals.get("strength")
+            confidence = signals.get("confidence")
+
+            if bias:
+                all_biases.append(bias)
+                all_strengths.append(strength)
+                all_confidences.append(confidence)
+                if "bullish" in bias:
+                    timeframe_recommendations[timeframe] = "BUY"
+                elif "bearish" in bias:
+                    timeframe_recommendations[timeframe] = "SELL"
+                else:
+                    timeframe_recommendations[timeframe] = "HOLD"
+
+        buy_count = sum(1 for rec in timeframe_recommendations.values() if rec == "BUY")
+        sell_count = sum(1 for rec in timeframe_recommendations.values() if rec == "SELL")
+        hold_count = sum(1 for rec in timeframe_recommendations.values() if rec == "HOLD")
+        total_timeframes = len(timeframe_recommendations)
+
+        buy_pct = (buy_count / total_timeframes) * 100 if total_timeframes > 0 else 0
+        sell_pct = (sell_count / total_timeframes) * 100 if total_timeframes > 0 else 0
+        hold_pct = (hold_count / total_timeframes) * 100 if total_timeframes > 0 else 0
+
+        if buy_pct >= 60:
+            overall_recommendation = "BUY"
+            consensus_confidence = "High" if buy_pct >= 75 else "Medium"
+        elif sell_pct >= 60:
+            overall_recommendation = "SELL"
+            consensus_confidence = "High" if sell_pct >= 75 else "Medium"
+        else:
+            overall_recommendation = "HOLD"
+            consensus_confidence = "Low"
+
+        high_conf_timeframes = [tf for tf, data in results.items()
+                                if data.get('indicators', {}).get('trading_signals', {}).get('confidence') == 'high']
+
+        avg_strength = float(np.mean(all_strengths)) if all_strengths else 0
+        output["consensus"] = {
+            "overall_recommendation": overall_recommendation,
+            "consensus_confidence": consensus_confidence,
+            "agreement_pct": max(buy_pct, sell_pct, hold_pct),
+            "breakdown": {
+                "buy_count": buy_count,
+                "sell_count": sell_count,
+                "hold_count": hold_count,
+                "buy_pct": buy_pct,
+                "sell_pct": sell_pct,
+                "hold_pct": hold_pct,
+            },
+            "timeframe_recommendations": timeframe_recommendations,
+            "avg_strength": avg_strength,
+            "high_confidence_timeframes": high_conf_timeframes
+        }
+        
+        return output
+
+# Example usage: 
+# analysis_json = self.generate_comprehensive_analysis_json(symbol, results)
+# print(json.dumps(analysis_json, indent=2))
 class MultiTimeframeAnalyzer:
     def __init__(self):
         self.valid_intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo']
@@ -2362,8 +2646,9 @@ def comprehensive_quick_analysis(symbol, timeframes=['5m', '15m', '1h', '1d']):
     results = analyzer.analyze_comprehensive_multi_timeframe(symbol, timeframes)
     
     if results:
-        analyzer.print_comprehensive_analysis(symbol, results)
-    
+        # analyzer.print_comprehensive_analysis(symbol, results)
+        analysis_json = analyzer.generate_comprehensive_analysis_json(symbol, results)
+        print(json.dumps(analysis_json, indent=2))
     return results
 
 def compare_symbols_multi_timeframe(symbols, timeframes=['15m', '1h', '1d']):
@@ -2415,8 +2700,8 @@ def demo_comprehensive_system():
     print("=" * 80)
     
     # Demo with popular stocks
-    symbols = ['SPY']
-    timeframes = ['5m', '15m', '1h','1d','5d']
+    symbols = ['DUOL']
+    timeframes = ['2m', '5m', '15m','30m','1h']
     
     for symbol in symbols:
         print(f"\n{'='*50}")
