@@ -6,3 +6,5 @@ numpy
 matplotlib
 scipy<2.3.0
 pandas-ta==0.4.71b0
+uvicorn[standard]==0.23.2
+fastapi==0.103.1
