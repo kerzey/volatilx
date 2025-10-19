@@ -103,7 +103,7 @@ from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 #Version with Fibonacci analysis and Multiple Symbols
 #######################################################################################################################################
 class MultiSymbolDayTraderAgent:
-    def __init__(self, symbols, timeframes=['5m', '15m', '1h']):
+    def __init__(self, symbols, timeframes=['2m','5m', '15m','30m','1h','1d', '5d', '1wk']):
         self.symbols = symbols if isinstance(symbols, list) else [symbols]
         self.timeframes = timeframes
         self.analyzer = ComprehensiveMultiTimeframeAnalyzer()
