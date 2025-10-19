@@ -13,7 +13,7 @@
         table tbody tr:hover { background-color: #f0f8ff; }
     </style>
     <script>
-      function renderResult(data) {
+        function renderResult(data) {
     const resultDiv = document.getElementById('result');
     resultDiv.innerHTML = '';
     if (!data.success) {
@@ -24,69 +24,57 @@
     for (let symbol in result) {
         const stock = result[symbol];
         let sections = [];
+        let block = {}; // Track current block of parsed details
 
         stock.analysis.forEach(line => {
-            console.log('Processing line:', line);
-            console.log('Received data:', data);
-            // Clean up separators and empty lines
-            if (line.startsWith('=') || line.trim() === '' || line.startsWith('---')) {
-                return;
-            }
+            // Skip separators or empty lines
+            if (line.startsWith('=') || line.trim() === '' || line.startsWith('---')) return;
 
-            // Identify timeframe info (e.g., "5m: Bias: ...")
+            // Timeframe info (e.g., "90m: Bias: ...")
             if (line.match(/^\s*\d+[mh]:/)) {
-                const match = line.match(/(\d+[mh]): Bias: ([^,]+), Confidence: ([^\s]+)/);
+                const match = line.match(/(\d+[mh]): Bias: ([^,]+), Confidence: ([^,\s]+)/);
                 if (match) {
-                    timeframe = match[1];
-                    bias = match[2];
-                    confidence = match[3];
+                    block.timeframe = match[1];
+                    block.bias = match[2];
+                    block.confidence = match[3];
                 } else {
-                    console.warn(`Failed to parse bias/confidence for line: ${line}`);
-                    bias = 'N/A';
-                    confidence = 'N/A';
+                    block.timeframe = block.bias = block.confidence = 'N/A';
                 }
                 return;
             }
 
-            // Identify price/support/resistance
+            // Price, support, resistance
             if (line.match(/Price:/)) {
-                const match = line.match(/Price: ([^,]+), Support: ([^,]+), Resistance: (.+)/);
+                const match = line.match(/Price: ([^,]+), Support: ([^,]+), Resistance: ([^,]+)/);
                 if (match) {
-                    price = match[1];
-                    support = match[2];
-                    resistance = match[3];
+                    block.price = match[1];
+                    block.support = match[2];
+                    block.resistance = match[3];
                 } else {
-                    console.warn(`Failed to parse price/support/resistance for line: ${line}`);
-                    price = 'N/A';
-                    support = 'N/A';
-                    resistance = 'N/A';
+                    block.price = block.support = block.resistance = 'N/A';
                 }
                 return;
             }
 
-            // Identify decision
+            // Decision
             if (line.match(/Decision:/)) {
-                decision = line.split('Decision: ')[1];
-                sections.push({
-                    timeframe: timeframe || 'N/A',
-                    bias: bias || 'N/A',
-                    confidence: confidence || 'N/A',
-                    price: price || 'N/A',
-                    support: support || 'N/A',
-                    resistance: resistance || 'N/A',
-                    decision: decision || 'N/A'
-                });
-                // Reset for next block
-                decision = '';
-                bias = '';
-                confidence = '';
-                price = '';
-                support = '';
-                resistance = '';
+                block.decision = line.split('Decision: ')[1];
+                // If any key is missing, default to 'N/A'
+                const sec = {
+                    timeframe: block.timeframe || 'N/A',
+                    bias: block.bias || 'N/A',
+                    confidence: block.confidence || 'N/A',
+                    price: block.price || 'N/A',
+                    support: block.support || 'N/A',
+                    resistance: block.resistance || 'N/A',
+                    decision: block.decision || 'N/A'
+                };
+                sections.push(sec);
+                // Reset block for next
+                block = {};
             }
         });
 
-        // Render the parsed sections in a table
         let tableHtml = `
             <table style="width:100%;margin-top:10px;border-collapse:collapse;">
                 <thead><tr>
@@ -107,18 +95,17 @@
             else if (sec.decision.startsWith('SELL')) color = "red";
             else if (sec.decision.startsWith('HOLD')) color = "orange";
             tableHtml += `
-            <tr>
-                <td>${sec.timeframe}</td>
-                <td>${sec.bias}</td>
-                <td>${sec.confidence}</td>
-                <td>${Number(sec.price).toFixed(2)}</td>
-                <td>${Number(sec.support).toFixed(2)}</td>
-                <td>${Number(sec.resistance).toFixed(2)}</td>
-                <td style="font-weight:bold;color:${color}">${sec.decision}</td>
-            </tr>
+                <tr>
+                    <td>${sec.timeframe}</td>
+                    <td>${sec.bias}</td>
+                    <td>${sec.confidence}</td>
+                    <td>${isNaN(sec.price) ? sec.price : Number(sec.price).toFixed(2)}</td>
+                    <td>${isNaN(sec.support) ? sec.support : Number(sec.support).toFixed(2)}</td>
+                    <td>${isNaN(sec.resistance) ? sec.resistance : Number(sec.resistance).toFixed(2)}</td>
+                    <td style="font-weight:bold;color:${color}">${sec.decision}</td>
+                </tr>
             `;
         });
-
         tableHtml += '</tbody></table>';
 
         resultDiv.innerHTML += `

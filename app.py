@@ -94,7 +94,6 @@ async def trade(request: Request):
             'success': True,
             'result': result
         }
-        print("Response:", json.dumps(response, indent=4))
         return JSONResponse(content=response, status_code=status.HTTP_200_OK)
     except Exception as e:
         response = {
