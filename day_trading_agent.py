@@ -125,7 +125,7 @@ class MultiSymbolDayTraderAgent:
             
             results = self.analyzer.analyze_comprehensive_multi_timeframe(symbol, self.timeframes)
             decision_results = self.make_decision(symbol, results)
-            print("Results ", results)  # Print the raw analysis results
+            # print("Results ", results)  # Print the raw analysis results
             analysis_output["analysis"].extend(decision_results)  # Append decision results
         except Exception as e:
             analysis_output["status"] = "error"
@@ -172,9 +172,9 @@ class MultiSymbolDayTraderAgent:
                     decision_output.append(f"  Decision: SELL {symbol} (near Fibonacci resistance)")
                 else:
                     decision_output.append(f"  Decision: HOLD {symbol}")
-                print("Decision output ", decision_output)
             else:
                 decision_output.append(f"  {timeframe}: indicators or trading_signals missing")
+        # print("Decision output ", decision_output)
         return decision_output
 
     def run_sequential(self):

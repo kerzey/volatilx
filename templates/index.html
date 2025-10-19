@@ -27,53 +27,51 @@
         let block = {}; // Track current block of parsed details
 
         stock.analysis.forEach(line => {
-            // Skip separators or empty lines
-            if (line.startsWith('=') || line.trim() === '' || line.startsWith('---')) return;
+    // Skip separators or empty lines
+    if (line.startsWith('=') || line.trim() === '' || line.startsWith('---')) return;
 
-            // Timeframe info (e.g., "90m: Bias: ...")
-            if (line.match(/^\s*\d+[mh]:/)) {
-                const match = line.match(/(\d+[mh]): Bias: ([^,]+), Confidence: ([^,\s]+)/);
-                if (match) {
-                    block.timeframe = match[1];
-                    block.bias = match[2];
-                    block.confidence = match[3];
-                } else {
-                    block.timeframe = block.bias = block.confidence = 'N/A';
-                }
-                return;
-            }
+    // Improved: Match ALL timeframes, not just m/h
+    if (line.match(/^\s*\d+\s*[mhdwk]+:/)) {
+        const match = line.match(/^\s*(\d+\s*[mhdwk]+):\s*Bias:\s*([^,]+),\s*Confidence:\s*([^\s,]+)/);
+        if (match) {
+            block.timeframe = match[1].trim();
+            block.bias = match[2].trim();
+            block.confidence = match[3].trim();
+        } else {
+            block.timeframe = block.bias = block.confidence = 'N/A';
+        }
+        return;
+    }
 
-            // Price, support, resistance
-            if (line.match(/Price:/)) {
-                const match = line.match(/Price: ([^,]+), Support: ([^,]+), Resistance: ([^,]+)/);
-                if (match) {
-                    block.price = match[1];
-                    block.support = match[2];
-                    block.resistance = match[3];
-                } else {
-                    block.price = block.support = block.resistance = 'N/A';
-                }
-                return;
-            }
+    // Price, support, resistance
+    if (line.match(/Price:/)) {
+        const match = line.match(/Price:\s*([^,]+),\s*Support:\s*([^,]+),\s*Resistance:\s*([^,]+)/);
+        if (match) {
+            block.price = match[1];
+            block.support = match[2];
+            block.resistance = match[3];
+        } else {
+            block.price = block.support = block.resistance = 'N/A';
+        }
+        return;
+    }
 
-            // Decision
-            if (line.match(/Decision:/)) {
-                block.decision = line.split('Decision: ')[1];
-                // If any key is missing, default to 'N/A'
-                const sec = {
-                    timeframe: block.timeframe || 'N/A',
-                    bias: block.bias || 'N/A',
-                    confidence: block.confidence || 'N/A',
-                    price: block.price || 'N/A',
-                    support: block.support || 'N/A',
-                    resistance: block.resistance || 'N/A',
-                    decision: block.decision || 'N/A'
-                };
-                sections.push(sec);
-                // Reset block for next
-                block = {};
-            }
-        });
+    if (line.match(/Decision:/)) {
+        block.decision = line.split('Decision: ')[1];
+        // Push only if there's any decision; guarantee keys
+        const sec = {
+            timeframe: block.timeframe || 'N/A',
+            bias: block.bias || 'N/A',
+            confidence: block.confidence || 'N/A',
+            price: block.price || 'N/A',
+            support: block.support || 'N/A',
+            resistance: block.resistance || 'N/A',
+            decision: block.decision || 'N/A'
+        };
+        sections.push(sec);
+        block = {};
+    }
+});
 
         let tableHtml = `
             <table style="width:100%;margin-top:10px;border-collapse:collapse;">
