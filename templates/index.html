@@ -27,6 +27,7 @@
 
         stock.analysis.forEach(line => {
             console.log('Processing line:', line);
+            console.log('Received data:', data);
             // Clean up separators and empty lines
             if (line.startsWith('=') || line.trim() === '' || line.startsWith('---')) {
                 return;

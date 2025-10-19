@@ -2415,7 +2415,7 @@ def demo_comprehensive_system():
     print("=" * 80)
     
     # Demo with popular stocks
-    symbols = ['SPY']
+    symbols = ['ASML']
     timeframes = ['2m','5m', '15m','30m','1h','90m','1d', '5d', '1wk']
     
     for symbol in symbols:

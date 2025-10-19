@@ -94,6 +94,7 @@ async def trade(request: Request):
             'success': True,
             'result': result
         }
+        print("Response:", json.dumps(response, indent=4))
         return JSONResponse(content=response, status_code=status.HTTP_200_OK)
     except Exception as e:
         response = {
@@ -102,12 +103,12 @@ async def trade(request: Request):
         }
         return JSONResponse(content=response, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@app.post("/indicators")
-async def fetch_indicators(request: Request):
-    try:
-        data = await request.json()
-        stock_symbol = data.get('stock_symbol')
-        indicators = indicator_fetcher.fetch(stock_symbol)
-        return JSONResponse(content={'success': True, 'indicators': indicators})
-    except Exception as e:
-        return JSONResponse(content={'success': False, 'error': str(e)}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# @app.post("/indicators")
+# async def fetch_indicators(request: Request):
+#     try:
+#         data = await request.json()
+#         stock_symbol = data.get('stock_symbol')
+#         indicators = indicator_fetcher.fetch(stock_symbol)
+#         return JSONResponse(content={'success': True, 'indicators': indicators})
+#     except Exception as e:
+#         return JSONResponse(content={'success': False, 'error': str(e)}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -103,7 +103,7 @@ from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 #Version with Fibonacci analysis and Multiple Symbols
 #######################################################################################################################################
 class MultiSymbolDayTraderAgent:
-    def __init__(self, symbols, timeframes=['2m','5m', '15m','30m','1h','90m','1d', '5d', '1wk']):
+    def __init__(self, symbols, timeframes=['2m','5m','15m','30m','1h','90m','1d','5d','1wk']):
         self.symbols = symbols if isinstance(symbols, list) else [symbols]
         self.timeframes = timeframes
         self.analyzer = ComprehensiveMultiTimeframeAnalyzer()
@@ -125,10 +125,12 @@ class MultiSymbolDayTraderAgent:
             
             results = self.analyzer.analyze_comprehensive_multi_timeframe(symbol, self.timeframes)
             decision_results = self.make_decision(symbol, results)
+            print("Results ", results)  # Print the raw analysis results
             analysis_output["analysis"].extend(decision_results)  # Append decision results
         except Exception as e:
             analysis_output["status"] = "error"
             analysis_output["error"] = str(e)
+        print("Analysis output ", analysis_output)  # Print the final analysis output
         return analysis_output
     
     def make_decision(self, symbol, analysis_results):
@@ -136,14 +138,25 @@ class MultiSymbolDayTraderAgent:
         decision_output = [f"\n--- ANALYSIS FOR {symbol} ---"]
         
         for timeframe, data in analysis_results.items():
-            if 'indicators' in data and 'trading_signals' in data['indicators']:
-                signals = data['indicators']['trading_signals']
-                fib_analysis = data['indicators'].get('fibonacci', {})
-                bias = signals['overall_bias']
-                confidence = signals['confidence']
-                current_price = data['current_price']
-                fib_support = fib_analysis.get('nearest_support', {}).get('price')
-                fib_resistance = fib_analysis.get('nearest_resistance', {}).get('price')
+            # Defensive: indicators may be missing or None
+            indicators = data.get('indicators') or {}
+            signals = indicators.get('trading_signals')
+            fib_analysis = indicators.get('fibonacci') or {}
+
+            if signals is not None:
+                bias = signals.get('overall_bias')
+                confidence = signals.get('confidence')
+                current_price = data.get('current_price')
+
+                fib_support = None
+                fib_resistance = None
+                if isinstance(fib_analysis, dict):
+                    nearest_support = fib_analysis.get('nearest_support')
+                    nearest_resistance = fib_analysis.get('nearest_resistance')
+                    if isinstance(nearest_support, dict):
+                        fib_support = nearest_support.get('price')
+                    if isinstance(nearest_resistance, dict):
+                        fib_resistance = nearest_resistance.get('price')
 
                 decision_output.append(f"  {timeframe}: Bias: {bias}, Confidence: {confidence}")
                 decision_output.append(f"  Price: {current_price}, Support: {fib_support}, Resistance: {fib_resistance}")
@@ -153,14 +166,17 @@ class MultiSymbolDayTraderAgent:
                     decision_output.append(f"  Decision: BUY {symbol}")
                 elif bias == 'strong_bearish' and confidence == 'high':
                     decision_output.append(f"  Decision: SELL {symbol}")
-                elif fib_support and current_price <= fib_support:
+                elif fib_support is not None and current_price <= fib_support:
                     decision_output.append(f"  Decision: BUY {symbol} (near Fibonacci support)")
-                elif fib_resistance and current_price >= fib_resistance:
+                elif fib_resistance is not None and current_price >= fib_resistance:
                     decision_output.append(f"  Decision: SELL {symbol} (near Fibonacci resistance)")
                 else:
                     decision_output.append(f"  Decision: HOLD {symbol}")
+                print("Decision output ", decision_output)
+            else:
+                decision_output.append(f"  {timeframe}: indicators or trading_signals missing")
         return decision_output
-    
+
     def run_sequential(self):
         """Run analysis for all symbols one time and return results."""
         results = {}  # Dictionary to store results for each symbol
@@ -257,7 +273,7 @@ class MultiSymbolDayTraderAgent:
         self.running = False
 if __name__ == "__main__":
     # Multiple symbols with parallel processing
-    symbols = ['DUOL', 'SPY', 'TQQQ', 'AMD', 'ASML','ORCL']
+    symbols = ['ASML']
     multi_trader = MultiSymbolDayTraderAgent(symbols=symbols)
     
     # Run in parallel (faster but uses more resources)
