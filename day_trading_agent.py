@@ -125,7 +125,7 @@ class MultiSymbolDayTraderAgent:
             
             results = self.analyzer.analyze_comprehensive_multi_timeframe(symbol, self.timeframes)
             decision_results = self.make_decision(symbol, results)
-            # print("Results ", results)  # Print the raw analysis results
+            print("Results ", results)  # Print the raw analysis results
             analysis_output["analysis"].extend(decision_results)  # Append decision results
         except Exception as e:
             analysis_output["status"] = "error"

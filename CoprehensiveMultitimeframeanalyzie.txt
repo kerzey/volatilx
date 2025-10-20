@@ -1,0 +1,917 @@
+class ComprehensiveMultiTimeframeAnalyzer:
+    def __init__(self):
+        self.fib_analyzer = AdvancedFibonacciAnalyzer()
+        self.wave_analyzer = ElliottWaveAnalyzer()
+        
+        self.valid_intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo']
+        self.interval_limits = {
+            '1m': {'max_period': '7d', 'max_days': 7},
+            '2m': {'max_period': '60d', 'max_days': 60},
+            '5m': {'max_period': '60d', 'max_days': 60},
+            '15m': {'max_period': '60d', 'max_days': 60},
+            '30m': {'max_period': '60d', 'max_days': 60},
+            '60m': {'max_period': '730d', 'max_days': 730},
+            '90m': {'max_period': '60d', 'max_days': 60},
+            '1h': {'max_period': '730d', 'max_days': 730},
+            '1d': {'max_period': 'max', 'max_days': 'unlimited'},
+            '5d': {'max_period': 'max', 'max_days': 'unlimited'},
+            '1wk': {'max_period': 'max', 'max_days': 'unlimited'},
+            '1mo': {'max_period': 'max', 'max_days': 'unlimited'},
+            '3mo': {'max_period': 'max', 'max_days': 'unlimited'}
+        }
+    
+    def get_stock_data(self, symbol, interval='1d', period='6mo'):
+        """Fetch stock data with specified interval"""
+        if interval not in self.valid_intervals:
+            raise ValueError(f"Invalid interval. Must be one of: {self.valid_intervals}")
+        
+        # Check period limits for the interval
+        max_period = self.interval_limits[interval]['max_period']
+        if max_period != 'max' and self._period_exceeds_limit(period, max_period):
+            print(f"Warning: Period '{period}' may exceed limit for interval '{interval}'. Using '{max_period}' instead.")
+            period = max_period
+        
+        try:
+            ticker = yf.Ticker(symbol)
+            df = ticker.history(period=period, interval=interval)
+            
+            if df.empty:
+                print(f"No data returned for {symbol} with interval {interval} and period {period}")
+                return None
+            
+            print(f"✅ Fetched {len(df)} {interval} candles for {symbol} over {period}")
+            return df
+            
+        except Exception as e:
+            print(f"Error fetching data for {symbol}: {e}")
+            return None
+    
+    def _period_exceeds_limit(self, period, max_period):
+        """Check if requested period exceeds the limit for the interval"""
+        period_days = self._period_to_days(period)
+        max_days = self._period_to_days(max_period)
+        
+        if period_days and max_days:
+            return period_days > max_days
+        return False
+    
+    def _period_to_days(self, period):
+        """Convert period string to approximate days"""
+        if period == 'max':
+            return float('inf')
+        
+        period_map = {
+            '1d': 1, '2d': 2, '5d': 5, '7d': 7, '10d': 10,
+            '1mo': 30, '2mo': 60, '3mo': 90, '6mo': 180,
+            '1y': 365, '2y': 730, '5y': 1825, '10y': 3650,
+            '60d': 60, '730d': 730
+        }
+        
+        return period_map.get(period, None)
+    
+    def calculate_comprehensive_indicators(self, df, interval):
+        """Calculate all indicators including basic, Fibonacci, and Elliott Wave"""
+        indicators = {}
+        
+        # Adjust indicator periods based on timeframe
+        if interval in ['1m', '2m', '5m']:
+            # Faster settings for short timeframes
+            macd_fast, macd_slow, macd_signal = 6, 13, 4
+            adx_period = 7
+            rsi_period = 7
+        elif interval in ['15m', '30m']:
+            # Medium settings
+            macd_fast, macd_slow, macd_signal = 8, 17, 6
+            adx_period = 10
+            rsi_period = 10
+        elif interval in ['1h', '90m']:
+            # Standard settings
+            macd_fast, macd_slow, macd_signal = 12, 26, 9
+            adx_period = 14
+            rsi_period = 14
+        else:
+            # Daily+ settings
+            macd_fast, macd_slow, macd_signal = 12, 26, 9
+            adx_period = 14
+            rsi_period = 14
+        
+        try:
+            # Basic Technical Indicators
+            indicators['basic'] = self._calculate_basic_indicators(df, macd_fast, macd_slow, macd_signal, adx_period, rsi_period)
+            
+            # Fibonacci Analysis
+            fib_analysis = self.fib_analyzer.calculate_fibonacci_retracements(df)
+            indicators['fibonacci'] = fib_analysis if fib_analysis else {'error': 'Insufficient data for Fibonacci analysis'}
+            
+            # Elliott Wave Analysis
+            wave_analysis = self.wave_analyzer.detect_wave_structure(df)
+            indicators['elliott_wave'] = wave_analysis
+            
+            # Combined Trading Signals
+            indicators['trading_signals'] = self._generate_comprehensive_signals(
+                indicators['basic'], 
+                indicators['fibonacci'], 
+                indicators['elliott_wave'],
+                interval
+            )
+            
+        except Exception as e:
+            print(f"Error calculating indicators for {interval}: {e}")
+            indicators['error'] = str(e)
+        
+        return indicators
+    
+    def _calculate_basic_indicators(self, df, macd_fast, macd_slow, macd_signal, adx_period, rsi_period):
+        """Calculate basic technical indicators with improved error handling"""
+        basic_indicators = {}
+        
+        try:
+            # MACD
+            macd_data = ta.macd(df['Close'], fast=macd_fast, slow=macd_slow, signal=macd_signal)
+            if macd_data is not None and not macd_data.empty:
+                macd_col = f'MACD_{macd_fast}_{macd_slow}_{macd_signal}'
+                signal_col = f'MACDs_{macd_fast}_{macd_slow}_{macd_signal}'
+                hist_col = f'MACDh_{macd_fast}_{macd_slow}_{macd_signal}'
+                
+                basic_indicators['MACD'] = {
+                    'macd': macd_data[macd_col].iloc[-1] if macd_col in macd_data.columns else None,
+                    'signal': macd_data[signal_col].iloc[-1] if signal_col in macd_data.columns else None,
+                    'histogram': macd_data[hist_col].iloc[-1] if hist_col in macd_data.columns else None,
+                    'settings': f"({macd_fast},{macd_slow},{macd_signal})"
+                }
+                
+                if basic_indicators['MACD']['macd'] and basic_indicators['MACD']['signal']:
+                    basic_indicators['MACD']['crossover'] = 'bullish' if basic_indicators['MACD']['macd'] > basic_indicators['MACD']['signal'] else 'bearish'
+            
+            # ADX
+            adx_data = ta.adx(df['High'], df['Low'], df['Close'], length=adx_period)
+            if adx_data is not None and not adx_data.empty:
+                basic_indicators['ADX'] = {
+                    'adx': adx_data[f'ADX_{adx_period}'].iloc[-1],
+                    'di_plus': adx_data[f'DMP_{adx_period}'].iloc[-1],
+                    'di_minus': adx_data[f'DMN_{adx_period}'].iloc[-1],
+                    'period': adx_period,
+                    'trend_strength': 'strong' if adx_data[f'ADX_{adx_period}'].iloc[-1] > 25 else 'weak'
+                }
+            
+            # RSI
+            rsi_data = ta.rsi(df['Close'], length=rsi_period)
+            if rsi_data is not None:
+                basic_indicators['RSI'] = {
+                    'value': rsi_data.iloc[-1],
+                    'period': rsi_period,
+                    'overbought': rsi_data.iloc[-1] > 70,
+                    'oversold': rsi_data.iloc[-1] < 30
+                }
+            
+            # OBV
+            obv_data = ta.obv(df['Close'], df['Volume'])
+            if obv_data is not None and len(obv_data) > 1:
+                basic_indicators['OBV'] = {
+                    'current': obv_data.iloc[-1],
+                    'previous': obv_data.iloc[-2],
+                    'trend': 'bullish' if obv_data.iloc[-1] > obv_data.iloc[-2] else 'bearish'
+                }
+            
+            # Moving Averages
+            sma_20 = ta.sma(df['Close'], length=min(20, len(df)//2))
+            sma_50 = ta.sma(df['Close'], length=min(50, len(df)//2))
+            
+            if sma_20 is not None and sma_50 is not None and len(sma_20) > 0 and len(sma_50) > 0:
+                basic_indicators['Moving_Averages'] = {
+                    'sma_20': sma_20.iloc[-1],
+                    'sma_50': sma_50.iloc[-1],
+                    'trend': 'bullish' if sma_20.iloc[-1] > sma_50.iloc[-1] else 'bearish'
+                }
+            
+            # Bollinger Bands - Fixed with better error handling
+            try:
+                bb_data = ta.bbands(df['Close'], length=20, std=2)
+                if bb_data is not None and not bb_data.empty:
+                    # Check for different possible column naming conventions
+                    upper_col = None
+                    middle_col = None
+                    lower_col = None
+                    
+                    # Common column name patterns for Bollinger Bands
+                    possible_upper = ['BBU_20_2.0', 'BBU_20_2', 'upper', 'Upper', 'BB_upper']
+                    possible_middle = ['BBM_20_2.0', 'BBM_20_2', 'middle', 'Middle', 'BB_middle']
+                    possible_lower = ['BBL_20_2.0', 'BBL_20_2', 'lower', 'Lower', 'BB_lower']
+                    
+                    # Find the correct column names
+                    for col in bb_data.columns:
+                        if any(pattern in col for pattern in possible_upper):
+                            upper_col = col
+                        elif any(pattern in col for pattern in possible_middle):
+                            middle_col = col
+                        elif any(pattern in col for pattern in possible_lower):
+                            lower_col = col
+                    
+                    # If standard naming doesn't work, try to identify by position
+                    if not all([upper_col, middle_col, lower_col]) and len(bb_data.columns) >= 3:
+                        cols = list(bb_data.columns)
+                        # Typically: lower, middle, upper or upper, middle, lower
+                        if len(cols) == 3:
+                            # Sort by last value to identify upper/lower
+                            last_values = [(col, bb_data[col].iloc[-1]) for col in cols]
+                            last_values.sort(key=lambda x: x[1])
+                            lower_col = last_values[0][0]
+                            middle_col = last_values[1][0]
+                            upper_col = last_values[2][0]
+                    
+                    if all([upper_col, middle_col, lower_col]):
+                        current_price = df['Close'].iloc[-1]
+                        upper_val = bb_data[upper_col].iloc[-1]
+                        middle_val = bb_data[middle_col].iloc[-1]
+                        lower_val = bb_data[lower_col].iloc[-1]
+                        
+                        basic_indicators['Bollinger_Bands'] = {
+                            'upper': upper_val,
+                            'middle': middle_val,
+                            'lower': lower_val,
+                            'position': self._get_bb_position_safe(current_price, upper_val, middle_val, lower_val),
+                            'columns_used': {
+                                'upper': upper_col,
+                                'middle': middle_col,
+                                'lower': lower_col
+                            }
+                        }
+                    else:
+                        print(f"Warning: Could not identify Bollinger Bands columns. Available columns: {list(bb_data.columns)}")
+                        basic_indicators['Bollinger_Bands'] = {
+                            'error': 'Could not identify column names',
+                            'available_columns': list(bb_data.columns)
+                        }
+                else:
+                    print("Warning: Bollinger Bands calculation returned empty data")
+                    
+            except Exception as bb_error:
+                print(f"Bollinger Bands calculation error: {bb_error}")
+                basic_indicators['Bollinger_Bands'] = {'error': str(bb_error)}
+            
+        except Exception as e:
+            print(f"Error in basic indicators calculation: {e}")
+            basic_indicators['error'] = str(e)
+        
+        return basic_indicators
+    
+    def _get_bb_position_safe(self, current_price, upper, middle, lower):
+        """Safe version of Bollinger Bands position calculation"""
+        try:
+            # Calculate percentage position within bands
+            if upper != lower and upper is not None and lower is not None:
+                bb_percentage = (current_price - lower) / (upper - lower) * 100
+            else:
+                bb_percentage = 50  # Default to middle if bands are flat or invalid
+            
+            # Determine position category
+            if current_price > upper:
+                category = 'above_upper'
+            elif current_price > middle:
+                category = 'upper_half'
+            elif current_price > lower:
+                category = 'lower_half'
+            else:
+                category = 'below_lower'
+            
+            position_data = {
+                'category': category,
+                'percentage': round(bb_percentage, 2),
+                'distance_from_middle': round(abs(current_price - middle), 4) if middle is not None else None
+            }
+            
+            return position_data
+            
+        except Exception as e:
+            print(f"Error calculating BB position: {e}")
+            return {
+                'category': 'error', 
+                'percentage': None, 
+                'distance_from_middle': None,
+                'error': str(e)
+            }
+        
+    def _get_bb_position(self, current_price, bb_row):
+        """Enhanced version with better error handling for Bollinger Bands position"""
+        try:
+            # Handle both dictionary and Series input
+            if isinstance(bb_row, dict):
+                upper = bb_row.get('upper')
+                middle = bb_row.get('middle') 
+                lower = bb_row.get('lower')
+            else:
+                # Try different column name patterns
+                upper = None
+                middle = None
+                lower = None
+                
+                # Check for standard column names
+                for col in bb_row.index:
+                    if 'BBU' in col or 'upper' in col.lower():
+                        upper = bb_row[col]
+                    elif 'BBM' in col or 'middle' in col.lower():
+                        middle = bb_row[col]
+                    elif 'BBL' in col or 'lower' in col.lower():
+                        lower = bb_row[col]
+            
+            # Validate values
+            if any(val is None or pd.isna(val) for val in [upper, middle, lower]):
+                return {
+                    'category': 'insufficient_data',
+                    'percentage': None,
+                    'distance_from_middle': None
+                }
+            
+            # Calculate percentage position within bands
+            if upper != lower:  # Avoid division by zero
+                bb_percentage = (current_price - lower) / (upper - lower) * 100
+            else:
+                bb_percentage = 50  # Default to middle if bands are flat
+            
+            # Determine category
+            category = self._get_position_category(current_price, upper, middle, lower)
+            
+            position_data = {
+                'category': category,
+                'percentage': round(bb_percentage, 2),
+                'distance_from_middle': round(abs(current_price - middle), 4)
+            }
+            
+            return position_data
+            
+        except Exception as e:
+            print(f"Error calculating Bollinger Bands position: {e}")
+            return {
+                'category': 'error', 
+                'percentage': None, 
+                'distance_from_middle': None,
+                'error_details': str(e)
+            }
+    
+    def _generate_comprehensive_signals(self, basic_indicators, fib_analysis, wave_analysis, interval):
+        """Generate comprehensive trading signals combining all analyses"""
+        signals = {
+            'timeframe': interval,
+            'overall_bias': 'neutral',
+            'strength': 0,
+            'confidence': 'low',
+            'entry_signals': [],
+            'exit_signals': [],
+            'key_levels': {},
+            'risk_reward': {},
+            'signal_breakdown': {
+                'basic_score': 0,
+                'fibonacci_score': 0,
+                'elliott_wave_score': 0,
+                'total_score': 0
+            }
+        }
+        
+        # Scoring system
+        bullish_score = 0
+        bearish_score = 0
+        
+        # Basic Indicators Scoring
+        basic_bullish, basic_bearish, basic_signals = self._score_basic_indicators(basic_indicators)
+        bullish_score += basic_bullish
+        bearish_score += basic_bearish
+        signals['entry_signals'].extend(basic_signals['bullish'])
+        signals['exit_signals'].extend(basic_signals['bearish'])
+        signals['signal_breakdown']['basic_score'] = basic_bullish - basic_bearish
+        
+        # Fibonacci Analysis Scoring
+        if fib_analysis and 'error' not in fib_analysis:
+            fib_bullish, fib_bearish, fib_signals = self._score_fibonacci_analysis(fib_analysis)
+            bullish_score += fib_bullish
+            bearish_score += fib_bearish
+            signals['entry_signals'].extend(fib_signals['bullish'])
+            signals['exit_signals'].extend(fib_signals['bearish'])
+            signals['signal_breakdown']['fibonacci_score'] = fib_bullish - fib_bearish
+            
+            # Set key Fibonacci levels
+            signals['key_levels'].update({
+                'fib_support': fib_analysis['nearest_support']['price'] if fib_analysis['nearest_support'] else None,
+                'fib_resistance': fib_analysis['nearest_resistance']['price'] if fib_analysis['nearest_resistance'] else None,
+                'fib_382': fib_analysis['key_levels']['38.2%'],
+                'fib_618': fib_analysis['key_levels']['61.8%']
+            })
+        
+        # Elliott Wave Analysis Scoring
+        if wave_analysis and wave_analysis.get('confidence', 0) > 0:
+            wave_bullish, wave_bearish, wave_signals = self._score_elliott_wave_analysis(wave_analysis)
+            bullish_score += wave_bullish
+            bearish_score += wave_bearish
+            signals['entry_signals'].extend(wave_signals['bullish'])
+            signals['exit_signals'].extend(wave_signals['bearish'])
+            signals['signal_breakdown']['elliott_wave_score'] = wave_bullish - wave_bearish
+        # Calculate overall bias and strength
+        total_score = bullish_score + bearish_score
+        signals['signal_breakdown']['total_score'] = bullish_score - bearish_score
+        
+        if total_score > 0:
+            bullish_pct = (bullish_score / total_score) * 100
+            
+            if bullish_pct >= 75:
+                signals['overall_bias'] = 'strong_bullish'
+                signals['strength'] = bullish_pct
+                signals['confidence'] = 'high'
+            elif bullish_pct >= 60:
+                signals['overall_bias'] = 'bullish'
+                signals['strength'] = bullish_pct
+                signals['confidence'] = 'medium'
+            elif bullish_pct >= 40:
+                signals['overall_bias'] = 'neutral'
+                signals['strength'] = 50
+                signals['confidence'] = 'low'
+            elif bullish_pct >= 25:
+                signals['overall_bias'] = 'bearish'
+                signals['strength'] = 100 - bullish_pct
+                signals['confidence'] = 'medium'
+            else:
+                signals['overall_bias'] = 'strong_bearish'
+                signals['strength'] = 100 - bullish_pct
+                signals['confidence'] = 'high'
+        
+        # Calculate risk/reward if we have key levels
+        if signals['key_levels'].get('fib_support') and signals['key_levels'].get('fib_resistance'):
+            current_price = fib_analysis['current_price']
+            support = signals['key_levels']['fib_support']
+            resistance = signals['key_levels']['fib_resistance']
+            
+            risk = abs(current_price - support)
+            reward = abs(resistance - current_price)
+            
+            if risk > 0:
+                signals['risk_reward'] = {
+                    'ratio': reward / risk,
+                    'risk_amount': risk,
+                    'reward_potential': reward,
+                    'stop_loss': support,
+                    'take_profit': resistance
+                }
+        
+        return signals
+    
+    def _score_basic_indicators(self, basic_indicators):
+        """Score basic technical indicators"""
+        bullish_score = 0
+        bearish_score = 0
+        signals = {'bullish': [], 'bearish': []}
+        
+        # MACD scoring
+        if 'MACD' in basic_indicators and basic_indicators['MACD'].get('crossover'):
+            if basic_indicators['MACD']['crossover'] == 'bullish':
+                bullish_score += 3
+                signals['bullish'].append(f"MACD bullish crossover {basic_indicators['MACD']['settings']}")
+            else:
+                bearish_score += 3
+                signals['bearish'].append(f"MACD bearish crossover {basic_indicators['MACD']['settings']}")
+        
+        # ADX scoring
+        if 'ADX' in basic_indicators:
+            adx_data = basic_indicators['ADX']
+            if adx_data['trend_strength'] == 'strong':
+                if adx_data['di_plus'] > adx_data['di_minus']:
+                    bullish_score += 4
+                    signals['bullish'].append(f"Strong bullish trend (ADX: {adx_data['adx']:.1f})")
+                else:
+                    bearish_score += 4
+                    signals['bearish'].append(f"Strong bearish trend (ADX: {adx_data['adx']:.1f})")
+        
+        # RSI scoring
+        if 'RSI' in basic_indicators:
+            rsi_data = basic_indicators['RSI']
+            if rsi_data['oversold']:
+                bullish_score += 2
+                signals['bullish'].append(f"RSI oversold ({rsi_data['value']:.1f})")
+            elif rsi_data['overbought']:
+                bearish_score += 2
+                signals['bearish'].append(f"RSI overbought ({rsi_data['value']:.1f})")
+        
+        # OBV scoring
+        if 'OBV' in basic_indicators:
+            obv_data = basic_indicators['OBV']
+            if obv_data['trend'] == 'bullish':
+                bullish_score += 2
+                signals['bullish'].append("Volume supporting uptrend (OBV)")
+            else:
+                bearish_score += 2
+                signals['bearish'].append("Volume supporting downtrend (OBV)")
+        
+        # Moving Average scoring
+        if 'Moving_Averages' in basic_indicators:
+            ma_data = basic_indicators['Moving_Averages']
+            if ma_data['trend'] == 'bullish':
+                bullish_score += 2
+                signals['bullish'].append("Price above moving averages")
+            else:
+                bearish_score += 2
+                signals['bearish'].append("Price below moving averages")
+        
+        # Bollinger Bands scoring
+        if 'Bollinger_Bands' in basic_indicators:
+            bb_data = basic_indicators['Bollinger_Bands']
+            if bb_data['position'] == 'below_lower':
+                bullish_score += 1
+                signals['bullish'].append("Price below lower Bollinger Band (oversold)")
+            elif bb_data['position'] == 'above_upper':
+                bearish_score += 1
+                signals['bearish'].append("Price above upper Bollinger Band (overbought)")
+        
+        return bullish_score, bearish_score, signals
+    
+    def _score_fibonacci_analysis(self, fib_analysis):
+        """Score Fibonacci retracement analysis"""
+        bullish_score = 0
+        bearish_score = 0
+        signals = {'bullish': [], 'bearish': []}
+        
+        current_price = fib_analysis['current_price']
+        
+        # Check proximity to key Fibonacci levels
+        for level_name, level_price in fib_analysis['key_levels'].items():
+            distance_pct = abs((current_price - level_price) / current_price) * 100
+            
+            if distance_pct < 1.5:  # Within 1.5% of Fibonacci level
+                if level_name in ['38.2%', '50%', '61.8%']:  # Key retracement levels
+                    if fib_analysis['trend_direction'] == 'uptrend':
+                        if current_price >= level_price:
+                            bullish_score += 3
+                            signals['bullish'].append(f"Price holding above {level_name} Fibonacci support")
+                        else:
+                            bearish_score += 2
+                            signals['bearish'].append(f"Price below {level_name} Fibonacci support")
+                    else:  # downtrend
+                        if current_price <= level_price:
+                            bearish_score += 3
+                            signals['bearish'].append(f"Price holding below {level_name} Fibonacci resistance")
+                        else:
+                            bullish_score += 2
+                            signals['bullish'].append(f"Price above {level_name} Fibonacci resistance")
+        
+        # Trend direction scoring
+        if fib_analysis['trend_direction'] == 'uptrend':
+            bullish_score += 1
+            signals['bullish'].append("Fibonacci analysis shows uptrend structure")
+        else:
+            bearish_score += 1
+            signals['bearish'].append("Fibonacci analysis shows downtrend structure")
+        
+        return bullish_score, bearish_score, signals
+    
+    def _score_elliott_wave_analysis(self, wave_analysis):
+        """Score Elliott Wave analysis"""
+        bullish_score = 0
+        bearish_score = 0
+        signals = {'bullish': [], 'bearish': []}
+        
+        confidence = wave_analysis.get('confidence', 0)
+        pattern = wave_analysis.get('pattern', '')
+        trend = wave_analysis.get('trend', '')
+        
+        # Weight scoring by confidence
+        confidence_multiplier = confidence / 100
+        
+        if pattern == 'impulse' and confidence > 50:
+            if trend == 'bullish':
+                score = int(4 * confidence_multiplier)
+                bullish_score += score
+                signals['bullish'].append(f"Bullish impulse wave pattern (confidence: {confidence:.0f}%)")
+            elif trend == 'bearish':
+                score = int(4 * confidence_multiplier)
+                bearish_score += score
+                signals['bearish'].append(f"Bearish impulse wave pattern (confidence: {confidence:.0f}%)")
+        
+        elif pattern == 'corrective' and confidence > 40:
+            # Corrective patterns suggest trend reversal
+            if trend == 'bullish':
+                score = int(2 * confidence_multiplier)
+                bearish_score += score  # Corrective in bullish trend suggests bearish reversal
+                signals['bearish'].append(f"Corrective wave pattern suggests trend exhaustion (confidence: {confidence:.0f}%)")
+            elif trend == 'bearish':
+                score = int(2 * confidence_multiplier)
+                bullish_score += score  # Corrective in bearish trend suggests bullish reversal
+                signals['bullish'].append(f"Corrective wave pattern suggests trend exhaustion (confidence: {confidence:.0f}%)")
+        
+        return bullish_score, bearish_score, signals
+    
+    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='6mo'):
+        """Comprehensive analysis across multiple timeframes"""
+        if timeframes is None:
+            timeframes = ['5m', '15m', '1h', '1d']
+        
+        results = {}
+        
+        print(f"\n🚀 Starting comprehensive multi-timeframe analysis for {symbol}...")
+        print(f"Timeframes: {', '.join(timeframes)}")
+        print("=" * 80)
+        
+        for interval in timeframes:
+            print(f"\n📊 Analyzing {symbol} on {interval} timeframe...")
+            
+            # Adjust period based on interval
+            if interval in ['1m', '2m']:
+                period = '1d'
+            elif interval in ['5m', '15m', '30m', '90m']:
+                period = '5d'
+            elif interval in ['60m', '1h']:
+                period = '1mo'
+            else:
+                period = base_period
+            
+            # Get data
+            df = self.get_stock_data(symbol, interval=interval, period=period)
+            
+            if df is not None:
+                # Calculate comprehensive indicators
+                indicators = self.calculate_comprehensive_indicators(df, interval)
+                
+                results[interval] = {
+                    'data': df,
+                    'indicators': indicators,
+                    'current_price': df['Close'].iloc[-1],
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                }
+        
+        return results
+    
+    def print_comprehensive_analysis(self, symbol, results):
+        """Print detailed comprehensive analysis"""
+        if not results:
+            print("No analysis data available")
+            return
+        
+        print(f"\n{'='*100}")
+        print(f"COMPREHENSIVE MULTI-TIMEFRAME ANALYSIS: {symbol}")
+        print(f"{'='*100}")
+        print(f"Analysis Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Summary table
+        print(f"\n📊 TIMEFRAME SUMMARY:")
+        print(f"{'TF':<6} {'Price':<10} {'Bias':<15} {'Strength':<8} {'Conf':<6} {'MACD':<8} {'ADX':<6} {'RSI':<6} {'Fib':<8} {'Wave':<12}")
+        print("-" * 100)
+        
+        for timeframe, data in results.items():
+            if 'indicators' in data and 'trading_signals' in data['indicators']:
+                current_price = data['current_price']
+                signals = data['indicators']['trading_signals']
+                basic = data['indicators'].get('basic', {})
+                fib = data['indicators'].get('fibonacci', {})
+                wave = data['indicators'].get('elliott_wave', {})
+                
+                # Format data for table
+                bias = signals['overall_bias'].replace('_', ' ').title()[:14]
+                strength = f"{signals['strength']:.0f}%"
+                confidence = signals['confidence'][:4].title()
+                
+                macd_status = "Bull" if basic.get('MACD', {}).get('crossover') == 'bullish' else "Bear" if basic.get('MACD', {}).get('crossover') == 'bearish' else "N/A"
+                adx_val = f"{basic.get('ADX', {}).get('adx', 0):.0f}" if 'ADX' in basic else "N/A"
+                rsi_val = f"{basic.get('RSI', {}).get('value', 0):.0f}" if 'RSI' in basic else "N/A"
+                
+                fib_trend = fib.get('trend_direction', 'N/A')[:7] if 'error' not in fib else "N/A"
+                wave_pattern = f"{wave.get('pattern', 'N/A')[:4]}-{wave.get('confidence', 0):.0f}%" if wave.get('confidence', 0) > 0 else "N/A"
+                
+                print(f"{timeframe:<6} ${current_price:<9.2f} {bias:<15} {strength:<8} {confidence:<6} {macd_status:<8} {adx_val:<6} {rsi_val:<6} {fib_trend:<8} {wave_pattern:<12}")
+        
+        # Detailed analysis for each timeframe
+        for timeframe, data in results.items():
+            if 'indicators' in data:
+                self._print_detailed_timeframe_analysis(symbol, timeframe, data)
+        
+        # Multi-timeframe consensus
+        self._print_multi_timeframe_consensus(symbol, results)
+    
+    def _print_detailed_timeframe_analysis(self, symbol, timeframe, data):
+        """Print detailed analysis for a specific timeframe with improved error handling"""
+        print(f"\n🔍 DETAILED ANALYSIS - {timeframe.upper()} TIMEFRAME:")
+        print("-" * 60)
+        
+        indicators = data['indicators']
+        df = data['data']
+        current_price = data['current_price']
+        
+        print(f"Data Points: {len(df)} candles | Current Price: ${current_price:.2f}")
+        print(f"Price Range: ${df['Low'].min():.2f} - ${df['High'].max():.2f}")
+        
+        # Basic Indicators
+        if 'basic' in indicators:
+            basic = indicators['basic']
+            print(f"\n📈 Basic Indicators:")
+            
+            if 'MACD' in basic:
+                macd = basic['MACD']
+                print(f"  MACD {macd.get('settings', '')}: {macd.get('macd', 0):.4f} | Signal: {macd.get('signal', 0):.4f} | Cross: {macd.get('crossover', 'N/A')}")
+            
+            if 'ADX' in basic:
+                adx = basic['ADX']
+                print(f"  ADX({adx.get('period', 14)}): {adx.get('adx', 0):.2f} | +DI: {adx.get('di_plus', 0):.2f} | -DI: {adx.get('di_minus', 0):.2f} | Strength: {adx.get('trend_strength', 'N/A')}")
+            
+            if 'RSI' in basic:
+                rsi = basic['RSI']
+                status = "Overbought" if rsi.get('overbought') else "Oversold" if rsi.get('oversold') else "Normal"
+                print(f"  RSI({rsi.get('period', 14)}): {rsi.get('value', 0):.2f} ({status})")
+            
+            if 'OBV' in basic:
+                obv = basic['OBV']
+                print(f"  OBV: {obv.get('current', 0):,.0f} | Trend: {obv.get('trend', 'N/A')}")
+            
+            if 'Moving_Averages' in basic:
+                ma = basic['Moving_Averages']
+                print(f"  SMA20: ${ma.get('sma_20', 0):.2f} | SMA50: ${ma.get('sma_50', 0):.2f} | Trend: {ma.get('trend', 'N/A')}")
+            
+            if 'Bollinger_Bands' in basic:
+                bb = basic['Bollinger_Bands']
+                
+                # Handle error cases
+                if 'error' in bb:
+                    print(f"  Bollinger Bands: Error - {bb['error']}")
+                    if 'available_columns' in bb:
+                        print(f"    Available columns: {bb['available_columns']}")
+                else:
+                    # Normal case - display BB data
+                    print(f"  Bollinger Bands: Upper ${bb.get('upper', 0):.2f} | Middle ${bb.get('middle', 0):.2f} | Lower ${bb.get('lower', 0):.2f}")
+                    
+                    # Handle position display safely
+                    position = bb.get('position', 'N/A')
+                    if isinstance(position, dict):
+                        # Extract category from position dictionary
+                        position_str = position.get('category', 'N/A')
+                        percentage = position.get('percentage', 'N/A')
+                        distance = position.get('distance_from_middle', 'N/A')
+                        
+                        # Format position string
+                        if position_str != 'N/A':
+                            position_display = position_str.replace('_', ' ').title()
+                        else:
+                            position_display = 'N/A'
+                        
+                        print(f"  Position: {position_display}")
+                        if percentage != 'N/A':
+                            print(f"    BB Percentage: {percentage}%")
+                        if distance != 'N/A':
+                            print(f"    Distance from Middle: ${distance}")
+                            
+                    elif isinstance(position, str):
+                        # Handle string position (legacy format)
+                        position_display = position.replace('_', ' ').title()
+                        print(f"  Position: {position_display}")
+                    else:
+                        print(f"  Position: N/A")
+        
+        # Fibonacci Analysis
+        if 'fibonacci' in indicators and 'error' not in indicators['fibonacci']:
+            fib = indicators['fibonacci']
+            print(f"\n🌀 Fibonacci Analysis:")
+            print(f"  Trend Direction: {fib.get('trend_direction', 'N/A').title()}")
+            print(f"  Price Range: ${fib.get('low_price', 0):.2f} - ${fib.get('high_price', 0):.2f}")
+            print(f"  Key Levels:")
+            
+            key_levels = fib.get('key_levels', {})
+            for level in ['38.2%', '50%', '61.8%']:
+                if level in key_levels:
+                    price = key_levels[level]
+                    distance = abs(current_price - price)
+                    pct_away = (distance / current_price) * 100
+                    print(f"    {level}: ${price:.2f} ({pct_away:.1f}% away)")
+            
+            if fib.get('nearest_support'):
+                support = fib['nearest_support']
+                print(f"  Nearest Support: {support['level']} at ${support['price']:.2f}")
+            
+            if fib.get('nearest_resistance'):
+                resistance = fib['nearest_resistance']
+                print(f"  Nearest Resistance: {resistance['level']} at ${resistance['price']:.2f}")
+        
+        # Elliott Wave Analysis
+        if 'elliott_wave' in indicators:
+            wave = indicators['elliott_wave']
+            print(f"\n🌊 Elliott Wave Analysis:")
+            print(f"  Pattern: {wave.get('pattern', 'N/A').title()}")
+            print(f"  Trend: {wave.get('trend', 'N/A').title()}")
+            print(f"  Confidence: {wave.get('confidence', 0):.0f}%")
+            
+            if wave.get('next_expectation'):
+                print(f"  Next Expectation: {wave['next_expectation']}")
+            
+            if wave.get('wave_points'):
+                print(f"  Wave Points Detected: {len(wave['wave_points'])}")
+        
+        # Trading Signals
+        if 'trading_signals' in indicators:
+            signals = indicators['trading_signals']
+            print(f"\n🎯 Trading Signals:")
+            print(f"  Overall Bias: {signals['overall_bias'].replace('_', ' ').title()}")
+            print(f"  Strength: {signals['strength']:.0f}%")
+            print(f"  Confidence: {signals['confidence'].title()}")
+            
+            # Signal breakdown
+            breakdown = signals.get('signal_breakdown', {})
+            print(f"  Score Breakdown:")
+            print(f"    Basic Indicators: {breakdown.get('basic_score', 0):+d}")
+            print(f"    Fibonacci: {breakdown.get('fibonacci_score', 0):+d}")
+            print(f"    Elliott Wave: {breakdown.get('elliott_wave_score', 0):+d}")
+            print(f"    Total Score: {breakdown.get('total_score', 0):+d}")
+            
+            # Entry signals
+            if signals.get('entry_signals'):
+                print(f"  📈 Bullish Signals:")
+                for signal in signals['entry_signals'][:3]:  # Show top 3
+                    print(f"    • {signal}")
+            
+            # Exit signals
+            if signals.get('exit_signals'):
+                print(f"  📉 Bearish Signals:")
+                for signal in signals['exit_signals'][:3]:  # Show top 3
+                    print(f"    • {signal}")
+            
+            # Risk/Reward
+            if signals.get('risk_reward'):
+                rr = signals['risk_reward']
+                print(f"  💰 Risk/Reward Analysis:")
+                print(f"    Ratio: {rr.get('ratio', 0):.2f}:1")
+                print(f"    Stop Loss: ${rr.get('stop_loss', 0):.2f}")
+                print(f"    Take Profit: ${rr.get('take_profit', 0):.2f}")
+                print(f"    Risk Amount: ${rr.get('risk_amount', 0):.2f}")
+                print(f"    Reward Potential: ${rr.get('reward_potential', 0):.2f}")
+    
+    def _print_multi_timeframe_consensus(self, symbol, results):
+        """Print consensus analysis across all timeframes"""
+        print(f"\n🎯 MULTI-TIMEFRAME CONSENSUS:")
+        print("-" * 60)
+        
+        # Collect all signals
+        all_biases = []
+        all_strengths = []
+        all_confidences = []
+        timeframe_recommendations = {}
+        
+        for timeframe, data in results.items():
+            if 'indicators' in data and 'trading_signals' in data['indicators']:
+                signals = data['indicators']['trading_signals']
+                bias = signals['overall_bias']
+                strength = signals['strength']
+                confidence = signals['confidence']
+                
+                all_biases.append(bias)
+                all_strengths.append(strength)
+                all_confidences.append(confidence)
+                
+                # Convert to recommendation
+                if 'bullish' in bias:
+                    timeframe_recommendations[timeframe] = 'BUY'
+                elif 'bearish' in bias:
+                    timeframe_recommendations[timeframe] = 'SELL'
+                else:
+                    timeframe_recommendations[timeframe] = 'HOLD'
+        
+        if not all_biases:
+            print("No consensus data available")
+            return
+        
+        # Count recommendations
+        buy_count = sum(1 for rec in timeframe_recommendations.values() if rec == 'BUY')
+        sell_count = sum(1 for rec in timeframe_recommendations.values() if rec == 'SELL')
+        hold_count = sum(1 for rec in timeframe_recommendations.values() if rec == 'HOLD')
+        total_timeframes = len(timeframe_recommendations)
+        
+        # Calculate percentages
+        buy_pct = (buy_count / total_timeframes) * 100 if total_timeframes > 0 else 0
+        sell_pct = (sell_count / total_timeframes) * 100 if total_timeframes > 0 else 0
+        hold_pct = (hold_count / total_timeframes) * 100 if total_timeframes > 0 else 0
+        
+        # Determine overall consensus
+        if buy_pct >= 60:
+            overall_recommendation = 'BUY'
+            consensus_confidence = 'High' if buy_pct >= 75 else 'Medium'
+        elif sell_pct >= 60:
+            overall_recommendation = 'SELL'
+            consensus_confidence = 'High' if sell_pct >= 75 else 'Medium'
+        else:
+            overall_recommendation = 'HOLD'
+            consensus_confidence = 'Low'
+        
+        # Print consensus results
+        print(f"Overall Recommendation: {overall_recommendation}")
+        print(f"Consensus Confidence: {consensus_confidence}")
+        print(f"Agreement: {max(buy_pct, sell_pct, hold_pct):.1f}%")
+        print()
+        print(f"Timeframe Breakdown:")
+        print(f"  BUY signals: {buy_count}/{total_timeframes} ({buy_pct:.1f}%)")
+        print(f"  SELL signals: {sell_count}/{total_timeframes} ({sell_pct:.1f}%)")
+        print(f"  HOLD signals: {hold_count}/{total_timeframes} ({hold_pct:.1f}%)")
+        print()
+        print(f"Individual Timeframe Recommendations:")
+        for tf, rec in timeframe_recommendations.items():
+            print(f"  {tf}: {rec}")
+        
+        # Average strength across timeframes
+        avg_strength = np.mean(all_strengths) if all_strengths else 0
+        print(f"\nAverage Signal Strength: {avg_strength:.1f}%")
+        
+        # High confidence timeframes
+        high_conf_timeframes = [tf for tf, data in results.items() 
+                               if data.get('indicators', {}).get('trading_signals', {}).get('confidence') == 'high']
+        if high_conf_timeframes:
+            print(f"High Confidence Timeframes: {', '.join(high_conf_timeframes)}")
+   
+    def get_timeframe_consensus(self, results):
