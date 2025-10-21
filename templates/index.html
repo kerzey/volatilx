@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -167,5 +167,143 @@
     <button onclick="tradeStock()">Trade</button>
     <button onclick="fetchIndicators()">Fetch Indicators</button>
     <div id="result"></div>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Volatilx</title>
+    <!-- Link to external CSS for cleaner markup -->
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        function renderResult(data) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+            if (!data.success) {
+                resultDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                return;
+            }
+            const stockKeys = Object.keys(data.result);
+            stockKeys.forEach(symbol => {
+                const res = data.result[symbol];
+
+                // Main Consensus Info
+                let consensusBlock = `
+                    <div class="consensus-card">
+                        <h2>${symbol} &mdash; <span class="status">${res.status}</span></h2>
+                        <div><strong>Recommendation:</strong> <span class="recommendation ${res.consensus.overall_recommendation.toLowerCase()}">
+                            ${res.consensus.overall_recommendation}
+                        </span></div>
+                        <div><strong>Confidence:</strong> <span class="confidence">${res.consensus.confidence}</span></div>
+                        <div><strong>Strength:</strong> <span>${res.consensus.strength.toFixed(2)}%</span></div>
+                        <div><strong>Buy Signals:</strong> <span>${res.consensus.buy_signals}</span></div>
+                        <div><strong>Sell Signals:</strong> <span>${res.consensus.sell_signals}</span></div>
+                        <div><strong>Hold Signals:</strong> <span>${res.consensus.hold_signals}</span></div>
+                        <div><strong>Reasoning:</strong>
+                            <ul>
+                                ${res.consensus.reasoning.map(reason =>
+                                    `<li>${reason}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="timestamp"><strong>Timestamp:</strong> ${res.timestamp}</div>
+                        <div class="analysis-time"><strong>Analysis Time:</strong> ${res.analysis_time_seconds.toFixed(2)}s</div>
+                    </div>
+                `;
+
+                // Table of Timeframe Decisions
+                let tableRows = '';
+                Object.entries(res.decisions).forEach(([tf, dec]) => {
+                    tableRows += `
+                        <tr>
+                            <td>${tf}</td>
+                            <td>
+                                <span class="rec-${dec.recommendation.toLowerCase()}">${dec.recommendation}</span>
+                            </td>
+                            <td>${dec.confidence}</td>
+                            <td>${dec.strength ? dec.strength.toFixed(2) : '-'}</td>
+                            <td>${dec.entry_price !== undefined && dec.entry_price !== null ? dec.entry_price : '-'}</td>
+                            <td>${dec.stop_loss !== undefined && dec.stop_loss !== null ? dec.stop_loss : '-'}</td>
+                            <td>${dec.take_profit !== undefined && dec.take_profit !== null ? dec.take_profit : '-'}</td>
+                            <td>${dec.risk_reward_ratio !== undefined && dec.risk_reward_ratio !== null ?
+                        dec.risk_reward_ratio.toFixed(2) : '-'}</td>
+                            <td>
+                                <ul>
+                                    ${dec.reasoning.map(r => `<li>${r}</li>`).join('')}
+                                </ul>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                let decisionTable = `
+                    <div class="table-block">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Timeframe</th>
+                                    <th>Decision</th>
+                                    <th>Confidence</th>
+                                    <th>Strength</th>
+                                    <th>Entry Price</th>
+                                    <th>Stop Loss</th>
+                                    <th>Take Profit</th>
+                                    <th>Risk/Reward</th>
+                                    <th>Reasoning</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                // Combine both blocks
+                resultDiv.innerHTML += `
+                    <div class="result-card">
+                        ${consensusBlock}
+                        ${decisionTable}
+                        ${res.error ? `<div class="error">${res.error}</div>` : ''}
+                    </div>
+                `;
+            });
+        }
+
+        async function tradeStock() {
+            const stockSymbol = document.getElementById('stockSymbol').value.trim();
+            if (!stockSymbol) {
+                alert('Please enter a valid stock symbol.');
+                return;
+            }
+            try {
+                const response = await fetch('/trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stock_symbol: stockSymbol })
+                });
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                const data = await response.json();
+                renderResult(data);
+            } catch (error) {
+                console.error('Error fetching trade data:', error);
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = `<div class="error">Failed to fetch trade data. Please try again later.</div>`;
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Volatilx <span style="font-size:0.7em;color:#1976d2;">Modern Trading Dashboard</span></h1>
+        <div class="input-block">
+            <input type="text" id="stockSymbol" placeholder="Enter Stock Symbol" />
+            <button onclick="tradeStock()">Trade</button>
+        </div>
+        <div id="result"></div>
+    </div>
 </body>
 </html>

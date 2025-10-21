@@ -1025,7 +1025,7 @@ class MultiSymbolDayTraderAgent:
             with open(filename, 'w') as f:
                 json.dump(export_data, f, indent=2, default=str)
             print(f"✅ Results exported to {filename}")
-            return filename
+            return export_data, filename
         except Exception as e:
             print(f"❌ Error exporting results: {e}")
             return None
@@ -1169,7 +1169,7 @@ if __name__ == "__main__":
     print("=" * 50)
     
     # Example with single symbol - use valid timeframes only
-    symbols = ['GOLD']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
+    symbols = ['']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
     
     # Initialize the agent with valid timeframes (no 90m)
     multi_trader = MultiSymbolDayTraderAgent(

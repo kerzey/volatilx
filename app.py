@@ -70,6 +70,8 @@ import json
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+# Mount the static files directory right after initializing FastAPI
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # If you have static files (css, js), use this:
 # app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -87,8 +89,21 @@ async def trade(request: Request):
         print("Printing data:", data)
         stock_symbol = data.get('stock_symbol')
         print("Printing stock symbol:", stock_symbol)
-        agent = MultiSymbolDayTraderAgent(symbols=stock_symbol)
+        agent = MultiSymbolDayTraderAgent(
+            symbols=stock_symbol,
+            timeframes=['5m', '15m', '30m', '1h', '1d']
+            )
+        api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
+        secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
+        agent.set_credentials(api_key=api_key, secret_key=secret_key)
+         # Set trading parameters
+        agent.set_trading_parameters(
+            buy_threshold=70,
+            sell_threshold=70,
+            high_confidence_only=True
+        )
         result = agent.run_sequential()
+        result = agent.export_results(result)[0]
         print("Printing result:", result)
         response = {
             'success': True,
@@ -111,3 +126,41 @@ async def trade(request: Request):
 #         return JSONResponse(content={'success': True, 'indicators': indicators})
 #     except Exception as e:
 #         return JSONResponse(content={'success': False, 'error': str(e)}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#  print("🚀 Multi-Symbol Day Trading Agent")
+#     print("=" * 50)
+    
+#     # Example with single symbol - use valid timeframes only
+#     symbols = ['']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
+    
+#     # Initialize the agent with valid timeframes (no 90m)
+#     multi_trader = MultiSymbolDayTraderAgent(
+#         symbols=symbols,
+#         timeframes=['5m', '15m', '30m', '1h', '1d']  # Removed 90m, 5d, 1wk for Alpaca compatibility
+#     )
+#     api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
+#     secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
+#     multi_trader.set_credentials(api_key=api_key, secret_key=secret_key)
+    
+#     # Set trading parameters
+#     multi_trader.set_trading_parameters(
+#         buy_threshold=70,
+#         sell_threshold=70,
+#         high_confidence_only=True
+#     )
+    
+#     # Print current status
+#     multi_trader.print_status()
+    
+#     # You would uncomment and set your actual Alpaca credentials here:
+#     # multi_trader.set_credentials('your_api_key', 'your_secret_key')
+    
+#     print(f"\n🔍 Running analysis...")
+    
+#     # Run sequential analysis (recommended for testing)
+#     results = multi_trader.run_sequential()
+#     # print("Resutls ", results)
+#     # Export results to file
+#     if results:
+#         multi_trader.export_results(results)
+
