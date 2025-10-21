@@ -2439,7 +2439,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return start_date, end_date
     
-    def get_stock_data(self, symbol, interval='1d', period='6mo'):
+    def get_stock_data(self, symbol, interval='1d', period='18mo'):
         """Fetch stock data with specified interval using Alpaca API"""
         if not self.api:
             raise ValueError("Alpaca API credentials not set. Use set_credentials() method.")
@@ -3042,7 +3042,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return bullish_score, bearish_score, signals
     
-    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='12mo'):
+    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='36mo'):
         """Comprehensive analysis across multiple timeframes"""
         if timeframes is None:
             timeframes = ['5m', '15m', '1h', '1d']
@@ -3062,7 +3062,9 @@ class ComprehensiveMultiTimeframeAnalyzer:
             elif interval in ['5m', '15m', '30m']:
                 period = '5d'
             elif interval in ['60m', '1h']:
-                period = '1mo'
+                period = '2 mo'
+            elif interval in ['1d', '1wk']:
+                period = '18mo'
             else:
                 period = base_period
             
@@ -3471,7 +3473,7 @@ class MultiTimeframeAnalyzer:
         
         return start_date, end_date
     
-    def get_stock_data(self, symbol, interval='1d', period='6mo'):
+    def get_stock_data(self, symbol, interval='1d', period='18mo'):
         """Fetch stock data with specified interval using Alpaca API"""
         if not self.api:
             raise ValueError("Alpaca API credentials not set. Use set_credentials() method.")
@@ -3969,7 +3971,7 @@ class ElliottWaveAnalyzer:
             'corrective': ['A', 'B', 'C']
         }
     
-    def detect_wave_structure(self, df, lookback=50):
+    def detect_wave_structure(self, df, lookback=200):
         """Detect potential Elliott Wave structure"""
         recent_data = df.tail(lookback)
         
@@ -4001,7 +4003,7 @@ class ElliottWaveAnalyzer:
         
         # Analyze the pattern
         wave_analysis = self.analyze_wave_pattern(all_points, recent_data)
-        
+        print ('Wave Anaysis', wave_analysis)
         return wave_analysis
     
     def analyze_wave_pattern(self, points, df):
