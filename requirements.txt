@@ -10,7 +10,7 @@ scipy<2.3.0
 uvicorn[standard]==0.23.2
 fastapi==0.103.1
 alpaca-trade-api==2.3.0
-pandas-ta @ git+https://github.com/twopirllc/pandas-ta.git
+pandas-ta @ git+https://github.com/0xAVX/pandas-ta.git
 aiohttp==3.8.1
 # pandas-ta==0.3.14b0
 setuptools>=65.5.0
