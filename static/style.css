@@ -29,7 +29,8 @@ h1 {
 }
 
 input[type="text"] {
-    flex: 1;
+    width: 220px;              /* Set your desired width */
+    min-width: 120px;
     padding: 10px 12px;
     border-radius: 6px;
     border: 1px solid #dde8fd;

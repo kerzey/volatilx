@@ -223,9 +223,9 @@
                             </td>
                             <td>${dec.confidence}</td>
                             <td>${dec.strength ? dec.strength.toFixed(2) : '-'}</td>
-                            <td>${dec.entry_price !== undefined && dec.entry_price !== null ? dec.entry_price : '-'}</td>
-                            <td>${dec.stop_loss !== undefined && dec.stop_loss !== null ? dec.stop_loss : '-'}</td>
-                            <td>${dec.take_profit !== undefined && dec.take_profit !== null ? dec.take_profit : '-'}</td>
+                            <td>${dec.entry_price !== undefined && dec.entry_price !== null ? Number(dec.entry_price).toFixed(2) : '-'}</td>
+                            <td>${dec.stop_loss !== undefined && dec.stop_loss !== null ? Number(dec.stop_loss).toFixed(2) : '-'}</td>
+                            <td>${dec.take_profit !== undefined && dec.take_profit !== null ? Number(dec.take_profit).toFixed(2) : '-'}</td>
                             <td>${dec.risk_reward_ratio !== undefined && dec.risk_reward_ratio !== null ?
                         dec.risk_reward_ratio.toFixed(2) : '-'}</td>
                             <td>
@@ -270,7 +270,14 @@
                 `;
             });
         }
-
+        document.addEventListener("DOMContentLoaded", function () {
+            const input = document.getElementById("stockSymbol");
+            input.addEventListener("keydown", function (e) {
+                if (e.key === "Enter") {
+                    tradeStock();
+                }
+            });
+        });
         async function tradeStock() {
             const stockSymbol = document.getElementById('stockSymbol').value.trim();
             if (!stockSymbol) {
