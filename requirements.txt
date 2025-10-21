@@ -5,11 +5,11 @@ pandas
 numpy
 matplotlib
 scipy<2.3.0
-uvicorn[standard]==0.23.2
+uvicorn==0.23.2
 fastapi==0.103.1
 alpaca-trade-api==2.3.0
 pandas-ta @ git+https://github.com/0xAVX/pandas-ta.git
-aiohttp>=3.8.1,<4.0
+aiohttp>.=3.9.0
 # pandas-ta==0.3.14b0
 # setuptools>=65.5.0
 # wheel>=0.40.0
