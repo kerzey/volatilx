@@ -12,3 +12,4 @@ fastapi==0.103.1
 alpaca-trade-api==2.3.0
 # pandas-ta @ git+https://github.com/twopirllc/pandas-ta.git
 aiohttp==3.8.1
+pandas_ta==0.3.14b0
