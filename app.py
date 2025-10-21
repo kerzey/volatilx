@@ -91,7 +91,7 @@ async def trade(request: Request):
         print("Printing stock symbol:", stock_symbol)
         agent = MultiSymbolDayTraderAgent(
             symbols=stock_symbol,
-            timeframes=['5m', '15m', '30m', '1h', '1d']
+            timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk']
             )
         api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
         secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"

@@ -1,0 +1,108 @@
+{
+  "ASML": {
+    "symbol": "ASML",
+    "timestamp": "2025-10-21 10:04:18",
+    "status": "success",
+    "consensus": {
+      "overall_recommendation": "HOLD",
+      "confidence": "LOW",
+      "strength": 72.94872945364261,
+      "buy_signals": 2,
+      "sell_signals": 3,
+      "hold_signals": 1,
+      "reasoning": [
+        "Mixed or weak signals across timeframes",
+        "3 high-confidence signals detected"
+      ]
+    },
+    "decisions": {
+      "1m": {
+        "recommendation": "SELL",
+        "confidence": "high",
+        "strength": 84.21052631578948,
+        "reasoning": [
+          "Strong strong_bearish signal with 84% strength",
+          "High confidence signal",
+          "Near Fibonacci support at $1029.54",
+          "Near Fibonacci resistance at $1033.37"
+        ],
+        "entry_price": 1030.55,
+        "stop_loss": 1029.54,
+        "take_profit": 1033.37264,
+        "risk_reward_ratio": 2.7946930693070473
+      },
+      "5m": {
+        "recommendation": "SELL",
+        "confidence": "high",
+        "strength": 91.30434782608695,
+        "reasoning": [
+          "Strong strong_bearish signal with 91% strength",
+          "High confidence signal",
+          "Near Fibonacci support at $1029.54",
+          "Near Fibonacci resistance at $1034.57"
+        ],
+        "entry_price": 1030.55,
+        "stop_loss": 1029.54,
+        "take_profit": 1034.57152,
+        "risk_reward_ratio": 3.981702970297075
+      },
+      "15m": {
+        "recommendation": "SELL",
+        "confidence": "high",
+        "strength": 82.35294117647058,
+        "reasoning": [
+          "Strong strong_bearish signal with 82% strength",
+          "High confidence signal",
+          "Near Fibonacci support at $1027.12",
+          "Near Fibonacci resistance at $1032.47"
+        ],
+        "entry_price": 1030.55,
+        "stop_loss": 1027.12018,
+        "take_profit": 1032.47434,
+        "risk_reward_ratio": 0.5610615134321899
+      },
+      "30m": {
+        "recommendation": "BUY",
+        "confidence": "medium",
+        "strength": 63.1578947368421,
+        "reasoning": [
+          "Neutral or weak signal: bullish (63%)",
+          "Near Fibonacci support at $1027.88",
+          "Near Fibonacci resistance at $1033.61"
+        ],
+        "entry_price": 1030.55,
+        "stop_loss": 1027.88,
+        "take_profit": 1033.61244,
+        "risk_reward_ratio": 1.1469812734083629
+      },
+      "1h": {
+        "recommendation": "BUY",
+        "confidence": "medium",
+        "strength": 66.66666666666666,
+        "reasoning": [
+          "Neutral or weak signal: bullish (67%)",
+          "Near Fibonacci support at $1025.82",
+          "Near Fibonacci resistance at $1035.89"
+        ],
+        "entry_price": 1030.55,
+        "stop_loss": 1025.8196400000002,
+        "take_profit": 1035.89072,
+        "risk_reward_ratio": 1.1290303486416218
+      },
+      "1d": {
+        "recommendation": "HOLD",
+        "confidence": "low",
+        "strength": 50,
+        "reasoning": [
+          "Neutral or weak signal: neutral (50%)"
+        ],
+        "entry_price": 1030.55,
+        "stop_loss": 970.37728,
+        "take_profit": 1059.0,
+        "risk_reward_ratio": 0.4728056168974925
+      }
+    },
+    "error": null,
+    "analysis_time_seconds": 0.7940447330474854
+  }
+}

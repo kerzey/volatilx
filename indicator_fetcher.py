@@ -3042,7 +3042,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return bullish_score, bearish_score, signals
     
-    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='6mo'):
+    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='12mo'):
         """Comprehensive analysis across multiple timeframes"""
         if timeframes is None:
             timeframes = ['5m', '15m', '1h', '1d']

@@ -1169,12 +1169,12 @@ if __name__ == "__main__":
     print("=" * 50)
     
     # Example with single symbol - use valid timeframes only
-    symbols = ['']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
+    symbols = ['ASML']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
     
     # Initialize the agent with valid timeframes (no 90m)
     multi_trader = MultiSymbolDayTraderAgent(
         symbols=symbols,
-        timeframes=['5m', '15m', '30m', '1h', '1d']  # Removed 90m, 5d, 1wk for Alpaca compatibility
+        timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk']  # Removed 90m, 5d, 1wk for Alpaca compatibility
     )
     api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
     secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
