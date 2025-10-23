@@ -11,7 +11,6 @@ alpaca-trade-api==2.3.0
 pandas-ta @ git+https://github.com/0xAVX/pandas-ta.git
 aiohttp>=3.8.1
 PyYAML
-dotenv
 # pandas-ta==0.3.14b0
 # setuptools>=65.5.0
 # wheel>=0.40.0
@@ -24,7 +23,7 @@ python-multipart==0.0.6
 authlib==1.2.1
 itsdangerous==2.1.2
 sqlalchemy==2.0.23
-uvicorn[standard]==0.24.0
+# uvicorn[standard]==0.24.0
 jinja2==3.1.2
 python-dotenv==1.0.0
 PyJWT==2.8.0
