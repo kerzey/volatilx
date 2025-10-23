@@ -1,0 +1,206 @@
+body, html {
+    height: 100%;
+    margin: 0;
+    background: #f5f8fa;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+}
+
+/* Container styling */
+.container {
+    max-width: 14000px;
+    margin: 50px auto;
+    padding: 24px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(33, 150, 243, 0.08), 0 0.5px 3px #eee;
+}
+
+h1 {
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #2362cd;
+    margin-bottom: 24px;
+}
+
+.input-block {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+input[type="text"] {
+    width: 220px;              /* Set your desired width */
+    min-width: 120px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #dde8fd;
+    font-size: 1.1em;
+}
+
+button {
+    padding: 10px 24px;
+    background: linear-gradient(90deg, #2362cd 0%, #1976d2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: #14449e;
+}
+
+.result-card {
+    margin-top: 24px;
+    background: #fafcff;
+    border: 1px solid #dde8fd;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 10px #e3f0fc;
+}
+
+.consensus-card h2 {
+    font-size: 1.3em;
+    margin-bottom: 8px;
+}
+
+.consensus-card .recommendation.buy { color: #32c259; }
+.consensus-card .recommendation.sell { color: #e52a2a; }
+.consensus-card .recommendation.hold { color: #ff9800; }
+.status { font-size: 0.95em; color: #3a5c97; }
+
+.consensus-card .timestamp,
+.consensus-card .analysis-time { font-size: 0.95em; color: #6c757d; margin-top: 8px; }
+
+.table-block {
+    margin-top: 20px;
+    overflow-x: auto;
+}
+.table-block table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 1em;
+    background: #fff;
+}
+
+.table-block th, .table-block td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #e6edf7;
+}
+
+/* Widen Reasoning column (9th column) */
+.table-block th:nth-child(9),
+.table-block td:nth-child(9) {
+    width: 320px;
+    min-width: 320px;
+    word-break: break-word; /* Helps long text wrap inside cell */
+}
+
+.table-block thead th {
+    background: #eff4fa;
+    color: #1976d2;
+    font-weight: bold;
+    border-bottom: 2px solid #dde8fd;
+}
+
+.table-block tbody tr:hover {
+    background-color: #e6edf7;
+    transition: background 0.2s;
+}
+
+.rec-buy { color: #32c259; font-weight:bold; }
+.rec-sell { color: #e52a2a; font-weight:bold; }
+.rec-hold { color: #ff9800; font-weight:bold; }
+
+.error {
+    color: #e52a2a;
+    margin-top: 16px;
+    font-weight: bold;
+}
+
+/* Centered authentication card for sign-in/sign-up */
+.signin-card {
+    max-width: 390px;
+    margin: 60px auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(33, 150, 243, 0.10), 0 0.5px 3px #eee;
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.signin-logo {
+    width: 76px;
+    margin-bottom: 16px;
+}
+
+.signin-title, .signup-title {
+    color: #2362cd;
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.signin-form input, .signin-form button {
+    width: 220px;
+    min-width: 120px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #dde8fd;
+    font-size: 1.08em;
+}
+
+.signin-form button {
+    margin-bottom: 14px;
+    background: linear-gradient(90deg, #2362cd 0%, #1976d2 100%);
+    color: #fff;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.signin-form button:hover {
+    background: #14449e;
+}
+
+.provider-btns {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.provider-btns button {
+    background: #fff;
+    border: 1px solid #dde8fd;
+    color: #1976d2;
+    border-radius: 6px;
+    font-size: 1em;
+    padding: 10px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.provider-btns button.google {
+    border-color: #db4437;
+    color: #db4437;
+}
+.provider-btns button.apple {
+    border-color: #333;
+    color: #333;
+}
+
+.signup-link {
+    font-size: 0.98em;
+    color: #2362cd;
+    margin-top: 18px;
+    text-align: center;
+}
+
+.signup-link a { color: #1976d2; text-decoration: underline; }

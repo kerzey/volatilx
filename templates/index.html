@@ -1,11 +1,120 @@
-<!-- templates/index.html -->
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Trading MVP</title>
+    <title>Volatilx</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f8fa; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #ddd; margin-bottom: 20px; padding: 16px; }
+        .analysis-list { list-style: none; padding: 0; }
+        .analysis-list li { padding: 6px 0; border-bottom: 1px solid #efefef; }
+        .decision { font-weight: bold; padding-left: 10px; color: #2362cd; }
+        .error { color: red; }
+        table tbody tr:hover { background-color: #f0f8ff; }
+    </style>
     <script>
+        function renderResult(data) {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '';
+    if (!data.success) {
+        resultDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+        return;
+    }
+    const result = data.result;
+    for (let symbol in result) {
+        const stock = result[symbol];
+        let sections = [];
+        let block = {}; // Track current block of parsed details
+
+        stock.analysis.forEach(line => {
+    // Skip separators or empty lines
+    if (line.startsWith('=') || line.trim() === '' || line.startsWith('---')) return;
+
+    // Improved: Match ALL timeframes, not just m/h
+    if (line.match(/^\s*\d+\s*[mhdwk]+:/)) {
+        const match = line.match(/^\s*(\d+\s*[mhdwk]+):\s*Bias:\s*([^,]+),\s*Confidence:\s*([^\s,]+)/);
+        if (match) {
+            block.timeframe = match[1].trim();
+            block.bias = match[2].trim();
+            block.confidence = match[3].trim();
+        } else {
+            block.timeframe = block.bias = block.confidence = 'N/A';
+        }
+        return;
+    }
+
+    // Price, support, resistance
+    if (line.match(/Price:/)) {
+        const match = line.match(/Price:\s*([^,]+),\s*Support:\s*([^,]+),\s*Resistance:\s*([^,]+)/);
+        if (match) {
+            block.price = match[1];
+            block.support = match[2];
+            block.resistance = match[3];
+        } else {
+            block.price = block.support = block.resistance = 'N/A';
+        }
+        return;
+    }
+
+    if (line.match(/Decision:/)) {
+        block.decision = line.split('Decision: ')[1];
+        // Push only if there's any decision; guarantee keys
+        const sec = {
+            timeframe: block.timeframe || 'N/A',
+            bias: block.bias || 'N/A',
+            confidence: block.confidence || 'N/A',
+            price: block.price || 'N/A',
+            support: block.support || 'N/A',
+            resistance: block.resistance || 'N/A',
+            decision: block.decision || 'N/A'
+        };
+        sections.push(sec);
+        block = {};
+    }
+});
+
+        let tableHtml = `
+            <table style="width:100%;margin-top:10px;border-collapse:collapse;">
+                <thead><tr>
+                    <th>Timeframe</th>
+                    <th>Bias</th>
+                    <th>Confidence</th>
+                    <th>Price</th>
+                    <th>Support</th>
+                    <th>Resistance</th>
+                    <th>Action</th>
+                </tr></thead>
+                <tbody>
+        `;
+
+        sections.forEach(sec => {
+            let color = "black";
+            if (sec.decision.startsWith('BUY')) color = "green";
+            else if (sec.decision.startsWith('SELL')) color = "red";
+            else if (sec.decision.startsWith('HOLD')) color = "orange";
+            tableHtml += `
+                <tr>
+                    <td>${sec.timeframe}</td>
+                    <td>${sec.bias}</td>
+                    <td>${sec.confidence}</td>
+                    <td>${isNaN(sec.price) ? sec.price : Number(sec.price).toFixed(2)}</td>
+                    <td>${isNaN(sec.support) ? sec.support : Number(sec.support).toFixed(2)}</td>
+                    <td>${isNaN(sec.resistance) ? sec.resistance : Number(sec.resistance).toFixed(2)}</td>
+                    <td style="font-weight:bold;color:${color}">${sec.decision}</td>
+                </tr>
+            `;
+        });
+        tableHtml += '</tbody></table>';
+
+        resultDiv.innerHTML += `
+            <div class="card">
+                <h2>${symbol}: ${stock.status}</h2>
+                ${sections.length ? tableHtml : "<em>No actionable analysis found.</em>"}
+                ${stock.error ? `<div class="error">${stock.error}</div>` : ''}
+            </div>
+        `;
+    }
+}
         async function tradeStock() {
             const stockSymbol = document.getElementById('stockSymbol').value;
             const response = await fetch('/trade', {
@@ -14,7 +123,7 @@
                 body: JSON.stringify({ stock_symbol: stockSymbol })
             });
             const data = await response.json();
-            document.getElementById('result').innerText = JSON.stringify(data);
+            renderResult(data);
         }
 
         async function fetchIndicators() {
@@ -25,15 +134,183 @@
                 body: JSON.stringify({ stock_symbol: stockSymbol })
             });
             const data = await response.json();
-            document.getElementById('result').innerText = JSON.stringify(data);
+            renderResult(data);
+        }
+        async function tradeStock() {
+    const stockSymbol = document.getElementById('stockSymbol').value.trim();
+    if (!stockSymbol) {
+        alert('Please enter a valid stock symbol.');
+        return;
+    }
+    try {
+        const response = await fetch('/trade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock_symbol: stockSymbol })
+        });
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+        }
+        const data = await response.json();
+        renderResult(data);
+    } catch (error) {
+        console.error('Error fetching trade data:', error);
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = `<div class="error">Failed to fetch trade data. Please try again later.</div>`;
+    }
+}
+    </script>
+</head>
+<body>
+    <h1>Volatilx</h1>
+    <input type="text" id="stockSymbol" placeholder="Enter Stock Symbol">
+    <button onclick="tradeStock()">Trade</button>
+    <button onclick="fetchIndicators()">Fetch Indicators</button>
+    <div id="result"></div>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Volatilx</title>
+    <!-- Link to external CSS for cleaner markup -->
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        function renderResult(data) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+            if (!data.success) {
+                resultDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                return;
+            }
+            const stockKeys = Object.keys(data.result);
+            stockKeys.forEach(symbol => {
+                const res = data.result[symbol];
+
+                // Main Consensus Info
+                let consensusBlock = `
+                    <div class="consensus-card">
+                        <h2>${symbol} &mdash; <span class="status">${res.status}</span></h2>
+                        <div><strong>Recommendation:</strong> <span class="recommendation ${res.consensus.overall_recommendation.toLowerCase()}">
+                            ${res.consensus.overall_recommendation}
+                        </span></div>
+                        <div><strong>Confidence:</strong> <span class="confidence">${res.consensus.confidence}</span></div>
+                        <div><strong>Strength:</strong> <span>${res.consensus.strength.toFixed(2)}%</span></div>
+                        <div><strong>Buy Signals:</strong> <span>${res.consensus.buy_signals}</span></div>
+                        <div><strong>Sell Signals:</strong> <span>${res.consensus.sell_signals}</span></div>
+                        <div><strong>Hold Signals:</strong> <span>${res.consensus.hold_signals}</span></div>
+                        <div><strong>Reasoning:</strong>
+                            <ul>
+                                ${res.consensus.reasoning.map(reason =>
+                                    `<li>${reason}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="timestamp"><strong>Timestamp:</strong> ${res.timestamp}</div>
+                        <div class="analysis-time"><strong>Analysis Time:</strong> ${res.analysis_time_seconds.toFixed(2)}s</div>
+                    </div>
+                `;
+
+                // Table of Timeframe Decisions
+                let tableRows = '';
+                Object.entries(res.decisions).forEach(([tf, dec]) => {
+                    tableRows += `
+                        <tr>
+                            <td>${tf}</td>
+                            <td>
+                                <span class="rec-${dec.recommendation.toLowerCase()}">${dec.recommendation}</span>
+                            </td>
+                            <td>${dec.confidence}</td>
+                            <td>${dec.strength ? dec.strength.toFixed(2) : '-'}</td>
+                            <td>${dec.entry_price !== undefined && dec.entry_price !== null ? Number(dec.entry_price).toFixed(2) : '-'}</td>
+                            <td>${dec.stop_loss !== undefined && dec.stop_loss !== null ? Number(dec.stop_loss).toFixed(2) : '-'}</td>
+                            <td>${dec.take_profit !== undefined && dec.take_profit !== null ? Number(dec.take_profit).toFixed(2) : '-'}</td>
+                            <td>${dec.risk_reward_ratio !== undefined && dec.risk_reward_ratio !== null ?
+                        dec.risk_reward_ratio.toFixed(2) : '-'}</td>
+                            <td>
+                                <ul>
+                                    ${dec.reasoning.map(r => `<li>${r}</li>`).join('')}
+                                </ul>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                let decisionTable = `
+                    <div class="table-block">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Timeframe</th>
+                                    <th>Decision</th>
+                                    <th>Confidence</th>
+                                    <th>Strength</th>
+                                    <th>Entry Price</th>
+                                    <th>Stop Loss</th>
+                                    <th>Take Profit</th>
+                                    <th>Risk/Reward</th>
+                                    <th>Reasoning</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                // Combine both blocks
+                resultDiv.innerHTML += `
+                    <div class="result-card">
+                        ${consensusBlock}
+                        ${decisionTable}
+                        ${res.error ? `<div class="error">${res.error}</div>` : ''}
+                    </div>
+                `;
+            });
+        }
+        document.addEventListener("DOMContentLoaded", function () {
+            const input = document.getElementById("stockSymbol");
+            input.addEventListener("keydown", function (e) {
+                if (e.key === "Enter") {
+                    tradeStock();
+                }
+            });
+        });
+        async function tradeStock() {
+            const stockSymbol = document.getElementById('stockSymbol').value.trim();
+            if (!stockSymbol) {
+                alert('Please enter a valid stock symbol.');
+                return;
+            }
+            try {
+                const response = await fetch('/trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stock_symbol: stockSymbol })
+                });
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                const data = await response.json();
+                renderResult(data);
+            } catch (error) {
+                console.error('Error fetching trade data:', error);
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = `<div class="error">Failed to fetch trade data. Please try again later.</div>`;
+            }
         }
     </script>
 </head>
 <body>
-    <h1>Stock Trading MVP</h1>
-    <input type="text" id="stockSymbol" placeholder="Enter Stock Symbol">
-    <button onclick="tradeStock()">Trade</button>
-    <button onclick="fetchIndicators()">Fetch Indicators</button>
-    <pre id="result"></pre>
+    <div class="container">
+        <h1>VolatilX <span style="font-size:0.7em;color:#1976d2;">AI - Stock Technical Analysis</span></h1>
+        <div class="input-block">
+            <input type="text" id="stockSymbol" placeholder="Enter Stock Symbol" />
+            <button onclick="tradeStock()">Trade</button>
+        </div>
+        <div id="result"></div>
+    </div>
 </body>
 </html>
