@@ -11,6 +11,7 @@ alpaca-trade-api==2.3.0
 pandas-ta @ git+https://github.com/0xAVX/pandas-ta.git
 aiohttp>=3.8.1
 PyYAML
+dotenv
 # pandas-ta==0.3.14b0
 # setuptools>=65.5.0
 # wheel>=0.40.0
