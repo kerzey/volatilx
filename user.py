@@ -2,7 +2,7 @@ from fastapi_users.db import SQLAlchemyBaseUserTable, SQLAlchemyUserDatabase
 from fastapi_users import BaseUserManager, IntegerIDMixin
 from fastapi import Depends, Request, HTTPException
 from models import Base
-from sqlalchemy import String, Column, Integer, Boolean
+from sqlalchemy import String, Column, Integer, Boolean, Text
 from db import engine, SessionLocal
 from fastapi_users import schemas
 from fastapi_users.password import PasswordHelper
@@ -27,18 +27,22 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     # Custom fields
     oauth_provider = Column(String, nullable=True)
     oauth_id = Column(String, nullable=True)
+    # openai_api_key = Column(Text, nullable=True)
 
 class UserRead(schemas.BaseUser[int]):
     oauth_provider: str | None = None
     oauth_id: str | None = None
+    # openai_api_key: str | None = None
 
 class UserCreate(schemas.BaseUserCreate):
     oauth_provider: str | None = None
     oauth_id: str | None = None
+    # openai_api_key: str | None = None
 
 class UserUpdate(schemas.BaseUserUpdate):
     oauth_provider: str | None = None
     oauth_id: str | None = None
+    # openai_api_key: str | None = None
 
 def init_db():
     Base.metadata.create_all(bind=engine)

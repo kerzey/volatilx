@@ -6,6 +6,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from datetime import datetime
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import User, UserRead, UserCreate, UserUpdate, get_user_db, get_user_manager, init_db, get_current_user_sync
@@ -22,19 +25,46 @@ from day_trading_agent import MultiSymbolDayTraderAgent
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 import json
 
-# Initialize DB tables if not already done (run once!)
-init_db()
+#OpenAI imports
+# from ai_agents.openai_service import OpenAIAnalysisService
+import jwt
+import hashlib
+from ai_agents.openai_service import openai_service
 
 app = FastAPI()
 load_dotenv()
+
 templates = Jinja2Templates(directory="templates")
 # Mount the static files directory right after initializing FastAPI
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        init_db()
+        print("Database initialized successfully")
+    except Exception as e:
+        print(f"Database initialization failed: {e}")
+        # Try to create tables anyway
+        from db import Base, engine
+        Base.metadata.create_all(bind=engine)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 # Session middleware for OAuth
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SESSION_SECRET_KEY", "super-secret-for-dev")
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://stock-trading-mvp-ad256f288f84.herokuapp.com", "http://127.0.0.1:8000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
 )
 
 ##############################################################################################
@@ -325,20 +355,34 @@ async def trade_page(request: Request, user: User = Depends(get_current_user_syn
 @app.post("/trade")
 async def trade(request: Request, user: User = Depends(get_current_user_sync)):
     try:
+        # Get JSON data from request
         data = await request.json()
+        print("=== TRADE ENDPOINT DEBUG ===")
         print("Printing data:", data)
+        
+        # Extract variables from the request data
         stock_symbol = data.get('stock_symbol')
+        use_ai_analysis = data.get('use_ai_analysis', False)
+        # language = data.get('language', 'en')
+        
         print("Printing stock symbol:", stock_symbol)
+        print("Use AI Analysis:", use_ai_analysis)
+        
+        if not stock_symbol:
+            return JSONResponse(
+                content={'success': False, 'error': 'Stock symbol is required'},
+                status_code=400
+            )
         
         # Initialize trading agent
         agent = MultiSymbolDayTraderAgent(
             symbols=stock_symbol,
-            timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk']
+            timeframes=['5m', '15m', '30m', '1h', '1d', '1wk','1mo']
         )
         
-        # Set Alpaca API credentials
-        api_key = "PKYJLOK4LZBY56NZKXZLNSG665"#os.getenv("ALPACA_API_KEY"),
-        secret_key ="4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1" #os.getenv("ALPACA_SECRET_KEY"),
+        # Set API credentials
+        api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
+        secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
         agent.set_credentials(api_key=api_key, secret_key=secret_key)
         
         # Set trading parameters
@@ -349,16 +393,65 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         )
         
         # Run the trading analysis
+        print("=== RUNNING TRADING ANALYSIS ===")
         result = agent.run_sequential()
-        result = agent.export_results(result)[0]
-        print("Printing result:", result)
+        
+        # Export results (returns data without writing to file)
+        if hasattr(agent, 'export_results'):
+            try:
+                export_data, json_string, filename = agent.export_results(result)
+                result_data = export_data
+            except ValueError:
+                result_data = agent.export_results(result)
+        else:
+            result_data = result
+        
+        # print("=== RAW RESULT DATA ===")
+        # print("Result data type:", type(result_data))
+        # print("Result data keys:", list(result_data.keys()) if isinstance(result_data, dict) else "Not a dict")
+        # print("Result data sample:", str(result_data)[:500] + "..." if len(str(result_data)) > 500 else str(result_data))
+        print("Raw result for AI:", result_data)
+        # AI Analysis if requested
+        ai_analysis = None
+        if use_ai_analysis:
+            try:
+                print("=== STARTING AI ANALYSIS ===")
+                
+                # # Structure the data properly for AI analysis
+                # structured_data = structure_trading_data_for_ai(result_data, stock_symbol)
+                # print("Structured data for AI:", structured_data)
+                
+                # # Use the centralized OpenAI service with structured data
+                # ai_analysis = openai_service.analyze_trading_data(structured_data, stock_symbol)
+                # print("AI Analysis completed:", ai_analysis.get("success", False))
+                ai_analysis = openai_service.analyze_trading_data(result_data, stock_symbol)
+                print("AI Analysis completed:", ai_analysis.get("success", False))
+                 # DEBUG: Print the full AI response
+                print("=== FULL AI ANALYSIS RESPONSE ===")
+                print("Success:", ai_analysis.get("success"))
+                print("Analysis keys:", list(ai_analysis.get("analysis", {}).keys()) if ai_analysis.get("analysis") else "No analysis key")
+                print("Raw response preview:", ai_analysis.get("raw_response", "")[:200] + "..." if ai_analysis.get("raw_response") else "No raw response")
+        
+                # Print each section
+                if ai_analysis.get("analysis"):
+                    for section_name, section_content in ai_analysis["analysis"].items():
+                        print(f"{section_name}: {section_content[:100]}..." if section_content else f"{section_name}: EMPTY")
+
+            except Exception as e:
+                print(f"AI Analysis failed: {e}")
+                ai_analysis = {
+                    "success": False,
+                    "error": f"AI analysis failed: {str(e)}"
+                }
         
         response = {
             'success': True,
-            'result': result
+            'result': result_data,
+            'ai_analysis': ai_analysis,
+            'symbol': stock_symbol,
+            'timestamp': str(datetime.now())
         }
         return JSONResponse(content=response, status_code=status.HTTP_200_OK)
-        
     except Exception as e:
         print(f"Error in trade endpoint: {e}")
         response = {
@@ -367,6 +460,288 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         }
         return JSONResponse(content=response, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:
+    """Structure the trading agent result data for AI analysis"""
+    
+    print(f"=== STRUCTURING DATA FOR AI ===")
+    print(f"Input type: {type(result_data)}")
+    
+    # Initialize structured data with defaults
+    structured = {
+        "symbol": symbol,
+        "timestamp": str(datetime.now()),
+        "analysis_type": "day_trading_analysis",
+        "current_price": "N/A",
+        "price_change": "N/A",
+        "volume": "N/A",
+        "market_sentiment": "N/A",
+        "signals": {},
+        "recommendations": {},
+        "technical_indicators": {},
+        "trading_result": result_data,
+        "data_source": "MultiSymbolDayTraderAgent"
+    }
+    
+    try:
+        if isinstance(result_data, dict):
+            print("Processing dictionary result...")
+            print("Available keys:", list(result_data.keys()))
+            
+            # Extract data based on common key patterns
+            for key, value in result_data.items():
+                key_lower = key.lower()
+                print(f"Processing key: {key} = {str(value)[:100]}...")
+                
+                # Price-related data
+                if any(price_key in key_lower for price_key in ['price', 'close', 'last']):
+                    if isinstance(value, (int, float)):
+                        structured["current_price"] = value
+                    elif isinstance(value, dict) and 'close' in value:
+                        structured["current_price"] = value['close']
+                
+                # Change/movement data
+                elif any(change_key in key_lower for change_key in ['change', 'move', 'diff']):
+                    structured["price_change"] = value
+                
+                # Volume data
+                elif 'volume' in key_lower:
+                    structured["volume"] = value
+                
+                # Signal data
+                elif any(signal_key in key_lower for signal_key in ['signal', 'buy', 'sell', 'action']):
+                    if isinstance(value, dict):
+                        structured["signals"].update(value)
+                    else:
+                        structured["signals"][key] = value
+                
+                # Recommendation data
+                elif any(rec_key in key_lower for rec_key in ['recommend', 'advice', 'suggest']):
+                    if isinstance(value, dict):
+                        structured["recommendations"].update(value)
+                    else:
+                        structured["recommendations"][key] = value
+                
+                # Technical indicator data
+                elif any(tech_key in key_lower for tech_key in ['rsi', 'macd', 'sma', 'ema', 'indicator', 'technical']):
+                    if isinstance(value, dict):
+                        structured["technical_indicators"].update(value)
+                    else:
+                        structured["technical_indicators"][key] = value
+            
+            # Try to extract nested data
+            if 'analysis' in result_data:
+                analysis_data = result_data['analysis']
+                if isinstance(analysis_data, dict):
+                    structured["signals"].update(analysis_data.get('signals', {}))
+                    structured["recommendations"].update(analysis_data.get('recommendations', {}))
+            
+            # Look for timeframe-specific data
+            for timeframe in ['1m', '5m', '15m', '30m', '1h', '1d']:
+                if timeframe in result_data:
+                    tf_data = result_data[timeframe]
+                    if isinstance(tf_data, dict):
+                        structured["technical_indicators"][f"{timeframe}_data"] = tf_data
+            
+            # Determine market sentiment based on signals
+            if structured["signals"]:
+                buy_signals = sum(1 for k, v in structured["signals"].items() 
+                                if 'buy' in str(v).lower() or 'bullish' in str(v).lower())
+                sell_signals = sum(1 for k, v in structured["signals"].items() 
+                                 if 'sell' in str(v).lower() or 'bearish' in str(v).lower())
+                
+                if buy_signals > sell_signals:
+                    structured["market_sentiment"] = "Bullish"
+                elif sell_signals > buy_signals:
+                    structured["market_sentiment"] = "Bearish"
+                else:
+                    structured["market_sentiment"] = "Neutral"
+        
+        elif isinstance(result_data, list) and len(result_data) > 0:
+            print("Processing list result...")
+            # If it's a list, try to process the first item
+            first_item = result_data[0]
+            if isinstance(first_item, dict):
+                return structure_trading_data_for_ai(first_item, symbol)
+            else:
+                structured["raw_analysis"] = str(result_data)
+                structured["market_sentiment"] = "Data processed"
+        
+        else:
+            print(f"Processing {type(result_data)} result...")
+            structured["raw_analysis"] = str(result_data)
+            structured["market_sentiment"] = "Analysis completed"
+    
+    except Exception as e:
+        print(f"Error structuring data: {e}")
+        structured["extraction_error"] = str(e)
+        structured["market_sentiment"] = "Error in data processing"
+    
+    print("=== FINAL STRUCTURED DATA ===")
+    print(f"Current Price: {structured['current_price']}")
+    print(f"Signals: {len(structured['signals'])} items")
+    print(f"Recommendations: {len(structured['recommendations'])} items")
+    print(f"Technical Indicators: {len(structured['technical_indicators'])} items")
+    print(f"Market Sentiment: {structured['market_sentiment']}")
+    
+    return structured
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request, user: User = Depends(get_current_user_sync)):
+    return templates. TemplateResponse("settings.html", {"request": request, "user": user})
+
+@app.post("/api/analyze")
+async def analyze_trading_data(
+    request: Request,
+    user: User = Depends(get_current_user_sync)
+):
+    """Analyze trading data using AI"""
+    try:
+        # Get the request data
+        data = await request.json()
+        symbol = data.get('symbol', 'UNKNOWN')
+        trading_data = data.get('trading_data', {})
+        
+        print(f"AI analysis requested by {user.email} for {symbol}")
+        print(f"Trading data keys: {list(trading_data.keys())}")
+        
+        # Enhance trading data with metadata
+        enhanced_trading_data = {
+            **trading_data,
+            "analysis_requested_by": user.email,
+            "analysis_timestamp": str(datetime.now()),
+            "symbol": symbol
+        }
+        
+        # Use the centralized OpenAI service
+        analysis_result = openai_service.analyze_trading_data(enhanced_trading_data, symbol)
+        
+        if analysis_result["success"]:
+            print(f"AI analysis completed for {symbol}, tokens used: {analysis_result.get('tokens_used', 0)}")
+            
+            # Add metadata to response
+            analysis_result.update({
+                "analyzed_by": user.email,
+                "analysis_timestamp": str(datetime.now()),
+                "symbol": symbol
+            })
+            
+            return JSONResponse(
+                content=analysis_result,
+                status_code=200
+            )
+        else:
+            print(f"AI analysis failed for {symbol}: {analysis_result.get('error', 'Unknown error')}")
+            return JSONResponse(
+                content=analysis_result,
+                status_code=400
+            )
+            
+    except Exception as e:
+        print(f"Error in AI analysis: {e}")
+        return JSONResponse(
+            content={
+                "success": False,
+                "error": f"Analysis failed: {str(e)}",
+                "timestamp": str(datetime.now())
+            },
+            status_code=500
+        )
+    
+# Add a health check endpoint for OpenAI
+@app.get("/api/test-openai")
+async def test_openai_connection(user: User = Depends(get_current_user_sync)):
+    """Test the centralized OpenAI API connection"""
+    try:
+        result = openai_service.test_connection()
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "success": False, 
+                "error": f"OpenAI service initialization error: {str(e)}",
+                "error_type": "service_error"
+            },
+            status_code=500
+        )
+# Add OpenAI status endpoint for more detailed info
+@app.get("/api/openai/status")
+async def openai_detailed_status(user: User = Depends(get_current_user_sync)):
+    """Get detailed OpenAI service status"""
+    try:
+        # Test connection
+        connection_result = openai_service.test_connection()
+        
+        # Get API key status (masked for security)
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        api_key_status = {
+            "configured": bool(api_key),
+            "key_preview": f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else "Invalid key format",
+            "key_length": len(api_key)
+        }
+        
+        return JSONResponse(content={
+            "connection_test": connection_result,
+            "api_key_status": api_key_status,
+            "service_version": "OpenAI v1.x",
+            "timestamp": str(datetime.now())
+        })
+        
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "success": False,
+                "error": f"Status check failed: {str(e)}",
+                "timestamp": str(datetime.now())
+            },
+            status_code=500
+        )
+    
+# @app.post("/settings/openai")
+# async def save_openai_key (
+#     request: Request, 
+#     openai_api_key: str = Form(...),
+#     user: User = Depends(get_current_user_sync) 
+#     ):
+#     """Save user's OpenAI API key"""
+#     try:
+#         # Test the API key first
+#         test_result = test_openai_connection(openai_api_key)
+        
+#         if not test_result["success"]:
+#             return JSONResponse(
+#                 content={"success": False, "error": test_result["error"]},
+#                 status_code=400
+#             )
+        
+#         # Save the API key to database
+#         db = SessionLocal()
+#         try:
+#             db_user = db.query(User).filter(User.id == user.id).first()
+#             if db_user:
+#                 db_user.openai_api_key = openai_api_key
+#                 db.commit()
+                
+#                 return JSONResponse(
+#                     content={"success": True, "message": "OpenAI API key saved successfully"},
+#                     status_code=200
+#                 )
+#             else:
+#                 return JSONResponse(
+#                     content={"success": False, "error": "User not found"},
+#                     status_code=404
+#                 )
+#         finally:
+#             db.close()
+            
+#     except Exception as e:
+#         return JSONResponse(
+#             content={"success": False, "error": str(e)},
+#             status_code=500
+#         )    
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
 # import os
 # from dotenv import load_dotenv
 # from fastapi import FastAPI, Request, Form, status, Depends

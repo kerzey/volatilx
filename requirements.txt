@@ -29,3 +29,4 @@ python-dotenv==1.0.0
 PyJWT==2.8.0
 httpx
 pydantic==2.4.0
+openai>=1.50.0

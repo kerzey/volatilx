@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -300,4 +300,545 @@
     </script>
 </body>
 </html>
+ -->
 
+ <! DOCTYPE html>
+ <html lang="en">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <title>VolatilX - Trading Dashboard</title>
+     <style>
+         * {
+             margin: 0;
+             padding: 0;
+             box-sizing: border-box;
+         }
+         
+         body {
+             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+             background: #f5f5f5;
+             min-height: 100vh;
+         }
+         
+         .header {
+             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+             color: white;
+             padding: 1rem 2rem;
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+         }
+         
+         .logo {
+             font-size: 1.8rem;
+             font-weight: bold;
+         }
+         
+         .nav-links {
+             display: flex;
+             gap: 1rem;
+             align-items: center;
+         }
+         
+         .nav-links a {
+             color: white;
+             text-decoration: none;
+             padding: 0.5rem 1rem;
+             border-radius: 5px;
+             transition: background-color 0.3s;
+         }
+         
+         .nav-links a:hover {
+             background: rgba(255, 255, 255, 0.2);
+         }
+         
+         .container {
+             max-width: 1200px;
+             margin: 2rem auto;
+             padding: 0 2rem;
+         }
+         
+         .trading-panel {
+             background: white;
+             border-radius: 10px;
+             padding: 2rem;
+             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+             margin-bottom: 2rem;
+         }
+         
+         .panel-title {
+             font-size: 1.5rem;
+             margin-bottom: 1.5rem;
+             color: #333;
+         }
+         
+         .input-group {
+             margin-bottom: 1.5rem;
+         }
+         
+         .input-group label {
+             display: block;
+             margin-bottom: 0.5rem;
+             font-weight: 500;
+             color: #555;
+         }
+         
+         .input-group input {
+             width: 100%;
+             padding: 0.75rem;
+             border: 2px solid #ddd;
+             border-radius: 5px;
+             font-size: 1rem;
+             transition: border-color 0.3s;
+         }
+         
+         .input-group input:focus {
+             outline: none;
+             border-color: #667eea;
+         }
+         
+         .checkbox-group {
+             display: flex;
+             align-items: center;
+             gap: 0.5rem;
+             margin-bottom: 1.5rem;
+         }
+         
+         .checkbox-group input[type="checkbox"] {
+             width: auto;
+             margin: 0;
+         }
+         
+         .checkbox-group label {
+             margin: 0;
+             cursor: pointer;
+         }
+         
+         .ai-info {
+             background: #e3f2fd;
+             border-left: 4px solid #2196f3;
+             padding: 1rem;
+             margin: 1rem 0;
+             border-radius: 0 5px 5px 0;
+             font-size: 0.9rem;
+         }
+         
+         .analyze-btn {
+             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+             color: white;
+             border: none;
+             padding: 1rem 2rem;
+             border-radius: 5px;
+             font-size: 1rem;
+             cursor: pointer;
+             transition: transform 0.2s;
+         }
+         
+         .analyze-btn:hover {
+             transform: translateY(-2px);
+         }
+         
+         .analyze-btn:disabled {
+             background: #ccc;
+             cursor: not-allowed;
+             transform: none;
+         }
+         
+         .results-panel {
+             background: white;
+             border-radius: 10px;
+             padding: 2rem;
+             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+             display: none;
+         }
+         
+         .loading {
+             text-align: center;
+             padding: 2rem;
+             color: #666;
+         }
+         
+         .spinner {
+             border: 4px solid #f3f3f3;
+             border-top: 4px solid #667eea;
+             border-radius: 50%;
+             width: 40px;
+             height: 40px;
+             animation: spin 1s linear infinite;
+             margin: 0 auto 1rem;
+         }
+         
+         @keyframes spin {
+             0% { transform: rotate(0deg); }
+             100% { transform: rotate(360deg); }
+         }
+         
+         .result-item {
+             background: #f8f9fa;
+             border-left: 4px solid #667eea;
+             padding: 1rem;
+             margin: 1rem 0;
+             border-radius: 0 5px 5px 0;
+         }
+         
+         .result-title {
+             font-weight: bold;
+             color: #333;
+             margin-bottom: 0.5rem;
+         }
+         
+         .result-content {
+             color: #666;
+             line-height: 1.5;
+             white-space: pre-wrap;
+         }
+         
+         .error {
+             background: #fee;
+             border-left-color: #e74c3c;
+             color: #c0392b;
+         }
+         
+         .success {
+             background: #efe;
+             border-left-color: #27ae60;
+             color: #27ae60;
+         }
+         
+         .ai-analysis {
+             background: #f0f8ff;
+             border-left-color: #4285f4;
+         }
+         
+         .ai-section {
+             margin: 1rem 0;
+             padding: 1rem;
+             background: #fafafa;
+             border-radius: 5px;
+         }
+         
+         .ai-section-title {
+             font-weight: bold;
+             color: #333;
+             margin-bottom: 0.5rem;
+             text-transform: uppercase;
+             font-size: 0.9rem;
+         }
+         
+         .tabs {
+             display: flex;
+             border-bottom: 2px solid #eee;
+             margin-bottom: 1rem;
+         }
+         
+         .tab {
+             padding: 1rem 1.5rem;
+             cursor: pointer;
+             border-bottom: 2px solid transparent;
+             transition: all 0.3s;
+         }
+         
+         .tab.active {
+             border-bottom-color: #667eea;
+             color: #667eea;
+             font-weight: bold;
+         }
+         
+         .tab-content {
+             display: none;
+         }
+         
+         .tab-content.active {
+             display: block;
+         }
+     </style>
+ </head>
+ <body>
+     <div class="header">
+         <div class="logo">VolatilX</div>
+         <div class="nav-links">
+             <a href="/trade">Trading</a>
+             <a href="/settings">Settings</a>
+             <span>{{ user.email }}</span>
+             <a href="/logout">Logout</a>
+         </div>
+     </div>
+     
+     <div class="container">
+         <div class="trading-panel">
+             <h2 class="panel-title">AI Trading Analysis</h2>
+             <form id="tradingForm">
+                 <div class="input-group">
+                     <label for="stockSymbol">Stock Symbol</label>
+                     <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" required>
+                 </div>
+                 
+                 <div class="checkbox-group">
+                     <input type="checkbox" id="useAiAnalysis" name="use_ai_analysis" {% if user.openai_api_key %}checked{% endif %}>
+                     <label for="useAiAnalysis">Get AI Investment Stragety</label>
+                 </div>
+                 <!-- <div class="radio-group language-radio-group">
+                    <label>Select your language:</label><br>
+                    <input type="radio" id="lang-en" name="language" value="en" checked>
+                    <label for="lang-en">English</label>
+                    <input type="radio" id="lang-tr" name="language" value="tr">
+                    <label for="lang-tr">Turkish</label>
+                    <input type="radio" id="lang-es" name="language" value="es">
+                    <label for="lang-es">Spanish</label>
+                    <input type="radio" id="lang-ja" name="language" value="ja">
+                    <label for="lang-ja">Japanese</label>
+                    <input type="radio" id="lang-zh" name="language" value="zh">
+                    <label for="lang-zh">Chinese</label>
+                </div> -->
+                 
+                 {% if user.openai_api_key %}
+                 <div class="ai-info">
+                     <strong>AI Analysis Enabled:</strong> You'll receive personalized investment strategy including short-term and long-term strategies based on the technical analysis.
+                 </div>
+                 {% else %}
+                 <div class="ai-info">
+                     <strong>AI Analysis Available:</strong> Get AI-powered investment strategy with your analysis.
+                 </div>
+                 {% endif %}
+                 
+                 <button type="submit" class="analyze-btn" id="analyzeBtn">
+                     Analyze Stock
+                 </button>
+             </form>
+         </div>
+         
+         <div class="results-panel" id="resultsPanel">
+             <h2 class="panel-title">Analysis Results</h2>
+             
+             <div class="tabs" id="resultTabs" style="display: none;">
+                 <div class="tab active" onclick="showTab('technical')">Technical Analysis</div>
+                 <div class="tab" onclick="showTab('ai')" id="aiTab">AI Investment Strategy</div>
+             </div>
+             
+             <div id="resultsContent">
+                 <div id="technicalContent" class="tab-content active"></div>
+                 <div id="aiContent" class="tab-content"></div>
+             </div>
+         </div>
+     </div>
+     
+     <script>
+         let currentResults = null;
+         
+         document.getElementById('tradingForm').addEventListener('submit', async function(e) {
+             e.preventDefault();
+             
+             const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
+             const useAiAnalysis = document.getElementById('useAiAnalysis').checked;
+             const analyzeBtn = document.getElementById('analyzeBtn');
+             const resultsPanel = document.getElementById('resultsPanel');
+             const resultsContent = document.getElementById('resultsContent');
+             const resultTabs = document.getElementById('resultTabs');
+             
+             if (!stockSymbol) {
+                 alert('Please enter a stock symbol');
+                 return;
+             }
+             
+             // Show loading state
+             analyzeBtn.disabled = true;
+             analyzeBtn.textContent = useAiAnalysis ? 'Analyzing with AI...' : 'Analyzing...';
+             resultsPanel.style.display = 'block';
+             resultTabs.style.display = 'none';
+             
+             document.getElementById('technicalContent').innerHTML = `
+                 <div class="loading">
+                     <div class="spinner"></div>
+                     <p>Analyzing ${stockSymbol}... This may take a few moments.</p>
+                 </div>
+             `;
+             
+             document.getElementById('aiContent').innerHTML = '';
+             
+             try {
+                 const response = await fetch('/trade', {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json',
+                     },
+                     body: JSON.stringify({
+                         stock_symbol: stockSymbol,
+                         use_ai_analysis: useAiAnalysis
+                     })
+                 });
+                 
+                 const data = await response.json();
+                 
+                 if (data.success) {
+                     currentResults = data;
+                     displayResults(data, stockSymbol);
+                     
+                     if (useAiAnalysis) {
+                         resultTabs.style.display = 'flex';
+                         displayAiAnalysis(data.ai_analysis);
+                     }
+                 } else {
+                     displayError(data.error || 'Analysis failed');
+                 }
+                 
+             } catch (error) {
+                 console.error('Error:', error);
+                 displayError('Network error occurred. Please try again.');
+             } finally {
+                 // Reset button state
+                 analyzeBtn.disabled = false;
+                 analyzeBtn.textContent = 'Analyze Stock';
+             }
+         });
+         
+         function displayResults(data, symbol) {
+             const technicalContent = document.getElementById('technicalContent');
+             const result = data.result;
+             
+             let html = `<div class="result-item success">
+                 <div class="result-title">Technical Analysis Complete for ${symbol}</div>
+                 <div class="result-content">Technical analysis has been completed successfully.</div>
+             </div>`;
+             
+             if (result) {
+                 if (typeof result === 'string') {
+                     html += `<div class="result-item">
+                         <div class="result-title">Trading Recommendation</div>
+                         <div class="result-content">${result}</div>
+                     </div>`;
+                 } else if (typeof result === 'object') {
+                     for (const [key, value] of Object.entries(result)) {
+                         html += `<div class="result-item">
+                             <div class="result-title">${key.replace(/_/g, ' ').toUpperCase()}</div>
+                             <div class="result-content">${JSON.stringify(value, null, 2)}</div>
+                         </div>`;
+                     }
+                 }
+             }
+             
+             technicalContent.innerHTML = html;
+         }
+         
+         function displayAiAnalysis(aiAnalysis) {
+             const aiContent = document.getElementById('aiContent');
+             
+             if (!aiAnalysis) {
+                 aiContent.innerHTML = `<div class="result-item">
+                     <div class="result-title">AI Analysis</div>
+                     <div class="result-content">AI analysis was not requested or failed.</div>
+                 </div>`;
+                 return;
+             }
+             
+             if (!aiAnalysis.success) {
+                 aiContent.innerHTML = `<div class="result-item error">
+                     <div class="result-title">AI Analysis Failed</div>
+                     <div class="result-content">${aiAnalysis.error}</div>
+                 </div>`;
+                 return;
+             }
+             
+             const analysis = aiAnalysis.analysis;
+             let html = `<div class="result-item success ai-analysis">
+                 <div class="result-title">AI Investment strategy</div>
+                 <div class="result-content">AI analysis completed successfully using ${aiAnalysis.tokens_used || 'N/A'} tokens.</div>
+             </div>`;
+             
+             // Display structured analysis
+             if (analysis) {
+                 if (analysis.market_position) {
+                     html += `<div class="ai-section">
+                         <div class="ai-section-title">Current Market Position</div>
+                         <div class="result-content">${analysis.market_position}</div>
+                     </div>`;
+                 }
+                 
+                 if (analysis.short_term_strategy) {
+                     html += `<div class="ai-section">
+                         <div class="ai-section-title">Short-Term Strategy (1-30 days)</div>
+                         <div class="result-content">${analysis.short_term_strategy}</div>
+                     </div>`;
+                 }
+                 
+                 if (analysis.long_term_strategy) {
+                     html += `<div class="ai-section">
+                        <div class="ai-section-title">Long-Term Strategy (3-12 months)</div>
+                        <div class="result-content">${analysis.long_term_strategy}</div>
+                    </div>`;
+                }
+                
+                if (analysis.risk_assessment) {
+                    html += `<div class="ai-section">
+                        <div class="ai-section-title">Risk Assessment</div>
+                        <div class="result-content">${analysis.risk_assessment}</div>
+                    </div>`;
+                }
+                
+                if (analysis.action_items) {
+                    html += `<div class="ai-section">
+                        <div class="ai-section-title">Action Items</div>
+                        <div class="result-content">${analysis.action_items}</div>
+                    </div>`;
+                }
+                
+                if (analysis.summary) {
+                    html += `<div class="ai-section">
+                        <div class="ai-section-title">Summary</div>
+                        <div class="result-content">${analysis.summary}</div>
+                    </div>`;
+                }
+            }
+            
+            // If no structured analysis, show raw response
+            if (!analysis && aiAnalysis.raw_response) {
+                html += `<div class="result-item ai-analysis">
+                    <div class="result-title">AI Investment strategy</div>
+                    <div class="result-content">${aiAnalysis.raw_response}</div>
+                </div>`;
+            }
+            
+            aiContent.innerHTML = html;
+        }
+        
+        function displayError(error) {
+            const technicalContent = document.getElementById('technicalContent');
+            technicalContent.innerHTML = `
+                <div class="result-item error">
+                    <div class="result-title">Analysis Failed</div>
+                    <div class="result-content">${error}</div>
+                </div>
+            `;
+        }
+        
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + 'Content').classList.add('active');
+            
+            // Add active class to selected tab
+            event.target.classList.add('active');
+        }
+        
+        // // Auto-disable AI checkbox if no API key
+        // document.addEventListener('DOMContentLoaded', function() {
+        //     const hasApiKey = {{ 'true' if user.openai_api_key else 'false' }};
+        //     const aiCheckbox = document.getElementById('useAiAnalysis');
+            
+        //     if (!hasApiKey) {
+        //         aiCheckbox.disabled = true;
+        //         aiCheckbox.checked = false;
+        //     }
+        // });
+    </script>
+</body>
+</html>

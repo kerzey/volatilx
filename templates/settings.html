@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VolatilX - Settings</title>
+    <style>
+        /* Your existing styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .nav-links a.active {
+            background: rgba(255, 255, 255, 0.3);
+            font-weight: bold;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .settings-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .panel-title {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+        
+        .section {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .section-description {
+            color: #666;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        
+        .user-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        
+        .user-info strong {
+            color: #333;
+        }
+        
+        .info-box {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .info-box h4 {
+            margin-bottom: 0.5rem;
+            color: #2e7d32;
+        }
+        
+        .info-box p {
+            margin-bottom: 0.5rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-active {
+            background: #4caf50;
+        }
+        
+        .status-inactive {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">VolatilX</div>
+        <div class="nav-links">
+            <a href="/trade">Trading</a>
+            <a href="/settings" class="active">Settings</a>
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="settings-panel">
+            <h1 class="panel-title">Account Settings</h1>
+            
+            <!-- User Information Section -->
+            <div class="section">
+                <h2 class="section-title">Account Information</h2>
+                <p class="section-description">Your account details and status</p>
+                
+                <div class="user-info">
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Account Status:</strong> 
+                        <span class="status-indicator status-active"></span>
+                        Active
+                    </p>
+                    <p><strong>Member Since:</strong> {{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}</p>
+                </div>
+            </div>
+
+            <!-- AI Analysis Status Section -->
+            <div class="section">
+                <h2 class="section-title">AI Analysis</h2>
+                <p class="section-description">AI-powered investment analysis status</p>
+                
+                <div class="info-box">
+                    <h4>✅ AI Analysis Available</h4>
+                    <p>AI-powered investment analysis is enabled for all users.</p>
+                    <p>Get detailed market insights, risk assessments, and trading recommendations powered by advanced AI.</p>
+                    <p><strong>Features included:</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>Market position assessment</li>
+                        <li>Short-term and long-term strategies</li>
+                        <li>Risk analysis and mitigation</li>
+                        <li>Actionable trading recommendations</li>
+                    </ul>
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <span class="status-indicator status-active"></span>
+                    <strong>AI Analysis: Ready to use</strong>
+                </div>
+            </div>
+
+            <!-- Trading Preferences Section -->
+            <div class="section">
+                <h2 class="section-title">Trading Preferences</h2>
+                <p class="section-description">Customize your trading analysis settings</p>
+                
+                <div class="info-box">
+                    <h4>📊 Current Settings</h4>
+                    <p><strong>Buy Threshold:</strong> 70% confidence</p>
+                    <p><strong>Sell Threshold:</strong> 70% confidence</p>
+                    <p><strong>Analysis Mode:</strong> High confidence only</p>
+                    <p><strong>Timeframes:</strong> 1m, 5m, 15m, 30m, 1h, 1d, 1wk</p>
+                </div>
+            </div>
+
+            <!-- Security Section -->
+            <div class="section">
+                <h2 class="section-title">Security</h2>
+                <p class="section-description">Account security and authentication</p>
+                
+                <div class="user-info">
+                    <p><strong>Authentication Method:</strong> 
+                        {% if user.oauth_provider %}
+                            {{ user.oauth_provider.title() }} OAuth
+                        {% else %}
+                            Email & Password
+                        {% endif %}
+                    </p>
+                    <p><strong>Account Verified:</strong> 
+                        {% if user.is_verified %}
+                            <span style="color: #4caf50;">✓ Verified</span>
+                        {% else %}
+                            <span style="color: #f44336;">✗ Not Verified</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
