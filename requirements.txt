@@ -30,3 +30,4 @@ PyJWT==2.8.0
 httpx
 pydantic==2.4.0
 openai>=1.50.0
+bcrypt>=4.0.1
