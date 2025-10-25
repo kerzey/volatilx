@@ -4,6 +4,6 @@ __pycache__/
 
 # Virtual environments
 venv/
-.env/
+.env
+.env*
 .DS_Store
-Procfile
