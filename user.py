@@ -28,20 +28,24 @@ class User(SQLAlchemyBaseUserTable[int], Base):
     oauth_provider = Column(String, nullable=True)
     oauth_id = Column(String, nullable=True)
     # openai_api_key = Column(Text, nullable=True)
+    tier = Column(String, default="free", nullable=False)
 
 class UserRead(schemas.BaseUser[int]):
     oauth_provider: str | None = None
     oauth_id: str | None = None
+    tier: str | None = None
     # openai_api_key: str | None = None
 
 class UserCreate(schemas.BaseUserCreate):
     oauth_provider: str | None = None
     oauth_id: str | None = None
+    tier: str | None = None
     # openai_api_key: str | None = None
 
 class UserUpdate(schemas.BaseUserUpdate):
     oauth_provider: str | None = None
     oauth_id: str | None = None
+    tier: str | None = None
     # openai_api_key: str | None = None
 
 def init_db():

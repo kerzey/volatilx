@@ -3,13 +3,15 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
 # Database URL - Use sync SQLite only
-DATABASE_URL = "sqlite:///./data/users.db"
+# DATABASE_URL = "sqlite:///./data/users.db"
+# DATABASE_URL = "sqlite:///./data/users.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Create sync engine
 engine = create_engine(
     DATABASE_URL, 
     echo=True,  # Set to False in production
-    connect_args={"check_same_thread": False}  # Needed for SQLite
+    # connect_args={"check_same_thread": False}  # Needed for SQLite
 )
 
 # Session maker for sync operations
