@@ -6,11 +6,12 @@ import os
 # DATABASE_URL = "sqlite:///./data/users.db"
 # DATABASE_URL = "sqlite:///./data/users.db"
 DATABASE_URL = os.getenv("DATABASE_URL")
-
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required.")
 # Create sync engine
 engine = create_engine(
     DATABASE_URL, 
-    echo=True,  # Set to False in production
+    echo=False,  # Set to False in production
     # connect_args={"check_same_thread": False}  # Needed for SQLite
 )
 
