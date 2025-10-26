@@ -60,7 +60,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SESSION_SECRET_KEY", "super-secret-for-dev")
 )
-app.add_middleware(ForwardedMiddleware)
+# app.add_middleware(ForwardedMiddleware)
 # app.add_middleware(ProxyHeadersMiddleware) 
 
 # Add CORS middleware
