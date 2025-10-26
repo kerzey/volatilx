@@ -762,6 +762,7 @@
 
         function displayResults(data, symbol) {
              const technicalContent = document.getElementById('technicalContent');
+             const tradeTableDiv = document.getElementById('trade-report-table');
              const result = data.result;
              
              let html = `<div class="result-item success">
@@ -769,19 +770,16 @@
                  <div class="result-content">Technical analysis has been completed successfully.</div>
              </div>`;
              
-             if (result) {
-                 if (typeof result === 'string') {
-                     html += `<div class="result-item">
-                         <div class="result-title">Trading Recommendation</div>
-                         <div class="result-content">${result}</div>
-                     </div>`;
-                 } else if (typeof result === 'object') {
-                    renderTradeTable(result);
-                 }
-             }
-             
-             technicalContent.innerHTML = html;
-         }
+            // Only display summary, not JSON
+            technicalContent.innerHTML = html;
+
+            // If result is an object, show formatted table
+            if (result && typeof result === 'object') {
+                renderTradeTable(result); // This fills trade-report-table div
+            } else {
+                tradeTableDiv.innerHTML = ''; // Clear if not an object
+            }
+        }
          
         function displayAiAnalysis(aiAnalysis) {
              const aiContent = document.getElementById('aiContent');
@@ -891,6 +889,7 @@
             // Add active class to selected tab
             event.target.classList.add('active');
         }
+
 
         
         // // Auto-disable AI checkbox if no API key
