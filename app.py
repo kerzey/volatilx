@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+# from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -57,11 +58,18 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SESSION_SECRET_KEY", "super-secret-for-dev")
 )
+# app.add_middleware(ProxyHeadersMiddleware)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://stock-trading-mvp-ad256f288f84.herokuapp.com", "http://127.0.0.1:8000"],
+    allow_origins=[
+        "https://volatilx.com",
+        "https://www.volatilx.com",
+        "https://volatilx.ai",
+        "https://www.volatilx.ai",
+        "http://127.0.0.1:8000"  # keep this if you use local dev
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
