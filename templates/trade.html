@@ -618,15 +618,16 @@
              
              <div id="resultsContent">
                  <div id="technicalContent" class="tab-content active"></div>
+                 <div id="trade-report-table"></div> 
                  <div id="aiContent" class="tab-content"></div>
              </div>
          </div>
      </div>
      
      <script>
-         let currentResults = null;
+        let currentResults = null;
          
-         document.getElementById('tradingForm').addEventListener('submit', async function(e) {
+        document.getElementById('tradingForm').addEventListener('submit', async function(e) {
              e.preventDefault();
              
              const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
@@ -691,8 +692,75 @@
                  analyzeBtn.textContent = 'Analyze Stock';
              }
          });
-         
-         function displayResults(data, symbol) {
+        
+        function renderTradeTable(tradeReport) {
+            // Helper labels for less technical presentation
+            const labelMap = {
+                recommendation: "Action",
+                confidence: "Confidence Level",
+                strength: "Signal Strength (%)",
+                reasoning: "Key Insights",
+                entry_price: "Suggested Entry",
+                stop_loss: "Suggested Stop-Loss",
+                take_profit: "Target Profit",
+                risk_reward_ratio: "Risk/Reward Ratio"
+            };
+            // Round helper
+            function rd(x) { return typeof x === 'number' ? x.toFixed(2) : x; }
+
+            // Table HTML
+            let html = `<style>
+            .trade-table { border-collapse: collapse; width: 100%; font-size: 1rem; margin: 1rem 0; }
+            .trade-table th, .trade-table td { border: 1px solid #ddd; padding: 8px; }
+            .trade-table th { background-color: #f4f4f4; color: #333; }
+            .trade-table tr:nth-child(even){background-color: #fafafa;}
+            .trade-table tr:hover {background-color: #f1f7ff;}
+            .trade-table td ul { padding-left: 16px; margin:0;}
+            </style>`;
+
+            html += `<h2>Trade Strategy for ${tradeReport.symbol}</h2>`;
+            html += `<p><b>Overall Recommendation:</b> ${tradeReport.consensus.overall_recommendation}</p>`;
+            html += `<p><b>Confidence:</b> ${tradeReport.consensus.confidence}</p>`;
+            html += `<p><b>Buy/Sell/Hold Signals:</b> ${tradeReport.consensus.buy_signals} Buy, ${tradeReport.consensus.sell_signals} Sell, ${tradeReport.consensus.hold_signals} Hold</p>`;
+            html += `<p><b>Consensus Reasoning:</b> <ul>`;
+            tradeReport.consensus.reasoning.forEach(r => { html += `<li>${r}</li>`; });
+            html += `</ul></p>`;
+
+            html += `<table class="trade-table"><thead><tr>
+                <th>Timeframe</th>
+                <th>${labelMap.recommendation}</th>
+                <th>${labelMap.confidence}</th>
+                <th>${labelMap.strength}</th>
+                <th>${labelMap.entry_price}</th>
+                <th>${labelMap.stop_loss}</th>
+                <th>${labelMap.take_profit}</th>
+                <th>${labelMap.risk_reward_ratio}</th>
+                <th>${labelMap.reasoning}</th>
+            </tr></thead><tbody>`;
+
+            for (const [tf, dec] of Object.entries(tradeReport.decisions)) {
+                html += `<tr>
+                    <td><b>${tf.replace('m',' min').replace('h',' hr').replace('d',' day').replace('wk',' week').replace('mo',' month')}</b></td>
+                    <td>${dec.recommendation.replace('BUY','Buy').replace('SELL','Sell').replace('HOLD','Hold')}</td>
+                    <td>${dec.confidence.charAt(0).toUpperCase() + dec.confidence.slice(1)}</td>
+                    <td>${rd(dec.strength)}</td>
+                    <td>${rd(dec.entry_price)}</td>
+                    <td>${rd(dec.stop_loss)}</td>
+                    <td>${rd(dec.take_profit)}</td>
+                    <td>${rd(dec.risk_reward_ratio)}</td>
+                    <td>
+                        <ul>
+                        ${dec.reasoning.map(r => `<li>${r}</li>`).join('')}
+                        </ul>
+                    </td>
+                </tr>`;
+            }
+            html += `</tbody></table>`;
+            html += `<p><b>Analysis Completed In:</b> ${rd(tradeReport.analysis_time_seconds)} seconds</p>`;
+            document.getElementById('trade-report-table').innerHTML = html;
+        }
+
+        function displayResults(data, symbol) {
              const technicalContent = document.getElementById('technicalContent');
              const result = data.result;
              
@@ -708,19 +776,14 @@
                          <div class="result-content">${result}</div>
                      </div>`;
                  } else if (typeof result === 'object') {
-                     for (const [key, value] of Object.entries(result)) {
-                         html += `<div class="result-item">
-                             <div class="result-title">${key.replace(/_/g, ' ').toUpperCase()}</div>
-                             <div class="result-content">${JSON.stringify(value, null, 2)}</div>
-                         </div>`;
-                     }
+                    renderTradeTable(result);
                  }
              }
              
              technicalContent.innerHTML = html;
          }
          
-         function displayAiAnalysis(aiAnalysis) {
+        function displayAiAnalysis(aiAnalysis) {
              const aiContent = document.getElementById('aiContent');
              
              if (!aiAnalysis) {
@@ -828,6 +891,7 @@
             // Add active class to selected tab
             event.target.classList.add('active');
         }
+
         
         // // Auto-disable AI checkbox if no API key
         // document.addEventListener('DOMContentLoaded', function() {
