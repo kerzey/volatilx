@@ -4,7 +4,7 @@ yfinance
 pandas
 numpy
 matplotlib
-scipy<2.3.0
+scipy==1.11.0
 uvicorn==0.23.2
 fastapi==0.103.1
 alpaca-trade-api==2.3.0
