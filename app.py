@@ -7,7 +7,9 @@ from fastapi.templating import Jinja2Templates
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-# from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
+# from starlette.middleware.trustedhost import ProxyHeadersMiddleware
+# from starlette.middleware.trustedhost import ForwardedMiddleware
+from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -58,7 +60,8 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("SESSION_SECRET_KEY", "super-secret-for-dev")
 )
-# app.add_middleware(ProxyHeadersMiddleware)
+app.add_middleware(ForwardedMiddleware)
+# app.add_middleware(ProxyHeadersMiddleware) 
 
 # Add CORS middleware
 app.add_middleware(
@@ -195,8 +198,14 @@ async def azure_callback(request: Request):
 ##############################################################################################
 @app.get("/auth/google/login")
 async def google_login(request: Request):
-    redirect_uri = request.url_for("google_callback")
+    # Pin HTTPS, respect incoming domain
+    host = request.headers.get("host", "www.volatilx.com")
+    redirect_uri = f"https://{host}/auth/google/callback"
     return await oauth.google.authorize_redirect(request, redirect_uri)
+# @app.get("/auth/google/login")
+# async def google_login(request: Request):
+#     redirect_uri = request.url_for("google_callback")
+#     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/google/callback")
 async def google_callback(request: Request):
