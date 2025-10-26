@@ -671,7 +671,7 @@
                  
                  const data = await response.json();
                  
-                 if (data.success) {
+                 if (data.successdata.success && result) {
                      currentResults = data;
                      displayResults(data, stockSymbol);
                      
@@ -763,8 +763,7 @@
         function displayResults(data, symbol) {
              const technicalContent = document.getElementById('technicalContent');
              const tradeTableDiv = document.getElementById('trade-report-table');
-             const result = data.result;
-             
+             const result = data.result && data.result[data.symbol];             
              let html = `<div class="result-item success">
                  <div class="result-title">Technical Analysis Complete for ${symbol}</div>
                  <div class="result-content">Technical analysis has been completed successfully.</div>
