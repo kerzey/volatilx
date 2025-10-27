@@ -1,308 +1,4 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VolatilX - Trading Dashboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            min-height: 100vh;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .logo {
-            font-size: 1.8rem;
-            font-weight: bold;
-        }
-        
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .logout-btn {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 2rem;
-        }
-        
-        .trading-panel {
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-        }
-        
-        .panel-title {
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
-            color: #333;
-        }
-        
-        .input-group {
-            margin-bottom: 1.5rem;
-        }
-        
-        .input-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: #555;
-        }
-        
-        .input-group input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-        
-        .input-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .analyze-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 5px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .analyze-btn:hover {
-            transform: translateY(-2px);
-        }
-        
-        .analyze-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .results-panel {
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            display: none;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 2rem;
-            color: #666;
-        }
-        
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .result-item {
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 0 5px 5px 0;
-        }
-        
-        .result-title {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        
-        .result-content {
-            color: #666;
-            line-height: 1.5;
-        }
-        
-        .error {
-            background: #fee;
-            border-left-color: #e74c3c;
-            color: #c0392b;
-        }
-        
-        .success {
-            background: #efe;
-            border-left-color: #27ae60;
-            color: #27ae60;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="logo">VolatilX</div>
-        <div class="user-info">
-            <span>Welcome, {{ user.email }}</span>
-            <a href="/logout" class="logout-btn">Logout</a>
-        </div>
-    </div>
-    
-    <div class="container">
-        <div class="trading-panel">
-            <h2 class="panel-title">AI Trading Analysis</h2>
-            <form id="tradingForm">
-                <div class="input-group">
-                    <label for="stockSymbol">Stock Symbol</label>
-                    <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" required>
-                </div>
-                <button type="submit" class="analyze-btn" id="analyzeBtn">
-                    Analyze Stock
-                </button>
-            </form>
-        </div>
-        
-        <div class="results-panel" id="resultsPanel">
-            <h2 class="panel-title">Analysis Results</h2>
-            <div id="resultsContent"></div>
-        </div>
-    </div>
-    
-    <script>
-        document.getElementById('tradingForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
-            const analyzeBtn = document.getElementById('analyzeBtn');
-            const resultsPanel = document.getElementById('resultsPanel');
-            const resultsContent = document.getElementById('resultsContent');
-            
-            if (!stockSymbol) {
-                alert('Please enter a stock symbol');
-                return;
-            }
-            
-            // Show loading state
-            analyzeBtn.disabled = true;
-            analyzeBtn.textContent = 'Analyzing...';
-            resultsPanel.style.display = 'block';
-            resultsContent.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Analyzing ${stockSymbol}... This may take a few moments.</p>
-                </div>
-            `;
-            
-            try {
-                const response = await fetch('/trade', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        stock_symbol: stockSymbol
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    displayResults(data.result, stockSymbol);
-                } else {
-                    displayError(data.error || 'Analysis failed');
-                }
-                
-            } catch (error) {
-                console.error('Error:', error);
-                displayError('Network error occurred. Please try again.');
-            } finally {
-                // Reset button state
-                analyzeBtn.disabled = false;
-                analyzeBtn.textContent = 'Analyze Stock';
-            }
-        });
-        
-        function displayResults(result, symbol) {
-            const resultsContent = document.getElementById('resultsContent');
-            
-            let html = `<div class="result-item success">
-                <div class="result-title">Analysis Complete for ${symbol}</div>
-                <div class="result-content">AI analysis has been completed successfully.</div>
-            </div>`;
-            
-            if (result) {
-                if (typeof result === 'string') {
-                    html += `<div class="result-item">
-                        <div class="result-title">Trading Recommendation</div>
-                        <div class="result-content">${result}</div>
-                    </div>`;
-                } else if (typeof result === 'object') {
-                    for (const [key, value] of Object.entries(result)) {
-                        html += `<div class="result-item">
-                            <div class="result-title">${key.replace(/_/g, ' ').toUpperCase()}</div>
-                            <div class="result-content">${JSON.stringify(value, null, 2)}</div>
-                        </div>`;
-                    }
-                }
-            }
-            
-            resultsContent.innerHTML = html;
-        }
-        
-        function displayError(error) {
-            const resultsContent = document.getElementById('resultsContent');
-            resultsContent.innerHTML = `
-                <div class="result-item error">
-                    <div class="result-title">Analysis Failed</div>
-                    <div class="result-content">${error}</div>
-                </div>
-            `;
-        }
-    </script>
-</body>
-</html>
- -->
-
- <! DOCTYPE html>
+<! DOCTYPE html>
  <html lang="en">
  <head>
      <meta charset="UTF-8">
@@ -618,16 +314,15 @@
              
              <div id="resultsContent">
                  <div id="technicalContent" class="tab-content active"></div>
-                 <div id="trade-report-table"></div> 
                  <div id="aiContent" class="tab-content"></div>
              </div>
          </div>
      </div>
      
      <script>
-        let currentResults = null;
+         let currentResults = null;
          
-        document.getElementById('tradingForm').addEventListener('submit', async function(e) {
+         document.getElementById('tradingForm').addEventListener('submit', async function(e) {
              e.preventDefault();
              
              const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
@@ -671,7 +366,7 @@
                  
                  const data = await response.json();
                  
-                 if (data.successdata.success && result) {
+                 if (data.success) {
                      currentResults = data;
                      displayResults(data, stockSymbol);
                      
@@ -692,95 +387,36 @@
                  analyzeBtn.textContent = 'Analyze Stock';
              }
          });
-        
-        function renderTradeTable(tradeReport) {
-            // Helper labels for less technical presentation
-            const labelMap = {
-                recommendation: "Action",
-                confidence: "Confidence Level",
-                strength: "Signal Strength (%)",
-                reasoning: "Key Insights",
-                entry_price: "Suggested Entry",
-                stop_loss: "Suggested Stop-Loss",
-                take_profit: "Target Profit",
-                risk_reward_ratio: "Risk/Reward Ratio"
-            };
-            // Round helper
-            function rd(x) { return typeof x === 'number' ? x.toFixed(2) : x; }
-
-            // Table HTML
-            let html = `<style>
-            .trade-table { border-collapse: collapse; width: 100%; font-size: 1rem; margin: 1rem 0; }
-            .trade-table th, .trade-table td { border: 1px solid #ddd; padding: 8px; }
-            .trade-table th { background-color: #f4f4f4; color: #333; }
-            .trade-table tr:nth-child(even){background-color: #fafafa;}
-            .trade-table tr:hover {background-color: #f1f7ff;}
-            .trade-table td ul { padding-left: 16px; margin:0;}
-            </style>`;
-
-            html += `<h2>Trade Strategy for ${tradeReport.symbol}</h2>`;
-            html += `<p><b>Overall Recommendation:</b> ${tradeReport.consensus.overall_recommendation}</p>`;
-            html += `<p><b>Confidence:</b> ${tradeReport.consensus.confidence}</p>`;
-            html += `<p><b>Buy/Sell/Hold Signals:</b> ${tradeReport.consensus.buy_signals} Buy, ${tradeReport.consensus.sell_signals} Sell, ${tradeReport.consensus.hold_signals} Hold</p>`;
-            html += `<p><b>Consensus Reasoning:</b> <ul>`;
-            tradeReport.consensus.reasoning.forEach(r => { html += `<li>${r}</li>`; });
-            html += `</ul></p>`;
-
-            html += `<table class="trade-table"><thead><tr>
-                <th>Timeframe</th>
-                <th>${labelMap.recommendation}</th>
-                <th>${labelMap.confidence}</th>
-                <th>${labelMap.strength}</th>
-                <th>${labelMap.entry_price}</th>
-                <th>${labelMap.stop_loss}</th>
-                <th>${labelMap.take_profit}</th>
-                <th>${labelMap.risk_reward_ratio}</th>
-                <th>${labelMap.reasoning}</th>
-            </tr></thead><tbody>`;
-
-            for (const [tf, dec] of Object.entries(tradeReport.decisions)) {
-                html += `<tr>
-                    <td><b>${tf.replace('m',' min').replace('h',' hr').replace('d',' day').replace('wk',' week').replace('mo',' month')}</b></td>
-                    <td>${dec.recommendation.replace('BUY','Buy').replace('SELL','Sell').replace('HOLD','Hold')}</td>
-                    <td>${dec.confidence.charAt(0).toUpperCase() + dec.confidence.slice(1)}</td>
-                    <td>${rd(dec.strength)}</td>
-                    <td>${rd(dec.entry_price)}</td>
-                    <td>${rd(dec.stop_loss)}</td>
-                    <td>${rd(dec.take_profit)}</td>
-                    <td>${rd(dec.risk_reward_ratio)}</td>
-                    <td>
-                        <ul>
-                        ${dec.reasoning.map(r => `<li>${r}</li>`).join('')}
-                        </ul>
-                    </td>
-                </tr>`;
-            }
-            html += `</tbody></table>`;
-            html += `<p><b>Analysis Completed In:</b> ${rd(tradeReport.analysis_time_seconds)} seconds</p>`;
-            document.getElementById('trade-report-table').innerHTML = html;
-        }
-
-        function displayResults(data, symbol) {
+         
+         function displayResults(data, symbol) {
              const technicalContent = document.getElementById('technicalContent');
-             const tradeTableDiv = document.getElementById('trade-report-table');
-             const result = data.result && data.result[data.symbol];             
+             const result = data.result;
+             
              let html = `<div class="result-item success">
                  <div class="result-title">Technical Analysis Complete for ${symbol}</div>
                  <div class="result-content">Technical analysis has been completed successfully.</div>
              </div>`;
              
-            // Only display summary, not JSON
-            technicalContent.innerHTML = html;
-
-            // If result is an object, show formatted table
-            if (result && typeof result === 'object') {
-                renderTradeTable(result); // This fills trade-report-table div
-            } else {
-                tradeTableDiv.innerHTML = ''; // Clear if not an object
-            }
-        }
+             if (result) {
+                 if (typeof result === 'string') {
+                     html += `<div class="result-item">
+                         <div class="result-title">Trading Recommendation</div>
+                         <div class="result-content">${result}</div>
+                     </div>`;
+                 } else if (typeof result === 'object') {
+                     for (const [key, value] of Object.entries(result)) {
+                         html += `<div class="result-item">
+                             <div class="result-title">${key.replace(/_/g, ' ').toUpperCase()}</div>
+                             <div class="result-content">${JSON.stringify(value, null, 2)}</div>
+                         </div>`;
+                     }
+                 }
+             }
+             
+             technicalContent.innerHTML = html;
+         }
          
-        function displayAiAnalysis(aiAnalysis) {
+         function displayAiAnalysis(aiAnalysis) {
              const aiContent = document.getElementById('aiContent');
              
              if (!aiAnalysis) {
@@ -888,8 +524,6 @@
             // Add active class to selected tab
             event.target.classList.add('active');
         }
-
-
         
         // // Auto-disable AI checkbox if no API key
         // document.addEventListener('DOMContentLoaded', function() {
