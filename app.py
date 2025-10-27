@@ -411,17 +411,19 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         
         # Run the trading analysis
         print("=== RUNNING TRADING ANALYSIS ===")
-        result = agent.run_sequential()
-        
-        # Export results (returns data without writing to file)
-        if hasattr(agent, 'export_results'):
-            try:
-                export_data, json_string, filename = agent.export_results(result)
-                result_data = export_data
-            except ValueError:
-                result_data = agent.export_results(result)
-        else:
-            result_data = result
+        results = agent.run_sequential()
+        if results:
+            result_data = agent.export_results(results)
+            result_data =result_data[1]
+        # # Export results (returns data without writing to file)
+        # if hasattr(agent, 'export_results'):
+        #     try:
+        #         export_data, json_string, filename = agent.export_results(result)
+        #         result_data = export_data
+        #     except ValueError:
+        #         result_data = agent.export_results(result)
+        # else:
+        #     result_data = result
         
         # print("=== RAW RESULT DATA ===")
         # print("Result data type:", type(result_data))
@@ -712,3 +714,13 @@ async def openai_detailed_status(user: User = Depends(get_current_user_sync)):
             },
             status_code=500
         )
+# if __name__ == "__main__":
+#     import uvicorn
+
+#     # Run the FastAPI app with Uvicorn
+#     uvicorn.run(
+#         "app:app",  # "app" is the filename, and "app" is the FastAPI instance
+#         host="127.0.0.1",  # Localhost
+#         port=8000,         # Port number
+#         reload=True        # Enable auto-reload for development
+#     )

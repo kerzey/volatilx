@@ -610,7 +610,7 @@ class MultiSymbolDayTraderAgent:
             results = self.analyzer.analyze_comprehensive_multi_timeframe(
                 symbol=symbol, 
                 timeframes=self.timeframes,
-                base_period='3mo'
+                base_period='5y'
             )
             
             if not results:
@@ -1054,12 +1054,14 @@ class MultiSymbolDayTraderAgent:
             print(f"✅ Results prepared for export (filename would be: {filename})")
             
             # Return both the data and the JSON string
+            # print('prinnntt jsonnn', json_string)
+
             return export_data, json_string, filename
-            
+         
         except Exception as e:
             print(f"❌ Error preparing results for export: {e}")
             return None, None, None
-    
+        
     def set_trading_parameters(self, buy_threshold=70, sell_threshold=70, high_confidence_only=True):
         """Set trading decision parameters"""
         self.buy_threshold = buy_threshold
@@ -1199,12 +1201,12 @@ if __name__ == "__main__":
     print("=" * 50)
     
     # Example with single symbol - use valid timeframes only
-    symbols = ['OKLO']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
+    symbols = ['SPY']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
     
     # Initialize the agent with valid timeframes (no 90m)
     multi_trader = MultiSymbolDayTraderAgent(
         symbols=symbols,
-        timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk']  # Removed 90m, 5d, 1wk for Alpaca compatibility
+        timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']  # Removed 90m, 5d, 1wk for Alpaca compatibility
     )
     api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
     secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
@@ -1218,7 +1220,7 @@ if __name__ == "__main__":
     )
     
     # Print current status
-    multi_trader.print_status()
+    # multi_trader.print_status()
     
     # You would uncomment and set your actual Alpaca credentials here:
     # multi_trader.set_credentials('your_api_key', 'your_secret_key')
@@ -1230,7 +1232,8 @@ if __name__ == "__main__":
     # print("Resutls ", results)
     # Export results to file
     if results:
-        multi_trader.export_results(results)
+        a=multi_trader.export_results(results)
+    print('aaaaa', a[1])
     
     # Uncomment to run parallel analysis instead:
     # thread = multi_trader.run_parallel()

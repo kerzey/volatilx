@@ -2439,7 +2439,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return start_date, end_date
     
-    def get_stock_data(self, symbol, interval='1d', period='18mo'):
+    def get_stock_data(self, symbol, interval='1d', period='5y'):
         """Fetch stock data with specified interval using Alpaca API"""
         if not self.api:
             raise ValueError("Alpaca API credentials not set. Use set_credentials() method.")
@@ -2894,7 +2894,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
                     'stop_loss': support,
                     'take_profit': resistance
                 }
-        
+        # print("Signallllls", signals)
         return signals
     
     def _score_basic_indicators(self, basic_indicators):
@@ -3042,7 +3042,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return bullish_score, bearish_score, signals
     
-    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='36mo'):
+    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='5y'):
         """Comprehensive analysis across multiple timeframes"""
         if timeframes is None:
             timeframes = ['5m', '15m', '1h', '1d']
@@ -3058,16 +3058,18 @@ class ComprehensiveMultiTimeframeAnalyzer:
             
             # Adjust period based on interval
             if interval in ['1m', '2m']:
-                period = '1d'
-            elif interval in ['5m', '15m', '30m']:
                 period = '5d'
+            elif interval in ['5m', '15m', '30m']:
+                period = '10d'
             elif interval in ['60m', '1h']:
-                period = '2 mo'
-            elif interval in ['1d', '1wk']:
-                period = '18mo'
+                period = '3 mo'
+            elif interval in ['1d', '1d']:
+                period='1y'
+            elif interval in ['1wk', '1wk']:
+                period = '2y'
             else:
                 period = base_period
-            
+
             # Get data
             df = self.get_stock_data(symbol, interval=interval, period=period)
             
@@ -3866,7 +3868,8 @@ class AdvancedFibonacciAnalyzer:
         self.fib_levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.414, 1.618]
         self.fib_names = ['0%', '23.6%', '38.2%', '50%', '61.8%', '78.6%', '100%', '127.2%', '141.4%', '161.8%']
     
-    def find_swing_points(self, df, lookback=10):
+    def find_swing_points(self, df, lookback=15):
+      
         """Find swing highs and lows using peak detection"""
         highs = df['High'].values
         lows = df['Low'].values
@@ -3882,12 +3885,24 @@ class AdvancedFibonacciAnalyzer:
         return swing_highs, swing_lows
     
     def calculate_fibonacci_retracements(self, df, period_days=60, auto_detect=True):
+        # print("printttt df", df)
         """Calculate Fibonacci retracements with multiple methods"""
         recent_data = df.tail(period_days)
+          # Adjust period based on interval
+        # if recent_data in ['1m', '2m']:
+        #     period = '5d'
+        # elif recent_data in ['5m', '15m', '30m']:
+        #     period = '10d'
+        # elif recent_data in ['60m', '1h']:
+        #     period = '3 mo'
+        # elif intrecent_dataerval in ['1d', '1wk']:
+        #     period = '2y'
+        # else:
+        #     period = base_period
         
         if auto_detect:
             # Method 1: Auto-detect swing points
-            swing_highs, swing_lows = self.find_swing_points(recent_data, lookback=5)
+            swing_highs, swing_lows = self.find_swing_points(recent_data, lookback=15)
             
             if swing_highs and swing_lows:
                 # Get the most recent significant high and low
@@ -3958,9 +3973,15 @@ class AdvancedFibonacciAnalyzer:
             'nearest_support': nearest_support,
             'nearest_resistance': nearest_resistance,
             'key_levels': {
+                '23.6%': fib_levels['23.6%']['price'],
                 '38.2%': fib_levels['38.2%']['price'],
                 '50%': fib_levels['50%']['price'],
-                '61.8%': fib_levels['61.8%']['price']
+                '61.8%': fib_levels['61.8%']['price'],
+                '78.6%': fib_levels['78.6%']['price'],
+                '100%': fib_levels['100%']['price'],
+                '127.2%': fib_levels['127.2%']['price'],
+                '141.4%': fib_levels['141.4%']['price'],
+                '161.8%': fib_levels['161.8%']['price']
             }
         }
 
@@ -4165,10 +4186,12 @@ def run_comprehensive_analysis_example():
     
     # Initialize the analyzer (you'll need to provide your Alpaca API credentials)
     analyzer = ComprehensiveMultiTimeframeAnalyzer()
-    
+    api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
+    secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
+    analyzer.set_credentials(api_key,secret_key)
     # For demonstration, let's analyze a popular stock
-    symbol = "AAPL"
-    timeframes = ['15m', '1h', '1d']
+    symbol = "ASML"
+    timeframes = ['5m','15m','30m', '1h', '1d', '1wk','1mo']
     
     print(f"🚀 Running comprehensive analysis for {symbol}")
     print("=" * 80)
@@ -4178,7 +4201,7 @@ def run_comprehensive_analysis_example():
         results = analyzer.analyze_comprehensive_multi_timeframe(
             symbol=symbol,
             timeframes=timeframes,
-            base_period='3mo'
+            base_period='5y'
         )
         
         # Print the results
@@ -4201,7 +4224,7 @@ def setup_analyzer_with_credentials():
     api_key = "YOUR_ALPACA_API_KEY"
     secret_key = "YOUR_ALPACA_SECRET_KEY"
     
-    analyzer = ComprehensiveStockAnalyzer(api_key=api_key, secret_key=secret_key)
+    analyzer = ComprehensiveMultiTimeframeAnalyzer(api_key=api_key, secret_key=secret_key)
     
     return analyzer
 
@@ -4241,33 +4264,43 @@ def demo_elliott_wave_analysis():
     print(f"\nSupported patterns: {list(wave_analyzer.wave_patterns.keys())}")
 
 if __name__ == "__main__":
-    print("🚀 Comprehensive Stock Analysis System")
-    print("=" * 50)
+    run_comprehensive_analysis_example()
+    # multi_trader = ComprehensiveMultiTimeframeAnalyzer(
+    #     symbols=['DUOL'],
+    #     timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']  # Removed 90m, 5d, 1wk for Alpaca compatibility
+    # )
+    # api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
+    # secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
+    # multi_trader.set_credentials(api_key=api_key, secret_key=secret_key)
+    # run_comprehensive_analysis_example()
+
+    # print("🚀 Comprehensive Stock Analysis System")
+    # print("=" * 50)
     
-    print("\nThis system provides:")
-    print("✅ Multi-timeframe technical analysis")
-    print("✅ Advanced Fibonacci retracements")
-    print("✅ Elliott Wave pattern detection")
-    print("✅ Comprehensive trading signals")
-    print("✅ Risk/reward calculations")
-    print("✅ Multi-timeframe consensus")
+    # print("\nThis system provides:")
+    # print("✅ Multi-timeframe technical analysis")
+    # print("✅ Advanced Fibonacci retracements")
+    # print("✅ Elliott Wave pattern detection")
+    # print("✅ Comprehensive trading signals")
+    # print("✅ Risk/reward calculations")
+    # print("✅ Multi-timeframe consensus")
     
-    print("\n📊 Features:")
-    print("• MACD, ADX, RSI, OBV, Bollinger Bands")
-    print("• Automatic swing point detection")
-    print("• Wave pattern recognition")
-    print("• Support/resistance identification")
-    print("• Trading signal generation")
-    print("• Timeframe correlation analysis")
+    # print("\n📊 Features:")
+    # print("• MACD, ADX, RSI, OBV, Bollinger Bands")
+    # print("• Automatic swing point detection")
+    # print("• Wave pattern recognition")
+    # print("• Support/resistance identification")
+    # print("• Trading signal generation")
+    # print("• Timeframe correlation analysis")
     
     # Run demos
-    demo_fibonacci_analysis()
-    demo_elliott_wave_analysis()
-    
-    print("\n" + "=" * 50)
-    print("To use with real data:")
-    print("1. Get Alpaca API credentials")
-    print("2. Initialize analyzer with credentials")
-    print("3. Run analysis on your chosen symbols")
-    print("4. Review multi-timeframe results")
-    print("5. Make informed trading decisions")
+    # demo_fibonacci_analysis()
+    # demo_elliott_wave_analysis()
+    # 
+    # print("\n" + "=" * 50)
+    # print("To use with real data:")
+    # print("1. Get Alpaca API credentials")
+    # print("2. Initialize analyzer with credentials")
+    # print("3. Run analysis on your chosen symbols")
+    # print("4. Review multi-timeframe results")
+    # print("5. Make informed trading decisions")
