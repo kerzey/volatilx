@@ -7,7 +7,7 @@ name: Build and deploy Python app to Azure Web App - volatilx
 on:
   push:
     branches:
-      - v1.1
+      - main
   workflow_dispatch:
 
 jobs:
@@ -75,3 +75,4 @@ jobs:
           slot-name: 'Production'
 
           
+
