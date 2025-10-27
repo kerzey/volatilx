@@ -389,33 +389,111 @@
          });
          
          function displayResults(data, symbol) {
-             const technicalContent = document.getElementById('technicalContent');
-             const result = data.result;
-             
-             let html = `<div class="result-item success">
-                 <div class="result-title">Technical Analysis Complete for ${symbol}</div>
-                 <div class="result-content">Technical analysis has been completed successfully.</div>
-             </div>`;
-             
-             if (result) {
-                 if (typeof result === 'string') {
-                     html += `<div class="result-item">
-                         <div class="result-title">Trading Recommendation</div>
-                         <div class="result-content">${result}</div>
-                     </div>`;
-                 } else if (typeof result === 'object') {
-                     for (const [key, value] of Object.entries(result)) {
-                         html += `<div class="result-item">
-                             <div class="result-title">${key.replace(/_/g, ' ').toUpperCase()}</div>
-                             <div class="result-content">${JSON.stringify(value, null, 2)}</div>
-                         </div>`;
-                     }
-                 }
-             }
-             
-             technicalContent.innerHTML = html;
-         }
-         
+    const technicalContent = document.getElementById('technicalContent');
+    const result = data.result;
+
+    // Defensive check for existence of symbol data
+    const symbolData = result && result[symbol] ? result[symbol] : null;
+    if (!symbolData) {
+        technicalContent.innerHTML = `
+            <div class="result-item error">
+                <div class="result-title">Result Not Found</div>
+                <div class="result-content">No analysis data for ${symbol}.</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Consensus summary table
+    const cons = symbolData.consensus;
+    let consensusHtml = `<table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+        <tr style="background:#667eea;color:white;">
+            <th colspan="2" style="padding:8px;">Consensus Summary</th>
+        </tr>
+        <tr>
+            <td>Overall Recommendation</td>
+            <td><strong>${cons.overall_recommendation}</strong></td>
+        </tr>
+        <tr>
+            <td>Confidence</td>
+            <td>${cons.confidence}</td>
+        </tr>
+        <tr>
+            <td>Strength</td>
+            <td>${cons.strength.toFixed(2)}%</td>
+        </tr>
+        <tr>
+            <td>Buy Signals</td>
+            <td>${cons.buy_signals}</td>
+        </tr>
+        <tr>
+            <td>Sell Signals</td>
+            <td>${cons.sell_signals}</td>
+        </tr>
+        <tr>
+            <td>Hold Signals</td>
+            <td>${cons.hold_signals}</td>
+        </tr>
+        <tr>
+            <td>Reasoning</td>
+            <td>
+            <ul>
+            ${cons.reasoning.map(item => `<li>${item}</li>`).join('')}
+            </ul>
+            </td>
+        </tr>
+    </table>`;
+
+    // Decisions by timeframe
+    const decisions = symbolData.decisions;
+    let decisionHtml = `<table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr style="background:#764ba2;color:white;">
+                <th>Timeframe</th>
+                <th>Rec.</th>
+                <th>Conf.</th>
+                <th>Strength</th>
+                <th>Entry</th>
+                <th>Stop</th>
+                <th>Target</th>
+                <th>R/R</th>
+                <th>Reasoning</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (const [tf, d] of Object.entries(decisions)) {
+        decisionHtml += `
+            <tr>
+                <td>${tf}</td>
+                <td style="color:${d.recommendation === 'BUY' ? '#27ae60' : d.recommendation === 'SELL' ? '#e74c3c' : '#333'};font-weight:bold">${d.recommendation}</td>
+                <td>${d.confidence}</td>
+                <td>${d.strength.toFixed(2)}%</td>
+                <td>$${d.entry_price}</td>
+                <td>$${d.stop_loss}</td>
+                <td>$${d.take_profit}</td>
+                <td>${d.risk_reward_ratio.toFixed(2)}</td>
+                <td>
+                    <ul>
+                    ${d.reasoning.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </td>
+            </tr>
+        `;
+    }
+    decisionHtml += "</tbody></table>";
+
+    technicalContent.innerHTML = `
+        <div class="result-item success">
+            <div class="result-title">Technical Analysis Table for ${symbol}</div>
+            <div class="result-content">
+                ${consensusHtml}
+                ${decisionHtml}
+            </div>
+        </div>
+    `;
+}
          function displayAiAnalysis(aiAnalysis) {
              const aiContent = document.getElementById('aiContent');
              

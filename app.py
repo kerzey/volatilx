@@ -374,7 +374,7 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
     try:
         # Get JSON data from request
         data = await request.json()
-        print("=== TRADE ENDPOINT DEBUG ===")
+        # print("=== TRADE ENDPOINT DEBUG ===")
         print("Printing data:", data)
         
         # Extract variables from the request data
