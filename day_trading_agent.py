@@ -1201,7 +1201,7 @@ if __name__ == "__main__":
     print("=" * 50)
     
     # Example with single symbol - use valid timeframes only
-    symbols = ['SPY']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
+    symbols = ['ASML']#,'ASML','TSLA', "LULU","ORCL"]#,'SpY','QQQ','ETH','SMCI','BTC','NVDA']
     
     # Initialize the agent with valid timeframes (no 90m)
     multi_trader = MultiSymbolDayTraderAgent(
