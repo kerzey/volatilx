@@ -3062,7 +3062,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
             elif interval in ['5m', '15m', '30m']:
                 period = '10d'
             elif interval in ['60m', '1h']:
-                period = '3 mo'
+                period = '1 mo'
             elif interval in ['1d', '1d']:
                 period='1y'
             elif interval in ['1wk', '1wk']:
@@ -3960,7 +3960,18 @@ class AdvancedFibonacciAnalyzer:
             elif price > current_price:
                 if nearest_resistance is None or price < nearest_resistance['price']:
                     nearest_resistance = {'level': name, 'price': price}
-        
+        key_levels=  {
+                '23.6%': fib_levels['23.6%']['price'],
+                '38.2%': fib_levels['38.2%']['price'],
+                '50%': fib_levels['50%']['price'],
+                '61.8%': fib_levels['61.8%']['price'],
+                '78.6%': fib_levels['78.6%']['price'],
+                '100%': fib_levels['100%']['price'],
+                '127.2%': fib_levels['127.2%']['price'],
+                '141.4%': fib_levels['141.4%']['price'],
+                '161.8%': fib_levels['161.8%']['price']
+            }
+        print("Fibonacci Key Levels:", key_levels)
         return {
             'trend_direction': trend_direction,
             'high_price': high_price,
@@ -3983,6 +3994,7 @@ class AdvancedFibonacciAnalyzer:
                 '141.4%': fib_levels['141.4%']['price'],
                 '161.8%': fib_levels['161.8%']['price']
             }
+
         }
 
 class ElliottWaveAnalyzer:

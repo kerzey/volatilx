@@ -269,11 +269,20 @@
                      <label for="stockSymbol">Stock Symbol</label>
                      <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" required>
                  </div>
-                 
-                 <div class="checkbox-group">
+                 <div class="input-group">
+                    <label>Get AI Investment Strategy?</label>
+                    <div style="display:flex;gap:1rem;align-items:center">
+                        <input type="radio" id="ai-no" name="use_ai_analysis" value="no" checked>
+                        <label for="ai-no">No (Faster & Free)</label>
+                        <input type="radio" id="ai-yes" name="use_ai_analysis" value="yes">
+                        <label for="ai-yes">Yes (Slower, uses credits)</label>
+                    </div>
+                </div>
+                 # AI Analysis Option (Disabled for now)
+                 <!-- <div class="checkbox-group">
                      <input type="checkbox" id="useAiAnalysis" name="use_ai_analysis" {% if user.openai_api_key %}checked{% endif %}>
                      <label for="useAiAnalysis">Get AI Investment Stragety</label>
-                 </div>
+                 </div> -->
                  <!-- <div class="radio-group language-radio-group">
                     <label>Select your language:</label><br>
                     <input type="radio" id="lang-en" name="language" value="en" checked>
@@ -326,7 +335,8 @@
              e.preventDefault();
              
              const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
-             const useAiAnalysis = document.getElementById('useAiAnalysis').checked;
+            //  const useAiAnalysis = document.getElementById('useAiAnalysis').checked;
+            document.querySelector('input[name="use_ai_analysis"]:checked').value === 'yes';
              const analyzeBtn = document.getElementById('analyzeBtn');
              const resultsPanel = document.getElementById('resultsPanel');
              const resultsContent = document.getElementById('resultsContent');
