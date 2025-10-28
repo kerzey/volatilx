@@ -414,21 +414,11 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         results = agent.run_sequential()
         if results:
             result_data = agent.export_results(results)
-            result_data =result_data[1]
-        # # Export results (returns data without writing to file)
-        # if hasattr(agent, 'export_results'):
-        #     try:
-        #         export_data, json_string, filename = agent.export_results(result)
-        #         result_data = export_data
-        #     except ValueError:
-        #         result_data = agent.export_results(result)
-        # else:
-        #     result_data = result
-        
-        # print("=== RAW RESULT DATA ===")
-        # print("Result data type:", type(result_data))
-        # print("Result data keys:", list(result_data.keys()) if isinstance(result_data, dict) else "Not a dict")
-        # print("Result data sample:", str(result_data)[:500] + "..." if len(str(result_data)) > 500 else str(result_data))
+            # If result_data[1] is a string, parse it:
+            if isinstance(result_data[1], str):
+                result_data_json = json.loads(result_data[1])  # ensures you have a dict
+            else:
+                result_data_json = result_data[1]
         print("Raw result for AI:", result_data)
         # AI Analysis if requested
         ai_analysis = None
@@ -465,7 +455,7 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         
         response = {
             'success': True,
-            'result': result_data,
+            'result': result_data_json,
             'ai_analysis': ai_analysis,
             'symbol': stock_symbol,
             'timestamp': str(datetime.now())
