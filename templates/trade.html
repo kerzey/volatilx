@@ -471,40 +471,40 @@
 
             // Decisions by timeframe
             const decisions = symbolData.decisions;
-            let decisionHtml = `<table style="width:100%;border-collapse:collapse;">
+            let decisionHtml = `<table class="decisions-table" style="width:100%;border-collapse:collapse;">
                 <thead>
-                    <tr style="background:#764ba2;color:white;">
-                        <th>Timeframe</th>
-                        <th>Sig.</th>
-                        <th>Conf.</th>
-                        <th>Strength</th>
-                        <th>Entry</th>
-                        <th>Stop</th>
-                        <th>Target</th>
-                        <th>R/R</th>
-                        <th>Reasoning</th>
-                    </tr>
+                <tr style="background:#764ba2;color:white;">
+                    <th>Timeframe</th>
+                    <th>Sig.</th>
+                    <th>Conf.</th>
+                    <th>Strength</th>
+                    <th>Entry</th>
+                    <th>Stop</th>
+                    <th>Target</th>
+                    <th>R/R</th>
+                    <th>Reasoning</th>
+                </tr>
                 </thead>
                 <tbody>
             `;
 
             for (const [tf, d] of Object.entries(decisions)) {
                 decisionHtml += `
-                    <tr>
-                        <td>${tf}</td>
-                        <td style="color:${d.recommendation === 'BUY' ? '#27ae60' : d.recommendation === 'SELL' ? '#e74c3c' : '#333'};font-weight:bold">${d.recommendation}</td>
-                        <td>${d.confidence}</td>
-                        <td>${safeToFixed(d.strength)}%</td>
-                        <td>$${safeToFixed(d.entry_price)}</td>
-                        <td>$${safeToFixed(d.stop_loss)}</td>
-                        <td>$${safeToFixed(d.take_profit)}</td>
-                        <td>${safeToFixed(d.risk_reward_ratio)}</td>
-                        <td>
-                            <ul>
-                            ${d.reasoning.map(r => `<li>${r}</li>`).join('')}
-                            </ul>
-                        </td>
-                    </tr>
+                <tr>
+                    <td data-label="Timeframe">${tf}</td>
+                    <td data-label="Sig." style="color:${d.recommendation === 'BUY' ? '#27ae60' : d.recommendation === 'SELL' ? '#e74c3c' : '#333'};font-weight:bold">${d.recommendation}</td>
+                    <td data-label="Conf.">${d.confidence}</td>
+                    <td data-label="Strength">${safeToFixed(d.strength)}%</td>
+                    <td data-label="Entry">$${safeToFixed(d.entry_price)}</td>
+                    <td data-label="Stop">$${safeToFixed(d.stop_loss)}</td>
+                    <td data-label="Target">$${safeToFixed(d.take_profit)}</td>
+                    <td data-label="R/R">${safeToFixed(d.risk_reward_ratio)}</td>
+                    <td data-label="Reasoning">
+                    <ul>
+                    ${d.reasoning.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                    </td>
+                </tr>
                 `;
             }
             decisionHtml += "</tbody></table>";

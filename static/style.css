@@ -294,6 +294,39 @@ tr:last-child td {
 tbody tr:nth-child(even) {
     background: #f8f8fc;
 }
+@media (max-width: 700px) {
+  .decisions-table thead {
+    display: none;
+  }
+  .decisions-table, .decisions-table tbody, .decisions-table tr, .decisions-table td {
+    display: block;
+    width: 100%;
+  }
+  .decisions-table tr {
+    border: 1px solid #eee;
+    margin-bottom: 9px;
+    border-radius: 6px;
+    padding: 6px 0;
+    box-shadow: 0 1px 3px #e8e9ff;
+  }
+  .decisions-table td {
+    border: none;
+    padding: 8px 10px 8px 40%;
+    position: relative;
+    background: #fff !important;
+  }
+  .decisions-table td:before {
+    position: absolute;
+    left: 10px; top: 8px;
+    width: 36%;
+    content: attr(data-label);
+    font-weight: bold;
+    color: #667eea;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+}
+
 /* table th, table td {
 padding: 8px 10px;
 border: 1px solid #eee;
