@@ -246,14 +246,55 @@ button:hover, .analyze:hover, .big-green-btn:hover {
     margin-left: 8px;
     margin-right: 3px;
 }
-table {
+/* table {
     background: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
     margin-bottom: 24px;
     font-size: 0.95rem;
-  }
+  } */
+stable {
+    border: 3px solid #667eea;      /* Or #764ba2 for the second table */
+    border-radius: 10px;
+    overflow: hidden;
+    width: 100%;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
+    margin-bottom: 24px;
+}
+table th {
+    background: #f5f5f5;
+    color: #333;
+}
+table th {
+    padding: 16px 10px;      /* Increase padding for taller header */
+    font-size: 1.1rem;       /* Slightly larger font for header */
+    background: #667eea;     /* Match consensus summary primary color */
+    color: white;
+    font-weight: bold;       /* Make sure header text is bold */
+}
 table th, table td {
+    padding: 8px 10px;
+    border: 1px solid #eee;
+    vertical-align: top;
+}
+table th {
+    padding: 16px 10px;
+    font-size: 1.1rem;
+    background: #667eea;
+    color: white;
+    font-weight: bold;
+}
+td {
+    border-bottom: 1px solid #eee;
+}
+tr:last-child td {
+    border-bottom: none;
+}
+tbody tr:nth-child(even) {
+    background: #f8f8fc;
+}
+/* table th, table td {
 padding: 8px 10px;
 border: 1px solid #eee;
 vertical-align: top;
@@ -261,4 +302,4 @@ vertical-align: top;
 table th {
 background: #f5f5f5;
 color: #333;
-}
+} */
