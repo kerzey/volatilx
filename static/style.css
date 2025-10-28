@@ -295,50 +295,46 @@ tbody tr:nth-child(even) {
     background: #f8f8fc;
 }
 @media (max-width: 700px) {
-  .decisions-table {
-    border: none !important;              /* Remove table border */
-    background: none !important;
-    box-shadow: none !important;
+  table.decisions-table,
+  .decisions-table thead,
+  .decisions-table tbody,
+  .decisions-table tr,
+  .decisions-table td {
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   .decisions-table thead {
-    display: none !important;             /* Hide header */
-  }
-  .decisions-table,
-  .decisions-table tbody {
-    display: block;
-    width: 100%;
+    display: none !important;
   }
   .decisions-table tr {
-    display: block;
-    width: 100%;
-    margin-bottom: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px #e5e9fa;
-    background: #fff !important; /* Strong white for contrast with page */
-    border: 1px solid #aac3e0;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px #e0e7fa;
+    background: #fff !important;
+    border: 1px solid #764ba2 !important;
     overflow: hidden;
   }
   .decisions-table td {
-    display: block;
-    width: 100%;
     border: none !important;
-    padding: 12px 16px 12px 44%;
-    position: relative;
     background: none !important;
+    padding: 12px 16px 12px 43%;
+    position: relative;
     min-height: 36px;
     font-size: 1rem;
     text-align: left !important;
-    box-sizing: border-box;
+    box-sizing: border-box !important;
+    word-break: break-all;
   }
   .decisions-table td:before {
-    content: attr(data-label);
+    content: attr(data-label) " ";
     position: absolute;
     left: 12px;
     top: 12px;
     width: 40%;
     color: #764ba2;
     font-weight: 600;
-    font-size: 15px;
+    font-size: 0.95em;
     white-space: pre-wrap;
     text-align: left;
   }
