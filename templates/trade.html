@@ -278,11 +278,11 @@
                         <label for="ai-yes">Yes (Slower, uses credits)</label>
                     </div>
                 </div>
-                 # AI Analysis Option (Disabled for now)
-                 <!-- <div class="checkbox-group">
+                 # AI Analysis Option Will Be More Powerfull. Stay uned!
+                 <div class="checkbox-group">
                      <input type="checkbox" id="useAiAnalysis" name="use_ai_analysis" {% if user.openai_api_key %}checked{% endif %}>
                      <label for="useAiAnalysis">Get AI Investment Stragety</label>
-                 </div> -->
+                 </div>
                  <!-- <div class="radio-group language-radio-group">
                     <label>Select your language:</label><br>
                     <input type="radio" id="lang-en" name="language" value="en" checked>
@@ -297,7 +297,7 @@
                     <label for="lang-zh">Chinese</label>
                 </div> -->
                  
-                 {% if user.openai_api_key %}
+                 <!-- {% if user.openai_api_key %}
                  <div class="ai-info">
                      <strong>AI Analysis Enabled:</strong> You'll receive personalized investment strategy including short-term and long-term strategies based on the technical analysis.
                  </div>
@@ -305,7 +305,7 @@
                  <div class="ai-info">
                      <strong>AI Analysis Available:</strong> Get AI-powered investment strategy with your analysis.
                  </div>
-                 {% endif %}
+                 {% endif %} -->
                  
                  <button type="submit" class="analyze-btn" id="analyzeBtn">
                      Analyze Stock
@@ -335,8 +335,8 @@
              e.preventDefault();
              
              const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
-            //  const useAiAnalysis = document.getElementById('useAiAnalysis').checked;
-            document.querySelector('input[name="use_ai_analysis"]:checked').value === 'yes';
+             const useAiAnalysis =false //document.getElementById('useAiAnalysis').checked;
+            // document.querySelector('input[name="use_ai_analysis"]:checked').value === 'yes';
              const analyzeBtn = document.getElementById('analyzeBtn');
              const resultsPanel = document.getElementById('resultsPanel');
              const resultsContent = document.getElementById('resultsContent');
