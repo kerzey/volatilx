@@ -296,55 +296,42 @@ tbody tr:nth-child(even) {
 }
 
 @media (max-width: 700px) {
-  .decisions-table {
-    border: none !important;              /* Remove table border */
-    background: none !important;
-    box-shadow: none !important;
-  }
   .decisions-table thead {
-    display: none !important;             /* Hide header */
+    display: none;
   }
-  .decisions-table,
-  .decisions-table tbody {
+  .decisions-table, .decisions-table tbody, .decisions-table tr, .decisions-table td {
     display: block;
     width: 100%;
   }
   .decisions-table tr {
-    display: block;
-    width: 100%;
-    margin-bottom: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px #e5e9fa;
-    background: #fff !important; /* Strong white for contrast with page */
-    border: 1px solid #aac3e0;
+    border: 1px solid #BBB;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    box-shadow: 0 1px 6px #e0e7ff;
+    background: #f9fcff;
     overflow: hidden;
   }
   .decisions-table td {
-    display: block;
-    width: 100%;
     border: none !important;
-    padding: 12px 16px 12px 44%;
-    position: relative;
     background: none !important;
+    padding: 10px 14px 10px 42%;
+    position: relative;
+    text-align: left;
     min-height: 36px;
-    font-size: 1rem;
-    text-align: left !important;
-    box-sizing: border-box;
   }
   .decisions-table td:before {
     content: attr(data-label);
     position: absolute;
     left: 12px;
-    top: 12px;
-    width: 40%;
+    top: 10px;
+    width: 28%;
     color: #764ba2;
-    font-weight: 600;
-    font-size: 15px;
-    white-space: pre-wrap;
+    font-weight: bold;
+    white-space: nowrap;
+    font-size: 14px;
     text-align: left;
   }
 }
-
 
 /* table th, table td {
 padding: 8px 10px;
