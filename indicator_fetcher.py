@@ -3058,13 +3058,15 @@ class ComprehensiveMultiTimeframeAnalyzer:
             
             # Adjust period based on interval
             if interval in ['1m', '2m']:
+                period = '1d'
+            elif interval in ['5m']:
                 period = '5d'
-            elif interval in ['5m', '15m', '30m']:
-                period = '10d'
+            elif interval in ['15m', '30m']:
+                period = '7d'    
             elif interval in ['60m', '1h']:
-                period = '1 mo'
+                period = '10 d'
             elif interval in ['1d', '1d']:
-                period='1y'
+                period='6mo'
             elif interval in ['1wk', '1wk']:
                 period = '2y'
             else:

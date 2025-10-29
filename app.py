@@ -394,7 +394,7 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         # Initialize trading agent
         agent = MultiSymbolDayTraderAgent(
             symbols=stock_symbol,
-            timeframes=['5m', '15m', '30m', '1h', '1d', '1wk','1mo']
+            timeframes=['2m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']
         )
         
         # Set API credentials
