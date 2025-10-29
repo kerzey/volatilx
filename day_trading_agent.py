@@ -546,7 +546,7 @@ from datetime import datetime
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 
 class MultiSymbolDayTraderAgent:
-    def __init__(self, symbols, timeframes=['5m', '15m', '30m', '1h', '1d'], api_key=None, secret_key=None):
+    def __init__(self, symbols, timeframes=['2m','5m', '15m', '30m', '1h', '1d'], api_key=None, secret_key=None):
         """
         Initialize the Multi-Symbol Day Trader Agent
         

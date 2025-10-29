@@ -1,346 +1,321 @@
-* Reset & base styles */
-body, html {
-    height: 100%;
-    margin: 0;
-    background: #f5f8fa;
-    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+/* RESET & BASE -------------------------------------------------------------- */
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+body {
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  background: #f9fafe;
+  color: #25233a;
+  min-height: 100vh;
 }
 
-/* Container styling */
+/* HEADER & LOGO ------------------------------------------------------------- */
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 1.1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 16px rgba(102, 126, 234, 0.08);
+  z-index: 10;
+  position: sticky;
+  top: 0;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo img {
+  display: block;
+  height: 38px;
+  width: 38px;
+  object-fit: contain;
+  border-radius: 5px;
+  background: #fff2;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.07);
+}
+.logo span {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #fff;
+}
+
+/* NAVIGATION ------------------------------------------------------------- */
+.nav-links {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-links a {
+  color: #fff;
+  text-decoration: none;
+  padding: 6px 18px;
+  border-radius: 8px;
+  transition: background 0.22s;
+  font-weight: 500;
+}
+.nav-links a:hover,
+.nav-links a:focus {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* MAIN LAYOUT --------------------------------------------------------------- */
 .container {
-    max-width: 1400px;
-    margin: 50px auto;
-    padding: 2px;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 4px 24px rgba(33, 150, 243, 0.08), 0 0.5px 3px #e0f7fa;
+  width: 100%;
+  max-width: 480px;
+  margin: 2.4rem auto;
+  padding: 0 1.3rem;
 }
 
-/* Headings & titles */
-h1 {
-    font-weight: 700;
-    letter-spacing: 1px;
-    color: #1565c0; /* Deep blue */
-    margin-bottom: 24px;
+/* PANEL STYLES -------------------------------------------------------------- */
+.trading-panel, .results-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.8rem 1.3rem 1.3rem 1.3rem;
+  box-shadow: 0 4px 24px rgba(33, 150, 243, 0.08), 0 0.5px 3px #e0f7fa;
+  margin-bottom: 2rem;
+}
+.panel-title {
+  font-size: 1.24rem;
+  font-weight: bold;
+  margin-bottom: 1.1rem;
+  color: #68439e;
 }
 
-.signin-title, .signup-title {
-    color: #1565c0;
-    font-size: 1.5em;
-    font-weight: 700;
-    margin-bottom: 16px;
+/* FORM STYLES --------------------------------------------------------------- */
+.input-group,
+.checkbox-group {
+  margin-bottom: 1.45rem;
+}
+.input-group label,
+.checkbox-group label {
+  font-weight: 500;
+  margin-bottom: 0.45rem;
+  color: #555;
+  display: block;
+}
+.input-group input[type="text"],
+.input-group input[type="email"],
+.input-group input[type="password"] {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 2px solid #eee;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #f7faff;
+  transition: border 0.23s;
+}
+.input-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: #fffffc;
 }
 
-.signup-link {
-    font-size: 0.98em;
-    color: #1565c0;
-    margin-top: 18px;
-    text-align: center;
+/* Checkbox (align row) */
+.checkbox-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.7rem;
+  display: flex;
 }
-.signup-link a { color: #2196f3; text-decoration: underline; }
-
-/* Input block styling */
-.input-block {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
+.checkbox-group input[type="checkbox"] {
+  accent-color: #764ba2;
+  width: 19px;
+  height: 19px;
 }
 
-input[type="text"] {
-    width: 220px;
-    min-width: 120px;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border: 1px solid #b3e5fc;
-    font-size: 1.1em;
+/* AI notice box */
+.ai-info {
+  background: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  padding: 1rem;
+  margin-top: 0.65rem;
+  border-radius: 0 7px 7px 0;
+  font-size: 0.97em;
 }
 
-/* Main Action Button ("Analyze", "Buy", etc.) */
-button, .analyze, .big-green-btn {
-    padding: 12px 28px;
-    background: linear-gradient(90deg, #21c971 0%, #18a058 100%);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    font-size: 1.13em;
-    box-shadow: 0 1px 8px rgba(33, 201, 113, 0.09);
-    transition: background 0.2s, box-shadow 0.2s;
+/* BUTTONS ------------------------------------------------------------------- */
+.analyze-btn, button[type="submit"], .big-green-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  padding: 0.93rem 0.8rem;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1.1em;
+  box-shadow: 0 1px 8px rgba(102, 126, 234, 0.07);
+  transition: background 0.18s, box-shadow 0.18s;
+  margin-top: 0.45rem;
 }
-button:hover, .analyze:hover, .big-green-btn:hover {
-    background: linear-gradient(90deg, #19ad61 0%, #21c971 100%);
-    box-shadow: 0 2px 16px rgba(33,201,113,0.16);
+.analyze-btn:hover, button[type="submit"]:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  box-shadow: 0 2px 16px rgba(102,126,234,0.16);
 }
-
-/* Result card styling */
-.result-card {
-    width: 100%;
-    max-width: 100%;
-    margin-top: 24px;
-    background: #f1fff5; /* Soft green-white */
-    border: 1px solid #c2f2e3;
-    border-radius: 12px;
-    padding: 2px;
-    box-shadow: 0 2px 10px #e0f7fa;
+.analyze-btn:disabled {
+  background: #ccc!important;
+  color: #afacac!important;
+  cursor: not-allowed;
+  box-shadow: none;
+  font-weight: normal;
 }
 
-/* Consensus/Recommendation Styling */
-.consensus-card h2 {
-    font-size: 1.3em;
-    margin-bottom: 8px;
+/* LOADING & FEEDBACK -------------------------------------------------------- */
+.loading, .error, .success {
+  text-align: center;
+  padding: 1rem 0;
+  font-size: 1.05em;
+}
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  animation: spin 1s linear infinite;
+  margin: 1.4rem auto;
 }
 
-.consensus-card .recommendation.buy,
-.rec-buy { color: #21c971; font-weight:bold; }
-.consensus-card .recommendation.sell,
-.rec-sell { color: #e52a2a; font-weight:bold; }
-.consensus-card .recommendation.hold,
-.rec-hold { color: #ffd700; font-weight:bold; } /* Gold for hold/neutral */
-.status { font-size: 0.95em; color: #2979ff; }
-
-.consensus-card .timestamp,
-.consensus-card .analysis-time { font-size: 0.95em; color: #6c757d; margin-top: 8px; }
-
-/* Table styling */
-.table-block {
-    margin-top: 20px;
-    overflow-x: auto;
-}
-.table-block table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    font-size: 1em;
-    background: #fff;
+@keyframes spin {
+  0% {transform: rotate(0);}
+  100% {transform: rotate(360deg);}
 }
 
-.table-block th, .table-block td {
-    padding: 10px 8px;
-    border-bottom: 1px solid #e6edf7;
+/* RESULT CARD & TABLES ------------------------------------------------------ */
+.result-item {
+  padding: 1.1em 1em;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 5px rgba(33,150,243,0.06);
+}
+.result-item.success { border-left: 4px solid #27ae60; }
+.result-item.error { border-left: 4px solid #e74c3c; background: #fee; }
+.result-title {
+  font-weight: 600;
+  font-size: 1.04em;
+  color: #4b427a;
+  margin-bottom: 6px;
+}
+.result-content {
+  color: #555;
+  font-size: 1em;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+ul {
+  margin: 0.5em 0 0.5em 1.3em;
+}
+.ai-section { background: #fafafa; border-radius: 7px; padding: 1em; margin: 1em 0; }
+.ai-section-title {
+  font-weight: bold;
+  color: #68439e;
+  text-transform: uppercase;
+  font-size: 0.97rem;
+  margin-bottom: 0.3em;
 }
 
-.table-block th:nth-child(9),
-.table-block td:nth-child(9) {
-    width: 320px;
-    min-width: 320px;
-    word-break: break-word;
-}
-
-.table-block thead th {
-    background: #e3f2fd;
-    color: #1565c0;
-    font-weight: bold;
-    border-bottom: 2px solid #b3e5fc;
-}
-
-.table-block tbody tr:hover {
-    background-color: #e3fce7;
-    transition: background 0.2s;
-}
-
-/* Error and warning coloring */
-.error {
-    color: #e52a2a;
-    margin-top: 16px;
-    font-weight: bold;
-}
-
-/* Centered authentication card for sign-in/sign-up */
-.signin-card {
-    max-width: 390px;
-    margin: 60px auto;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 4px 24px rgba(33, 150, 243, 0.10), 0 0.5px 3px #e0f7fa;
-    padding: 32px 28px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.signin-logo {
-    width: 76px;
-    margin-bottom: 16px;
-}
-
-.signin-form input, .signin-form button {
-    width: 220px;
-    min-width: 120px;
-    margin-bottom: 10px;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border: 1px solid #b3e5fc;
-    font-size: 1.08em;
-}
-
-/* Auth form button (submit sign-in/signup) */
-.signin-form button {
-    margin-bottom: 14px;
-    background: linear-gradient(90deg, #21c971 0%, #18a058 100%);
-    color: #fff;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-}
-.signin-form button:hover {
-    background: linear-gradient(90deg, #19ad61 0%, #21c971 100%);
-}
-
-/* Provider Buttons (Google, Apple, etc.) */
-.provider-btns {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.provider-btns button {
-    background: #fff;
-    border: 1px solid #b3e5fc;
-    color: #2196f3;
-    border-radius: 6px;
-    font-size: 1em;
-    padding: 10px;
-    font-weight: bold;
-    cursor: pointer;
-}
-.provider-btns button.google {
-    border-color: #21c971;
-    color: #21c971;
-}
-.provider-btns button.apple {
-    border-color: #333;
-    color: #333;
-}
-
-/* Utility classes */
-.text-green { color: #21c971; }
-.text-blue { color: #1565c0; }
-.text-red { color: #e52a2a; }
-.text-gold { color: #ffd700; }
-
-/* Logo styling */
-.logo img, .signin-logo {
-    display: block;
-    margin: 0 auto;
-    height: 48px;
-}
-
-.signup-link {
-    font-size: 0.98em;
-    color: #2362cd;
-    margin-top: 18px;
-    text-align: center;
-}
-.language-radio-group {
-    margin-bottom: 16px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-}
-.language-radio-group label:first-child {
-    font-weight: 600;
-    width: 100%;
-    margin-bottom: 4px;
-}
-.language-radio-group input[type="radio"] {
-    margin-left: 8px;
-    margin-right: 3px;
-}
-/* table {
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
-    margin-bottom: 24px;
-    font-size: 0.95rem;
-  } */
+/* Table styles */
 table {
-    border: 3px solid #667eea;      /* Or #764ba2 for the second table */
-    border-radius: 10px;
-    overflow: hidden;
-    width: 100%;
-    background: #fff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
-    margin-bottom: 24px;
+  border: 3px solid #667eea;
+  border-radius: 10px;
+  overflow: hidden;
+  width: 100%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
+  margin-bottom: 1.7rem;
+  font-size: 0.95rem;
 }
-table th {
-    background: #f5f5f5;
-    color: #333;
-}
-table th {
-    padding: 16px 10px;      /* Increase padding for taller header */
-    font-size: 1.1rem;       /* Slightly larger font for header */
-    background: #667eea;     /* Match consensus summary primary color */
-    color: white;
-    font-weight: bold;       /* Make sure header text is bold */
-}
-table th, table td {
-    padding: 8px 10px;
-    border: 1px solid #eee;
-    vertical-align: top;
-}
-table th {
-    padding: 16px 10px;
-    font-size: 1.1rem;
-    background: #667eea;
-    color: white;
-    font-weight: bold;
+th {
+  padding: 11px 6px;
+  font-size: 1rem;
+  background: #667eea;
+  color: white;
+  font-weight: bold;
 }
 td {
-    border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  padding: 8px 7px;
 }
-tr:last-child td {
-    border-bottom: none;
-}
-tbody tr:nth-child(even) {
-    background: #f8f8fc;
-}
-
-@media (max-width: 700px) {
-  .decisions-table thead {
-    display: none;
-  }
-  .decisions-table, .decisions-table tbody, .decisions-table tr, .decisions-table td {
-    display: block;
-    width: 100%;
-  }
-  .decisions-table tr {
-    border: 1px solid #BBB;
+tbody tr:last-child td {border-bottom:none;}
+tbody tr:nth-child(even) { background: #f8f8fc;}
+/* Responsive stack tables for mobile */
+@media (max-width:650px) {
+  table, thead, tbody, th, td, tr {display:block;}
+  tr {
     margin-bottom: 12px;
     border-radius: 8px;
     box-shadow: 0 1px 6px #e0e7ff;
     background: #f9fcff;
     overflow: hidden;
   }
-  .decisions-table td {
-    border: none !important;
-    background: none !important;
-    padding: 10px 14px 10px 42%;
+  th {display:none;}
+  td {
+    border:none!important;
     position: relative;
+    padding-left: 52%;
+    min-height: 35px;
     text-align: left;
-    min-height: 36px;
+    background: none!important;
   }
-  .decisions-table td:before {
-    content: attr(data-label);
+  td:before {
     position: absolute;
-    left: 12px;
+    left: 11px;
     top: 10px;
-    width: 28%;
+    width: 45%;
     color: #764ba2;
     font-weight: bold;
     white-space: nowrap;
-    font-size: 14px;
+    content: attr(data-label);
+    font-size: 13px;
     text-align: left;
   }
 }
 
-/* table th, table td {
-padding: 8px 10px;
-border: 1px solid #eee;
-vertical-align: top;
+/* TABS ---------------------------------------------------------------------- */
+.tabs {
+  display: flex;
+  border-bottom: 2px solid #eee;
+  margin-bottom: 1rem;
+  gap: 14px;
 }
-table th {
-background: #f5f5f5;
-color: #333;
-} */
+.tab {
+  padding: 0.8rem 1.1rem;
+  cursor: pointer;
+  border-bottom: 2.5px solid transparent;
+  font-size: 1.06em;
+  transition: all 0.25s;
+  color: #68439e;
+  background: none;
+}
+.tab.active {
+  border-bottom-color: #667eea;
+  color: #667eea;
+  font-weight: bold;
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* SMALL DEVICES / MOBILE ---------------------------------------------------- */
+@media (max-width: 600px) {
+  html { font-size:15px; }
+  .header { flex-wrap:wrap; padding: 0.8rem 0.8rem;}
+  .logo span { font-size: 1.07rem; }
+  .nav-links { gap: 7px; font-size:0.95em;}
+  .container { padding: 0 0.5rem; }
+  .trading-panel, .results-panel { padding: 1.2rem 0.7rem;}
+}
+
+/* ACCESSIBILITY ------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px dashed #2196f3 !important;
+  outline-offset: 2px;
+}
+a:focus {background: rgba(255,255,255,0.26);}
+button:focus {box-shadow: 0 0 0 2.5px #bbb;}
