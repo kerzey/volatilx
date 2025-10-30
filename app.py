@@ -36,10 +36,10 @@ from ai_agents.openai_service import openai_service
 
 app = FastAPI()
 load_dotenv()
-
-templates = Jinja2Templates(directory="templates")
 # Mount the static files directory right after initializing FastAPI
 app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
