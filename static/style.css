@@ -66,10 +66,20 @@ body {
 
 /* MAIN LAYOUT --------------------------------------------------------------- */
 .container {
-  width: 100%;
-  max-width: 480px;
+  width: min(1200px, 100%);
   margin: 2.4rem auto;
   padding: 0 1.3rem;
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .container {
+    grid-template-columns: 360px minmax(0, 1fr);
+  }
 }
 
 /* PANEL STYLES -------------------------------------------------------------- */
@@ -135,7 +145,7 @@ body {
     box-sizing: border-box;
 }
 
-body {
+.signin-body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
