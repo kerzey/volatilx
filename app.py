@@ -34,11 +34,11 @@ import jwt
 import hashlib
 from ai_agents.openai_service import openai_service
 
-app = FastAPI()
 load_dotenv()
-# Mount the static files directory right after initializing FastAPI
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+
 
 
 @asynccontextmanager
@@ -54,6 +54,9 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Session middleware for OAuth
 app.add_middleware(
