@@ -1206,7 +1206,7 @@ if __name__ == "__main__":
     # Initialize the agent with valid timeframes (no 90m)
     multi_trader = MultiSymbolDayTraderAgent(
         symbols=symbols,
-        timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']  # Removed 90m, 5d, 1wk for Alpaca compatibility
+        timeframes=['2m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']  # Removed 90m, 5d, 1wk for Alpaca compatibility
     )
     api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
     secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"

@@ -5,7 +5,8 @@ from typing import Dict, Any
 import logging
 from dotenv import load_dotenv
 import json
-
+from textwrap import dedent
+import re
 # Load environment variables
 load_dotenv()
 
@@ -92,109 +93,105 @@ class OpenAIAnalysisService:
                     "details": error_str
                 }
     
-    # def analyze_trading_data(self, structured_data: Dict[str, Any], symbol: str) -> Dict[str, Any]:
-    #     """Analyze structured trading data and provide investment Strategy"""
-    #     try:
-    #         # Extract the actual trading result data
-    #         trading_result = structured_data.get('trading_result', {})
-    #         symbol_data = trading_result.get(symbol, {}) if trading_result else {}
+    def analyze_trading_data(self, structured_data: Dict[str, Any], symbol: str) -> Dict[str, Any]:
+        """Analyze structured trading data and provide investment Strategy"""
+        try:
+            # Extract the actual trading result data
+            trading_result = structured_data.get('trading_result', {})
+            symbol_data = trading_result.get(symbol, {}) if trading_result else {}
             
-    #         print(f"=== AI ANALYSIS DEBUG ===")
-    #         print(f"Symbol data keys: {list(symbol_data.keys()) if symbol_data else 'No symbol data'}")
+            print(f"=== AI ANALYSIS DEBUG ===")
+            print(f"Symbol data keys: {list(symbol_data.keys()) if symbol_data else 'No symbol data'}")
             
-    #         if not symbol_data:
-    #             print("No symbol data found, using fallback analysis")
-    #             return self._generate_fallback_analysis(structured_data, symbol)
+            if not symbol_data:
+                print("No symbol data found, using fallback analysis")
+                return self._generate_fallback_analysis(structured_data, symbol)
             
-    #         # Extract consensus data
-    #         consensus = symbol_data.get('consensus', {})
-    #         decisions = symbol_data.get('decisions', {})
+            # Extract consensus data
+            consensus = symbol_data.get('consensus', {})
+            decisions = symbol_data.get('decisions', {})
             
-    #         print(f"Consensus: {consensus}")
-    #         print(f"Decisions timeframes: {list(decisions.keys()) if decisions else 'No decisions'}")
+            print(f"Consensus: {consensus}")
+            print(f"Decisions timeframes: {list(decisions.keys()) if decisions else 'No decisions'}")
             
-    #         # Extract key metrics
-    #         overall_recommendation = consensus.get('overall_recommendation', 'N/A')
-    #         confidence_level = consensus.get('confidence', 'N/A')
-    #         strength = consensus.get('strength', 0)
-    #         buy_signals = consensus.get('buy_signals', 0)
-    #         sell_signals = consensus.get('sell_signals', 0)
-    #         reasoning = consensus.get('reasoning', [])
+            # Extract key metrics
+            overall_recommendation = consensus.get('overall_recommendation', 'N/A')
+            confidence_level = consensus.get('confidence', 'N/A')
+            strength = consensus.get('strength', 0)
+            buy_signals = consensus.get('buy_signals', 0)
+            sell_signals = consensus.get('sell_signals', 0)
+            reasoning = consensus.get('reasoning', [])
             
-    #         # Extract entry price from any timeframe (they should be the same)
-    #         entry_price = 'N/A'
-    #         if decisions:
-    #             first_decision = list(decisions.values())[0]
-    #             entry_price = first_decision.get('entry_price', 'N/A')
-    #             if hasattr(entry_price, 'item'):  # Handle numpy types
-    #                 entry_price = float(entry_price.item())
+            # Extract entry price from any timeframe (they should be the same)
+            entry_price = 'N/A'
+            if decisions:
+                first_decision = list(decisions.values())[0]
+                entry_price = first_decision.get('entry_price', 'N/A')
+                if hasattr(entry_price, 'item'):  # Handle numpy types
+                    entry_price = float(entry_price.item())
             
-    #         # Create a detailed analysis prompt with the actual data
-    #         prompt = f"""
-    #         You are analyzing a comprehensive multi-timeframe day trading analysis for {symbol}. Here are the ACTUAL trading signals and data:
+            # Create a detailed analysis prompt with the actual data
+            prompt = f"""
+            
+            You are an expert trading advisor. Based on the following technical analysis and stock data, give advice in the exact format below. Be concise and clear in each section:
 
-    #         === CONSENSUS TRADING RECOMMENDATION ===
-    #         • Overall Signal: {overall_recommendation}
-    #         • Confidence Level: {confidence_level}
-    #         • Signal Strength: {strength:.1f}%
-    #         • Buy Signals Detected: {buy_signals}
-    #         • Sell Signals Detected: {sell_signals}
-    #         • Entry Price: ${entry_price}
+            Result of the analysis for {symbol}:
+            {symbol_data}
 
-    #         === ALGORITHM REASONING ===
-    #         {chr(10).join([f"• {reason}" for reason in reasoning]) if reasoning else "• No specific reasoning provided"}
+            Respond only in this format:
+            1. Short-Term Trading (1-3 trades per day): 
+            - Give one to three specific trade ideas or set-ups for very short-term (intraday) trades.
 
-    #         === DETAILED TIMEFRAME ANALYSIS ===
-    #         {self._format_detailed_timeframe_analysis(decisions)}
+            2. Mid-Term Trading (1-3 trades per week): 
+            - Give one to three trade setups or ideas for trades lasting a few days to a week.
 
-    #         === RISK ANALYSIS ===
-    #         {self._format_risk_analysis(decisions)}
+            3. Long-Term/Hold Strategy: 
+            - Give one to two recommendations for long-term investors, focusing on holding periods of weeks to months or longer.
 
-    #         Based on this SPECIFIC trading analysis showing a {overall_recommendation} signal with {confidence_level} confidence and {strength:.1f}% strength, provide detailed actionable Strategy:
+            4. Sentiment Summary: 
+            - In one sentence, what is the current sentiment for {symbol}?
 
-    #         1. **Signal Interpretation**: Analyze the {overall_recommendation} consensus from {len(decisions)} timeframes
-    #         2. **Entry Strategy**: Specific entry plan using the ${entry_price} price point
-    #         3. **Risk Management**: Position sizing and stop-loss strategy using the calculated levels
-    #         4. **Timeframe Alignment**: How the {len(decisions)} different timeframes support this decision
-    #         5. **Action Plan**: Immediate next steps for executing this {overall_recommendation} signal
-    #         6. **Summary**: Clear recommendation with specific price targets
+            5. Fundamentals: 
+            - In one sentence, summarize the key fundamental factor(s) affecting {symbol}.
 
-    #         Focus on the STRONG {overall_recommendation} signal with {buy_signals} buy signals and {sell_signals} sell signals.
-    #         """
+            6. Major News: 
+            - In one sentence, mention the most important recent news event about {symbol}, or say "No major news at this time" if nothing relevant.
+            """
+            prompt = dedent(prompt).strip()
+            response = self.client.chat.completions.create(
+                model="GPT-5 mini", #"gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1500,
+                temperature=0.7
+            )
 
-    #         response = self.client.chat.completions.create(
-    #             model="gpt-3.5-turbo",
-    #             messages=[{"role": "user", "content": prompt}],
-    #             max_tokens=1500,
-    #             temperature=0.7
-    #         )
             
-    #         analysis_text = response.choices[0].message.content
-    #         sections = self._parse_trading_analysis_response(analysis_text)
+            analysis_text = response.choices[0].message.content
+            sections = self._parse_trading_analysis_response(analysis_text)
             
-    #         return {
-    #             "success": True,
-    #             "analysis": sections,
-    #             "tokens_used": response.usage.total_tokens if response.usage else 0,
-    #             "raw_response": analysis_text,
-    #             "symbol": symbol,
-    #             "timestamp": structured_data.get('timestamp', 'N/A'),
-    #             "model": response.model,
-    #             "data_source": "MultiSymbolDayTraderAgent_Detailed",
-    #             "trading_summary": {
-    #                 "recommendation": overall_recommendation,
-    #                 "confidence": confidence_level,
-    #                 "strength": strength,
-    #                 "entry_price": entry_price,
-    #                 "buy_signals": buy_signals,
-    #                 "sell_signals": sell_signals,
-    #                 "timeframes_analyzed": len(decisions)
-    #             }
-    #         }
+            return {
+                "success": True,
+                "analysis": sections,
+                "tokens_used": response.usage.total_tokens if response.usage else 0,
+                "raw_response": analysis_text,
+                "symbol": symbol,
+                "timestamp": structured_data.get('timestamp', 'N/A'),
+                "model": response.model,
+                "data_source": "MultiSymbolDayTraderAgent_Detailed",
+                "trading_summary": {
+                    "recommendation": overall_recommendation,
+                    "confidence": confidence_level,
+                    "strength": strength,
+                    "entry_price": entry_price,
+                    "buy_signals": buy_signals,
+                    "sell_signals": sell_signals,
+                    "timeframes_analyzed": len(decisions)
+                }
+            }
             
-    #     except Exception as e:
-    #         logger.error(f"AI analysis failed: {e}")
-    #         # return self._generate_mock_analysis(structured_data, symbol, str(e))
+        except Exception as e:
+            logger.error(f"AI analysis failed: {e}")
+            # return self._generate_mock_analysis(structured_data, symbol, str(e))
 
     def _format_detailed_timeframe_analysis(self, decisions: Dict[str, Any]) -> str:
         """Format detailed timeframe-specific trading decisions"""
@@ -215,14 +212,14 @@ class OpenAIAnalysisService:
             risk_reward = self._safe_extract_number(decision.get('risk_reward_ratio'))
             
             timeframe_analysis = f"""
-    {timeframe.upper()} TIMEFRAME SIGNAL:
-    • Signal: {recommendation} ({confidence} confidence)
-    • Strength: {strength:.1f}%
-    • Entry: {entry_price}
-    • Stop Loss: {stop_loss}
-    • Take Profit: {take_profit}
-    • Risk/Reward: {risk_reward}
-    • Technical Reasoning: {', '.join(reasoning) if reasoning else 'Standard technical analysis'}
+            {timeframe.upper()} TIMEFRAME SIGNAL:
+            • Signal: {recommendation} ({confidence} confidence)
+            • Strength: {strength:.1f}%
+            • Entry: {entry_price}
+            • Stop Loss: {stop_loss}
+            • Take Profit: {take_profit}
+            • Risk/Reward: {risk_reward}
+            • Technical Reasoning: {', '.join(reasoning) if reasoning else 'Standard technical analysis'}
             """.strip()
             
             analysis_parts.append(timeframe_analysis)
@@ -281,50 +278,83 @@ class OpenAIAnalysisService:
         return str(number_value)
 
     def _parse_trading_analysis_response(self, response_text: str) -> Dict[str, str]:
-        """Parse the AI response into structured sections for trading analysis"""
+        """Parse AI response into structured sections for trading analysis"""
         sections = {
-            "signal_interpretation": "",
-            "entry_strategy": "",
-            "risk_management": "",
-            "timeframe_alignment": "",
-            "action_plan": "",
-            "summary": ""
+            "short_term": re.compile(r"short[- ]?term trading.*:", re.IGNORECASE),
+            "mid_term": re.compile(r"mid[- ]?term trading.*:", re.IGNORECASE),
+            "long_term": re.compile(r"long[- ]?term.*(hold|strategy).*:", re.IGNORECASE),
+            "sentiment": re.compile(r"sentiment summary.*:", re.IGNORECASE),
+            "fundamentals": re.compile(r"fundamentals.*:", re.IGNORECASE),
+            "major_news": re.compile(r"major news.*:", re.IGNORECASE),
         }
-        
-        lines = response_text.split('\n')
-        current_section = "summary"  # default
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
+
+        result = {key: None for key in sections}
+        current_section = None
+
+        for line in response_text.splitlines():
+            line_strip = line.strip()
+            if not line_strip:
                 continue
-                
-            # Detect section headers
-            lower_line = line.lower()
-            if any(keyword in lower_line for keyword in ["signal interpretation", "signal analysis", "interpreting"]):
-                current_section = "signal_interpretation"
-            elif any(keyword in lower_line for keyword in ["entry strategy", "entry plan", "entry point"]):
-                current_section = "entry_strategy"
-            elif any(keyword in lower_line for keyword in ["risk management", "risk", "position sizing"]):
-                current_section = "risk_management"
-            elif any(keyword in lower_line for keyword in ["timeframe alignment", "timeframe", "alignment"]):
-                current_section = "timeframe_alignment"
-            elif any(keyword in lower_line for keyword in ["action plan", "next steps", "immediate", "execute"]):
-                current_section = "action_plan"
-            elif any(keyword in lower_line for keyword in ["summary", "conclusion", "recommendation"]):
-                current_section = "summary"
+
+            for key, pattern in sections.items():
+                if pattern.match(line_strip):
+                    current_section = key
+                    content = pattern.sub("", line_strip).strip(" -:\t")
+                    if content:
+                        result[key] = content
+                    break
             else:
-                # Add content to current section
-                if sections[current_section]:
-                    sections[current_section] += "\n" + line
-                else:
-                    sections[current_section] = line
+                if current_section:
+                    result[current_section] = (
+                        (result[current_section] + " " if result[current_section] else "")
+                        + line_strip
+                    )
+
+        return result
+        # """Parse the AI response into structured sections for trading analysis"""
+        # sections = {
+        #     "signal_interpretation": "",
+        #     "entry_strategy": "",
+        #     "risk_management": "",
+        #     "timeframe_alignment": "",
+        #     "action_plan": "",
+        #     "summary": ""
+        # }
         
-        # If parsing failed, put everything in summary
-        if not any(sections.values()):
-            sections["summary"] = response_text
+        # lines = response_text.split('\n')
+        # current_section = "summary"  # default
         
-        return sections
+        # for line in lines:
+        #     line = line.strip()
+        #     if not line:
+        #         continue
+                
+        #     # Detect section headers
+        #     lower_line = line.lower()
+        #     if any(keyword in lower_line for keyword in ["signal interpretation", "signal analysis", "interpreting"]):
+        #         current_section = "signal_interpretation"
+        #     elif any(keyword in lower_line for keyword in ["entry strategy", "entry plan", "entry point"]):
+        #         current_section = "entry_strategy"
+        #     elif any(keyword in lower_line for keyword in ["risk management", "risk", "position sizing"]):
+        #         current_section = "risk_management"
+        #     elif any(keyword in lower_line for keyword in ["timeframe alignment", "timeframe", "alignment"]):
+        #         current_section = "timeframe_alignment"
+        #     elif any(keyword in lower_line for keyword in ["action plan", "next steps", "immediate", "execute"]):
+        #         current_section = "action_plan"
+        #     elif any(keyword in lower_line for keyword in ["summary", "conclusion", "recommendation"]):
+        #         current_section = "summary"
+        #     else:
+        #         # Add content to current section
+        #         if sections[current_section]:
+        #             sections[current_section] += "\n" + line
+        #         else:
+        #             sections[current_section] = line
+        
+        # # If parsing failed, put everything in summary
+        # if not any(sections.values()):
+        #     sections["summary"] = response_text
+        
+        # return sections
 
     def _generate_fallback_analysis(self, structured_data: Dict[str, Any], symbol: str) -> Dict[str, Any]:
         """Generate analysis when symbol data is not properly structured"""
