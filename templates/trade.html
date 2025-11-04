@@ -41,35 +41,7 @@
                 <div class="input-group">
                     <input type="checkbox" id="useAiAnalysis" name="use_ai_analysis" value="true">
                     <label for="useAiAnalysis">Get AI Investment Strategy</label>
-                </div>
-<!--                 
-                <div class="input-group">
-                  <label>Get AI Investment Strategy?</label>
-                  <div class="ai-radio-row">
-                      <input type="radio" id="ai-no" name="use_ai_analysis" value="no" checked>
-                      <label for="ai-no">No (Faster & Free)</label>
-                      <input type="radio" id="ai-yes" name="use_ai_analysis" value="yes">
-                      <label for="ai-yes">Yes (Slower, uses credits)</label>
-                  </div>
-                </div>
-                -->
-                <!-- # AI Analysis Option Will Be More Powerfull. Stay uned! -->
-                <!--
-                <div class="radio-group language-radio-group">
-                  ...
-                </div>
-                -->
-                
-                <!-- {% if user.openai_api_key %}
-                <div class="ai-info">
-                    <strong>AI Analysis Enabled:</strong> You'll receive personalized investment strategy including short-term and long-term strategies based on the technical analysis.
-                </div>
-                {% else %}
-                <div class="ai-info">
-                    <strong>AI Analysis Available:</strong> Get AI-powered investment strategy with your analysis.
-                </div>
-                {% endif %} -->
-               
+                </div>               
                 <button type="submit" class="analyze-btn" id="analyzeBtn">
                     Analyze Stock
                 </button>
@@ -97,7 +69,7 @@
         document.getElementById('tradingForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
-            const useAiAnalysis = false; //document.getElementById('useAiAnalysis').checked;
+            const useAiAnalysis = document.getElementById('useAiAnalysis').checked;
             const analyzeBtn = document.getElementById('analyzeBtn');
             const resultsPanel = document.getElementById('resultsPanel');
             const resultsContent = document.getElementById('resultsContent');
