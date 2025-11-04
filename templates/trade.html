@@ -38,7 +38,7 @@
                     <label for="stockSymbol">Stock Symbol</label>
                     <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" required>
                 </div>
-                <!--
+<!--                 
                 <div class="input-group">
                   <label>Get AI Investment Strategy?</label>
                   <div class="ai-radio-row">
@@ -49,18 +49,19 @@
                   </div>
                 </div>
                 -->
-                # AI Analysis Option Will Be More Powerfull. Stay uned!
-                <div class="checkbox-group">
-                    <input type="checkbox" id="useAiAnalysis" name="use_ai_analysis" {% if user.openai_api_key %}checked{% endif %}>
-                    <label for="useAiAnalysis">Get AI Investment Stragety</label>
-                </div>
+                <!-- # AI Analysis Option Will Be More Powerfull. Stay uned! -->
+              <div class="checkbox-group">
+                    <input type="checkbox" id="useAiAnalysis" name="use_ai_analysis" value="true"
+                        {% if form.use_ai_analysis.data %}checked{% endif %}>
+                    <label for="useAiAnalysis">Get AI Investment Strategy</label>
+              </div>
                 <!--
                 <div class="radio-group language-radio-group">
                   ...
                 </div>
                 -->
                 
-                {% if user.openai_api_key %}
+                <!-- {% if user.openai_api_key %}
                 <div class="ai-info">
                     <strong>AI Analysis Enabled:</strong> You'll receive personalized investment strategy including short-term and long-term strategies based on the technical analysis.
                 </div>
@@ -68,7 +69,7 @@
                 <div class="ai-info">
                     <strong>AI Analysis Available:</strong> Get AI-powered investment strategy with your analysis.
                 </div>
-                {% endif %}
+                {% endif %} -->
                
                 <button type="submit" class="analyze-btn" id="analyzeBtn">
                     Analyze Stock
