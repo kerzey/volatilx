@@ -187,7 +187,8 @@ body {
 }
 
 .signin-container .logo span {
-    font-size: 2.6rem;
+    font-size: 2.5rem;
+    color: #2e6ed6;
 }
 
 .signin-container .subtitle {
