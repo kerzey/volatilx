@@ -202,10 +202,11 @@ body {
     justify-content: center;
     background: #4285f4;
     color: white;
-    padding: 12px 24px;
+    padding: 18px 0;
     border: none;
-    border-radius: 5px;
-    font-size: 16px;
+    border-radius: 8px;
+    font-size: 1.3rem;
+    font-weight: 600;
     cursor: pointer;
     text-decoration: none;
     transition: background-color 0.3s;
@@ -217,13 +218,13 @@ body {
 }
 
 .google-icon {
-    width: 20px;
-    height: 20px;
-    margin-right: 10px;
+    width: 28px;
+    height: 28px;
+    margin-right: 14px;
 }
 
 .features {
-    margin-top: 2rem;
+    margin-top: 2.1rem;
     text-align: left;
 }
 
