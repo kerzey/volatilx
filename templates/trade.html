@@ -69,7 +69,7 @@
         document.getElementById('tradingForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
-            const useAiAnalysis = document.getElementById('useAiAnalysis').checked;
+            const useAiAnalysis = false; //document.getElementById('useAiAnalysis').checked;
             const analyzeBtn = document.getElementById('analyzeBtn');
             const resultsPanel = document.getElementById('resultsPanel');
             const resultsContent = document.getElementById('resultsContent');
