@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TypedDict
 
+from langgraph.graph import END, START, StateGraph
 from openai import APIError, OpenAI
 
 from .expert_agent import (
@@ -16,10 +18,23 @@ from .expert_agent import (
     VolatilityExpertAgent,
 )
 from .trading_agents import (
+    BaseTradingAgent,
     DayTradingAgent,
     LongTermTradingAgent,
     SwingTradingAgent,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+class PrincipalAgentState(TypedDict, total=False):
+    """Intermediate state handed through the LangGraph pipeline."""
+
+    symbol: str
+    include_raw_results: bool
+    trading_results: Dict[str, Any]
+    principal_result: Dict[str, Any]
 
 
 def _json_dump(data: Any) -> str:
@@ -77,6 +92,9 @@ class PrincipalAgent:
             ),
         }
 
+        self._trading_sequence: list[tuple[str, BaseTradingAgent]] = []
+        self.refresh_graph()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -88,24 +106,28 @@ class PrincipalAgent:
     ) -> Dict[str, Any]:
         """Collect strategy insights and return client-facing recommendations."""
 
-        trading_results: Dict[str, Any] = {}
-        for strategy, agent in self.trading_agents.items():
-            trading_results[strategy] = agent.run(symbol)
-
-        strategy_summary, usage = self._summarise_for_client(symbol, trading_results)
-
-        payload: Dict[str, Any] = {
+        self.refresh_graph()
+        initial_state: PrincipalAgentState = {
             "symbol": symbol.upper(),
-            "generated_at": datetime.utcnow().isoformat(),
-            "strategies": strategy_summary,
-            "model": self.model,
-            "usage": usage,
+            "include_raw_results": include_raw_results,
+            "trading_results": {},
         }
 
-        if include_raw_results:
-            payload["trading_agent_outputs"] = trading_results
+        final_state = self.graph.invoke(
+            initial_state,
+            config={
+                "metadata": {
+                    "agent": "principal",
+                    "symbol": symbol.upper(),
+                }
+            },
+        )
 
-        return payload
+        result = final_state.get("principal_result")
+        if not isinstance(result, dict):
+            raise RuntimeError("Principal agent did not produce a result")
+
+        return result
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -165,6 +187,66 @@ class PrincipalAgent:
         }
 
         return summary, usage
+
+    def _build_graph(self):
+        builder = StateGraph(PrincipalAgentState)
+        builder.add_node("initialise", self._initialise_state)
+        builder.add_edge(START, "initialise")
+
+        previous = "initialise"
+        for strategy, agent in self._trading_sequence:
+            node_name = f"run_{strategy}"
+            builder.add_node(node_name, self._make_trading_node(strategy, agent))
+            builder.add_edge(previous, node_name)
+            previous = node_name
+
+        builder.add_node("summarise", self._summarise_node)
+        builder.add_edge(previous, "summarise")
+        builder.add_edge("summarise", END)
+        return builder.compile()
+
+    def refresh_graph(self) -> None:
+        """Recompile the LangGraph pipeline after registry changes."""
+
+        self._trading_sequence = list(self.trading_agents.items())
+        self.graph = self._build_graph()
+
+    def _initialise_state(self, state: PrincipalAgentState) -> PrincipalAgentState:
+        return {
+            "trading_results": dict(state.get("trading_results", {})),
+            "include_raw_results": state.get("include_raw_results", True),
+        }
+
+    def _make_trading_node(self, strategy: str, agent: BaseTradingAgent):
+        def _node(state: PrincipalAgentState) -> PrincipalAgentState:
+            symbol = state["symbol"]
+            logger.debug("Running trading agent '%s' for symbol %s", strategy, symbol)
+            result = agent.run(symbol)
+            results = dict(state.get("trading_results", {}))
+            results[strategy] = result
+            return {"trading_results": results}
+
+        return _node
+
+    def _summarise_node(self, state: PrincipalAgentState) -> PrincipalAgentState:
+        symbol = state["symbol"]
+        trading_results = state.get("trading_results", {})
+        include_raw = state.get("include_raw_results", True)
+
+        strategy_summary, usage = self._summarise_for_client(symbol, trading_results)
+
+        payload: Dict[str, Any] = {
+            "symbol": symbol,
+            "generated_at": datetime.utcnow().isoformat(),
+            "strategies": strategy_summary,
+            "model": self.model,
+            "usage": usage,
+        }
+
+        if include_raw:
+            payload["trading_agent_outputs"] = trading_results
+
+        return {"principal_result": payload}
 
 
 __all__ = ["PrincipalAgent"]

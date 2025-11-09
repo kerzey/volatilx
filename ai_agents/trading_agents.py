@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
+
+from langgraph.graph import END, START, StateGraph
 
 from .expert_agent import (
     BaseExpertAgent,
@@ -12,6 +15,17 @@ from .expert_agent import (
     TrendExpertAgent,
     VolatilityExpertAgent,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+class TradingAgentState(TypedDict, total=False):
+    """State container passed between LangGraph nodes."""
+
+    symbol: str
+    expert_outputs: Dict[str, Any]
+    final_result: Dict[str, Any]
 
 
 class BaseTradingAgent:
@@ -37,27 +51,37 @@ class BaseTradingAgent:
         if trend_agent:
             self.expert_registry["trend"] = trend_agent
 
-    def run(self, symbol: str) -> Dict[str, Any]:
-        plan = self._expert_plan()
-        expert_payloads: Dict[str, Any] = {}
-        for task in plan:
-            key = task["key"]
-            agent = self.expert_registry.get(key)
-            if not agent:
-                continue
-            kwargs = {
-                "timeframes": task.get("timeframes"),
-                "period_overrides": task.get("period_overrides"),
-            }
-            expert_payloads[key] = agent.run(symbol, **kwargs)
+        self._plan_template: List[Dict[str, Any]] = []
+        self.refresh_graph()
 
-        return {
-            "success": True,
-            "strategy": self.strategy_name,
+    def run(self, symbol: str) -> Dict[str, Any]:
+        self.refresh_graph()
+        initial_state: TradingAgentState = {
             "symbol": symbol.upper(),
-            "collected_at": datetime.utcnow().isoformat(),
-            "experts": expert_payloads,
+            "expert_outputs": {},
         }
+
+        final_state = self.graph.invoke(
+            initial_state,
+            config={
+                "metadata": {
+                    "strategy": self.strategy_name,
+                    "symbol": symbol.upper(),
+                }
+            },
+        )
+
+        result = final_state.get("final_result")
+        if not isinstance(result, dict):
+            raise RuntimeError(f"{self.strategy_name} agent did not produce a result")
+        return result
+
+    def refresh_graph(self) -> None:
+        """Rebuild the LangGraph pipeline (call after modifying expert plan)."""
+
+        plan = self._expert_plan() or []
+        self._plan_template = [dict(task) for task in plan]
+        self.graph = self._build_graph()
 
     # ------------------------------------------------------------------
     # Customisation points
@@ -66,6 +90,70 @@ class BaseTradingAgent:
         """Return plan describing which expert agents to consult."""
 
         raise NotImplementedError
+
+    def _build_graph(self):
+        builder = StateGraph(TradingAgentState)
+        builder.add_node("initialise", self._initialise_state)
+        builder.add_edge(START, "initialise")
+
+        previous = "initialise"
+        for index, task in enumerate(self._plan_template):
+            node_name = f"expert_{index}_{task.get('key', 'unknown')}"
+            builder.add_node(node_name, self._make_expert_node(task))
+            builder.add_edge(previous, node_name)
+            previous = node_name
+
+        builder.add_node("assemble", self._assemble_result)
+        builder.add_edge(previous, "assemble")
+        builder.add_edge("assemble", END)
+        return builder.compile()
+
+    def _initialise_state(self, state: TradingAgentState) -> TradingAgentState:
+        outputs = dict(state.get("expert_outputs", {}))
+        return {"expert_outputs": outputs}
+
+    def _make_expert_node(self, task: Dict[str, Any]):
+        key = task.get("key")
+        timeframes = task.get("timeframes")
+        period_overrides = task.get("period_overrides")
+
+        def _node(state: TradingAgentState) -> TradingAgentState:
+            if not key:
+                return {}
+
+            agent = self.expert_registry.get(key)
+            if not agent:
+                logger.warning(
+                    "No expert agent registered for key '%s' in strategy '%s'",
+                    key,
+                    self.strategy_name,
+                )
+                return {}
+
+            kwargs: Dict[str, Any] = {}
+            if timeframes:
+                kwargs["timeframes"] = timeframes
+            if period_overrides:
+                kwargs["period_overrides"] = period_overrides
+
+            expert_result = agent.run(state["symbol"], **kwargs)
+            outputs = dict(state.get("expert_outputs", {}))
+            outputs[key] = expert_result
+            return {"expert_outputs": outputs}
+
+        return _node
+
+    def _assemble_result(self, state: TradingAgentState) -> TradingAgentState:
+        symbol = state["symbol"]
+        outputs = state.get("expert_outputs", {})
+        result = {
+            "success": True,
+            "strategy": self.strategy_name,
+            "symbol": symbol,
+            "collected_at": datetime.utcnow().isoformat(),
+            "experts": outputs,
+        }
+        return {"final_result": result}
 
 
 class DayTradingAgent(BaseTradingAgent):
