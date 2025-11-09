@@ -1,38 +1,31 @@
-pip>=25.0
-setuptools>=80.0
-wheel>=0.42
+aiohttp>=3.8.1
+alpaca-trade-api==3.2.0
+authlib==1.2.1
+bcrypt==4.1.1
+fastapi>=0.115
+fastapi-users[sqlalchemy]>=13
 Flask==2.3.2
 gunicorn==20.1.0
-yfinance
-numpy==1.26.4
-pandas==2.2.2
-matplotlib
-scipy==1.13.0
-uvicorn==0.23.2
-fastapi==0.103.1
-alpaca-trade-api==3.2.0
-pandas-ta @ git+https://github.com/0xAVX/pandas-ta.git
-aiohttp>=3.8.1
-PyYAML>=6.0.1
-# pandas-ta==0.3.14b0
-# setuptools>=65.5.0
-# wheel>=0.40.0
-# pandas-ta==0.4.71b0
-# pandas-ta==0.4.3b0
-# fastapi==0.104.1
-fastapi-users[sqlalchemy]==12.1.3
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.7
-authlib==1.2.1
-itsdangerous==2.1.2
-sqlalchemy==2.0.23
-# uvicorn[standard]==0.24.0
-jinja2==3.1.2
-python-dotenv==1.0.0
-PyJWT==2.8.0
 httpx
-pydantic>=2.7,<3
-openai>=1.50.0
+itsdangerous==2.1.2
+jinja2==3.1.2
 langgraph>=0.1.3
-bcrypt==4.1.1
+matplotlib
+numpy==1.26.4
+openai>=1.50.0
+pandas==2.2.2
+pandas-ta @ git+https://github.com/0xAVX/pandas-ta.git
+passlib[bcrypt]==1.7.4
+pip>=25.0
 psycopg2-binary==2.9.9
+PyJWT==2.8.0
+pydantic>=2.7,<3
+PyYAML>=6.0.1
+python-dotenv==1.0.0
+python-multipart==0.0.7
+scipy==1.13.0
+setuptools>=80.0
+sqlalchemy==2.0.23
+uvicorn==0.23.2
+wheel>=0.42
+yfinance
