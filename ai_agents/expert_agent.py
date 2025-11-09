@@ -231,6 +231,12 @@ class BaseExpertAgent:
                     run_id=run.id,
                 )
 
+            if run.status == "failed":
+                details = getattr(run, "last_error", None)
+                message = getattr(details, "message", "unknown error")
+                logger.error("Assistant run failed: %s", message)
+                raise RuntimeError(f"Assistant run failed: {message}")
+            
             if run.status != "completed":
                 raise RuntimeError(f"Assistant run failed with status: {run.status}")
 
