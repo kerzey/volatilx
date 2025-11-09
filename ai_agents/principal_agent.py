@@ -212,7 +212,11 @@ class PrincipalAgent:
         self.graph = self._build_graph()
 
     def _initialise_state(self, state: PrincipalAgentState) -> PrincipalAgentState:
+        symbol = state.get("symbol")
+        if symbol is None:
+            raise RuntimeError("Principal agent initial state missing symbol")
         return {
+            "symbol": symbol,
             "trading_results": dict(state.get("trading_results", {})),
             "include_raw_results": state.get("include_raw_results", True),
         }
@@ -224,12 +228,14 @@ class PrincipalAgent:
             result = agent.run(symbol)
             results = dict(state.get("trading_results", {}))
             results[strategy] = result
-            return {"trading_results": results}
+            return {"symbol": symbol, "trading_results": results}
 
         return _node
 
     def _summarise_node(self, state: PrincipalAgentState) -> PrincipalAgentState:
-        symbol = state["symbol"]
+        symbol = state.get("symbol")
+        if symbol is None:
+            raise RuntimeError("Principal agent state missing symbol during summary")
         trading_results = state.get("trading_results", {})
         include_raw = state.get("include_raw_results", True)
 

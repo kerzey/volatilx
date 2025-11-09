@@ -110,7 +110,10 @@ class BaseTradingAgent:
 
     def _initialise_state(self, state: TradingAgentState) -> TradingAgentState:
         outputs = dict(state.get("expert_outputs", {}))
-        return {"expert_outputs": outputs}
+        symbol = state.get("symbol")
+        if symbol is None:
+            raise RuntimeError("Trading agent initial state missing symbol")
+        return {"symbol": symbol, "expert_outputs": outputs}
 
     def _make_expert_node(self, task: Dict[str, Any]):
         key = task.get("key")
@@ -128,7 +131,8 @@ class BaseTradingAgent:
                     key,
                     self.strategy_name,
                 )
-                return {}
+                symbol = state.get("symbol")
+                return {"symbol": symbol} if symbol else {}
 
             kwargs: Dict[str, Any] = {}
             if timeframes:
@@ -136,15 +140,22 @@ class BaseTradingAgent:
             if period_overrides:
                 kwargs["period_overrides"] = period_overrides
 
-            expert_result = agent.run(state["symbol"], **kwargs)
+            symbol = state.get("symbol")
+            if symbol is None:
+                raise RuntimeError(
+                    f"Trading agent '{self.strategy_name}' missing symbol before expert '{key}'"
+                )
+            expert_result = agent.run(symbol, **kwargs)
             outputs = dict(state.get("expert_outputs", {}))
             outputs[key] = expert_result
-            return {"expert_outputs": outputs}
+            return {"symbol": symbol, "expert_outputs": outputs}
 
         return _node
 
     def _assemble_result(self, state: TradingAgentState) -> TradingAgentState:
-        symbol = state["symbol"]
+        symbol = state.get("symbol")
+        if symbol is None:
+            raise RuntimeError("Trading agent state missing symbol during assembly")
         outputs = state.get("expert_outputs", {})
         result = {
             "success": True,
