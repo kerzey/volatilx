@@ -143,6 +143,15 @@ body {
   width: 19px;
   height: 19px;
 }
+.checkbox-group.sub-option {
+  margin-left: 1.8rem;
+  opacity: 0.85;
+  font-size: 0.95rem;
+}
+.checkbox-group.sub-option input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+}
 /* Sign in page style */
 .signin-body * {
   margin: 0;
@@ -394,6 +403,9 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   margin-bottom: 1rem;
   gap: 14px;
 }
+.tabs.hidden {
+  display: none !important;
+}
 .tab {
   padding: 0.8rem 1.1rem;
   cursor: pointer;
@@ -410,6 +422,36 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
 }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
+
+.plan-meta {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.plan-raw {
+  margin-top: 1.4rem;
+  background: #f4f6fb;
+  border: 1px solid #e0e7ff;
+  border-radius: 8px;
+  padding: 0.9rem;
+}
+.plan-raw summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #68439e;
+}
+.plan-raw pre {
+  margin-top: 0.8rem;
+  max-height: 240px;
+  overflow: auto;
+  background: #fff;
+  padding: 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  border: 1px solid #dfe6ff;
+}
 
 /* SMALL DEVICES / MOBILE ---------------------------------------------------- */
 @media (max-width: 600px) {

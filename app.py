@@ -1,3 +1,4 @@
+import logging
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, status, Depends
@@ -12,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Optional
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import User, UserRead, UserCreate, UserUpdate, get_user_db, get_user_manager, init_db, get_current_user_sync
@@ -33,12 +35,15 @@ import json
 import jwt
 import hashlib
 from ai_agents.openai_service import openai_service
+from ai_agents.principal_agent import PrincipalAgent
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -361,6 +366,21 @@ async def unauthorized_handler(request: Request, exc):
 ##############################################################################################
 indicator_fetcher = ComprehensiveMultiTimeframeAnalyzer()
 
+principal_agent_instance: Optional[PrincipalAgent] = None
+
+
+def get_principal_agent_instance() -> PrincipalAgent:
+    """Initialise and cache the principal trading agent."""
+
+    global principal_agent_instance
+    if principal_agent_instance is None:
+        try:
+            principal_agent_instance = PrincipalAgent()
+        except Exception as exc:  # noqa: BLE001 - surface initialization issues to caller
+            logger.error("Failed to initialise PrincipalAgent: %s", exc)
+            raise
+    return principal_agent_instance
+
 ##############################################################################################
 # Main Application Routes
 ##############################################################################################
@@ -383,6 +403,8 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         # Extract variables from the request data
         stock_symbol = data.get('stock_symbol')
         use_ai_analysis = data.get('use_ai_analysis', False)
+        use_principal_agent = data.get('use_principal_agent', use_ai_analysis)
+        include_principal_raw = bool(data.get('include_principal_raw_results', False))
         # language = data.get('language', 'en')
         
         print("Printing stock symbol:", stock_symbol)
@@ -415,6 +437,8 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         # Run the trading analysis
         print("=== RUNNING TRADING ANALYSIS ===")
         results = agent.run_sequential()
+        result_data = None
+        result_data_json = {}
         if results:
             result_data = agent.export_results(results)
             # If result_data[1] is a string, parse it:
@@ -422,10 +446,11 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                 result_data_json = json.loads(result_data[1])  # ensures you have a dict
             else:
                 result_data_json = result_data[1]
+
         print("Raw result for AI:", result_data)
         # AI Analysis if requested
         ai_analysis = None
-        if use_ai_analysis:
+        if use_ai_analysis and result_data is not None:
             try:
                 print("=== STARTING AI ANALYSIS ===")
                 
@@ -456,10 +481,35 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                     "error": f"AI analysis failed: {str(e)}"
                 }
         
+        elif use_ai_analysis:
+            ai_analysis = {
+                "success": False,
+                "error": "Trading data was not generated; unable to run AI analysis.",
+            }
+
+        principal_plan = None
+        if use_principal_agent:
+            try:
+                plan = get_principal_agent_instance().generate_trading_plan(
+                    stock_symbol,
+                    include_raw_results=include_principal_raw,
+                )
+                principal_plan = {
+                    "success": True,
+                    "data": plan,
+                }
+            except Exception as exc:  # noqa: BLE001 - surfaced in response for client visibility
+                logger.exception("Principal agent analysis failed for %s", stock_symbol)
+                principal_plan = {
+                    "success": False,
+                    "error": str(exc),
+                }
+
         response = {
             'success': True,
             'result': result_data_json,
             'ai_analysis': ai_analysis,
+            'principal_plan': principal_plan,
             'symbol': stock_symbol,
             'timestamp': str(datetime.now())
         }
@@ -471,6 +521,48 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             'error': str(e)
         }
         return JSONResponse(content=response, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@app.post("/api/principal/plan")
+async def generate_principal_plan(request: Request, user: User = Depends(get_current_user_sync)):
+    data = await request.json()
+    symbol = data.get("symbol")
+    include_raw = bool(data.get("include_raw_results", False))
+
+    if not symbol:
+        return JSONResponse(
+            content={"success": False, "error": "Symbol is required"},
+            status_code=400,
+        )
+
+    try:
+        plan = get_principal_agent_instance().generate_trading_plan(
+            symbol,
+            include_raw_results=include_raw,
+        )
+    except ValueError as exc:
+        logger.error("Principal agent rejected request for %s: %s", symbol, exc)
+        return JSONResponse(
+            content={"success": False, "error": str(exc)},
+            status_code=400,
+        )
+    except Exception as exc:  # noqa: BLE001 - capture unexpected agent failures
+        logger.exception("Principal agent failed for %s", symbol)
+        return JSONResponse(
+            content={
+                "success": False,
+                "error": "Principal agent failed to generate plan",
+                "details": str(exc),
+            },
+            status_code=500,
+        )
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "plan": plan,
+        },
+        status_code=200,
+    )
 
 def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:
     """Structure the trading agent result data for AI analysis"""
