@@ -3,7 +3,7 @@ alpaca-trade-api==3.2.0
 authlib==1.2.1
 bcrypt==4.1.1
 fastapi>=0.115
-fastapi-users[sqlalchemy]>=13
+fastapi-users[sqlalchemy]==15.0.1  # or stick with 14.x if you prefer
 Flask==2.3.2
 gunicorn==20.1.0
 httpx
@@ -18,11 +18,8 @@ pandas-ta @ git+https://github.com/0xAVX/pandas-ta.git
 passlib[bcrypt]==1.7.4
 pip>=25.0
 psycopg2-binary==2.9.9
-PyJWT==2.8.0
-pydantic>=2.7,<3
-PyYAML>=6.0.1
-python-dotenv==1.0.0
-python-multipart==0.0.7
+PyJWT==2.10.1          # matches fastapi-users >=14
+python-multipart==0.0.9
 scipy==1.13.0
 setuptools>=80.0
 sqlalchemy==2.0.23
