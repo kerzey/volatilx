@@ -16,6 +16,7 @@ import json
 import logging
 import math
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, TypedDict
@@ -133,11 +134,10 @@ class BaseExpertAgent:
         *,
         analyzer: Optional[ComprehensiveMultiTimeframeAnalyzer] = None,
         openai_client: Optional[OpenAI] = None,
-        agent_id: Optional[str] = None,
     ) -> None:
         self.analyzer = analyzer or self._build_analyzer()
         self.client = openai_client or self._build_openai_client()
-        self.agent_id = agent_id or self._ensure_agent()
+        self.assistant_id = self._ensure_assistant()
         self.graph = self._build_graph()
 
     # ------------------------------------------------------------------
@@ -215,15 +215,46 @@ class BaseExpertAgent:
             raise RuntimeError("Agent payload missing; indicator collection failed.")
 
         try:
-            response = self.client.responses.create(
-                agent_id=self.agent_id,
-                input=[{"role": "user", "content": payload}],
+            thread = self.client.beta.threads.create(
+                messages=[{"role": "user", "content": payload}]
             )
+            run = self.client.beta.threads.runs.create(
+                thread_id=thread.id,
+                assistant_id=self.assistant_id,
+                temperature=self.metadata.temperature,
+            )
+
+            while run.status in {"queued", "in_progress"}:
+                time.sleep(0.5)
+                run = self.client.beta.threads.runs.retrieve(
+                    thread_id=thread.id,
+                    run_id=run.id,
+                )
+
+            if run.status != "completed":
+                raise RuntimeError(f"Assistant run failed with status: {run.status}")
+
+            messages = self.client.beta.threads.messages.list(
+                thread_id=thread.id,
+                run_id=run.id,
+            )
+
+            response_texts: List[str] = []
+            for message in reversed(messages.data):
+                if getattr(message, "role", "") != "assistant":
+                    continue
+                for content in getattr(message, "content", []) or []:
+                    if getattr(content, "type", "") == "text":
+                        response_texts.append(content.text.value)
+
+            combined_response = "\n".join(chunk for chunk in response_texts if chunk).strip()
+            if not combined_response:
+                raise RuntimeError("Assistant returned no text content")
         except APIError as exc:  # noqa: BLE001
-            logger.error("OpenAI agent invocation failed: %s", exc)
+            logger.error("OpenAI assistant invocation failed: %s", exc)
             raise
 
-        parsed = self._parse_agent_response(response)
+        parsed = self._parse_agent_response(combined_response)
         return {"agent_result": parsed}
 
     # ------------------------------------------------------------------
@@ -253,15 +284,19 @@ class BaseExpertAgent:
             raise ValueError("OPENAI_API_KEY environment variable is required")
         return OpenAI(api_key=api_key)
 
-    def _ensure_agent(self) -> str:
-        response = self.client.agents.create(
+    def _ensure_assistant(self) -> str:
+        assistant = self.client.beta.assistants.create(
             name=self.metadata.name,
             description=self.metadata.description,
-            model=self.metadata.model,
             instructions=self.metadata.instructions,
+            model=self.metadata.model,
         )
-        logger.debug("Created OpenAI agent '%s' with id %s", self.metadata.name, response.id)
-        return response.id
+        logger.debug(
+            "Created OpenAI assistant '%s' with id %s",
+            self.metadata.name,
+            assistant.id,
+        )
+        return assistant.id
 
     # ------------------------------------------------------------------
     # Indicator collection helpers
@@ -324,23 +359,11 @@ class BaseExpertAgent:
             "Return a concise structured analysis."
         )
 
-    def _parse_agent_response(self, response: Any) -> Dict[str, Any]:
-        output_chunks: List[str] = []
-        raw_output = getattr(response, "output", None)
-        if raw_output:
-            for item in raw_output:
-                if getattr(item, "type", "") == "message":
-                    for content in getattr(item, "content", []) or []:
-                        if getattr(content, "type", "") == "output_text":
-                            output_chunks.append(getattr(content, "text", ""))
-        if not output_chunks:
-            output_chunks.append(str(response))
-
-        combined = "\n".join(chunk for chunk in output_chunks if chunk)
+    def _parse_agent_response(self, response_text: str) -> Dict[str, Any]:
         try:
-            parsed = json.loads(combined)
+            parsed = json.loads(response_text)
         except json.JSONDecodeError:
-            parsed = {"raw_text": combined}
+            parsed = {"raw_text": response_text}
         return parsed
 
 
