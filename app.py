@@ -206,14 +206,16 @@ async def azure_callback(request: Request):
 ##############################################################################################
 @app.get("/auth/google/login")
 async def google_login(request: Request):
-    # Pin HTTPS, respect incoming domain
+    # host = request.headers.get("host", "www.volatilx.com")
+    # redirect_uri = f"https://{host}/auth/google/callback"
+    # return await oauth.google.authorize_redirect(request, redirect_uri)
     host = request.headers.get("host", "www.volatilx.com")
-    redirect_uri = f"https://{host}/auth/google/callback"
+
+    is_local = host.startswith(("127.0.0.1", "localhost"))
+    scheme = "http" if is_local else "https"
+
+    redirect_uri = f"{scheme}://{host}/auth/google/callback"
     return await oauth.google.authorize_redirect(request, redirect_uri)
-# @app.get("/auth/google/login")
-# async def google_login(request: Request):
-#     redirect_uri = request.url_for("google_callback")
-#     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/google/callback")
 async def google_callback(request: Request):

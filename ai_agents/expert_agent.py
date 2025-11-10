@@ -256,6 +256,7 @@ class BaseExpertAgent:
             for message in reversed(messages.data):
                 if getattr(message, "role", "") != "assistant":
                     continue
+                print()
                 for content in getattr(message, "content", []) or []:
                     if getattr(content, "type", "") == "text":
                         response_texts.append(content.text.value)

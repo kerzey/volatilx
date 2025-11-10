@@ -2376,6 +2376,12 @@ class ComprehensiveMultiTimeframeAnalyzer:
         self.secret_key = secret_key
         self.base_url = base_url
         self.api = None
+        self._data_cache = {}
+        try:
+            cache_seconds = int(os.getenv("INDICATOR_CACHE_SECONDS", "120"))
+        except ValueError:
+            cache_seconds = 120
+        self._cache_ttl = timedelta(seconds=max(cache_seconds, 0))
         
         if api_key and secret_key:
             self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
@@ -2447,6 +2453,15 @@ class ComprehensiveMultiTimeframeAnalyzer:
         if interval not in self.valid_intervals:
             raise ValueError(f"Invalid interval. Must be one of: {self.valid_intervals}")
         
+        cache_key = (symbol.upper(), interval, period)
+        if self._cache_ttl.total_seconds() > 0:
+            cached_entry = self._data_cache.get(cache_key)
+            if cached_entry:
+                cached_df, cached_timestamp = cached_entry
+                if datetime.utcnow() - cached_timestamp <= self._cache_ttl:
+                    return cached_df.copy()
+                self._data_cache.pop(cache_key, None)
+
         try:
             start_date, end_date = self._convert_period_to_dates(period)
             
@@ -2484,6 +2499,8 @@ class ComprehensiveMultiTimeframeAnalyzer:
             df.index = bars.index
             
             print(f"✅ Fetched {len(df)} {interval} candles for {symbol} over {period}")
+            if self._cache_ttl.total_seconds() > 0:
+                self._data_cache[cache_key] = (df.copy(), datetime.utcnow())
             return df
             
         except Exception as e:

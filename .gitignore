@@ -9,3 +9,4 @@ venv/
 .DS_Store
 testenv/
 testenv/*
+dev.db

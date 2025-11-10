@@ -6,10 +6,11 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, Optional, TypedDict
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 from openai import APIError, OpenAI
+from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 
 from .expert_agent import (
     MomentumExpertAgent,
@@ -48,7 +49,7 @@ class PrincipalAgent:
         self,
         *,
         openai_client: Optional[OpenAI] = None,
-        openai_model: str = "gpt-4o-mini",
+        openai_model: str = "gpt-4o-mini",#"gpt-5-nano",#
         temperature: float = 0.35,
         momentum_agent: Optional[MomentumExpertAgent] = None,
         volatility_agent: Optional[VolatilityExpertAgent] = None,
@@ -61,13 +62,24 @@ class PrincipalAgent:
         self.client = openai_client or self._build_openai_client()
         self.model = openai_model
         self.temperature = temperature
+        self._summary_token_limit = 1600
+
+        analyzer = ComprehensiveMultiTimeframeAnalyzer(
+            api_key=os.getenv("ALPACA_API_KEY"),
+            secret_key=os.getenv("ALPACA_SECRET_KEY"),
+            base_url=os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets"),
+        )
 
         # Instantiate expert agents once and share across trading agents
         self.experts = {
-            "momentum": momentum_agent or MomentumExpertAgent(openai_client=self.client),
-            "volatility": volatility_agent or VolatilityExpertAgent(openai_client=self.client),
-            "pattern": pattern_agent or PatternRecognitionExpertAgent(openai_client=self.client),
-            "trend": trend_agent or TrendExpertAgent(openai_client=self.client),
+            "momentum": momentum_agent
+            or MomentumExpertAgent(openai_client=self.client, analyzer=analyzer),
+            "volatility": volatility_agent
+            or VolatilityExpertAgent(openai_client=self.client, analyzer=analyzer),
+            "pattern": pattern_agent
+            or PatternRecognitionExpertAgent(openai_client=self.client, analyzer=analyzer),
+            "trend": trend_agent
+            or TrendExpertAgent(openai_client=self.client, analyzer=analyzer),
         }
 
         self.trading_agents = {
@@ -153,24 +165,7 @@ class PrincipalAgent:
         )
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Symbol: {symbol.upper()}\n"
-                            "Trading agent outputs (JSON):\n"
-                            f"{user_payload}\n"
-                            "Craft disciplined, risk-aware guidance for the client."
-                        ),
-                    },
-                ],
-                temperature=self.temperature,
-                response_format={"type": "json_object"},
-                max_tokens=1600,
-            )
+            response = self._create_summary_completion(symbol, system_prompt, user_payload)
         except APIError as exc:  # noqa: BLE001
             raise RuntimeError(f"Principal agent failed to summarise strategies: {exc}") from exc
 
@@ -187,6 +182,72 @@ class PrincipalAgent:
         }
 
         return summary, usage
+
+    def _create_summary_completion(self, symbol: str, system_prompt: str, user_payload: str):
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": (
+                    f"Symbol: {symbol.upper()}\n"
+                    "Trading agent outputs (JSON):\n"
+                    f"{user_payload}\n"
+                    "Craft disciplined, risk-aware guidance for the client."
+                ),
+            },
+        ]
+
+        base_kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "response_format": {"type": "json_object"},
+        }
+
+        if self._model_requires_default_temperature():
+            base_kwargs.pop("temperature", None)
+
+        token_params = ("max_completion_tokens", "max_tokens")
+        last_error: Optional[APIError] = None
+        for param_name in token_params:
+            try:
+                response = self.client.chat.completions.create(
+                    **base_kwargs,
+                    **{param_name: self._summary_token_limit},
+                )
+                return response
+            except APIError as exc:  # noqa: BLE001
+                last_error = exc
+                if not self._is_unsupported_parameter_error(exc):
+                    raise
+                continue
+
+        if last_error is not None:
+            raise last_error
+
+        raise RuntimeError("Failed to create summary completion: no completion attempted")
+
+    @staticmethod
+    def _is_unsupported_parameter_error(exc: APIError) -> bool:
+        message = str(getattr(exc, "message", ""))
+        if "unsupported parameter" in message.lower():
+            return True
+        body = getattr(exc, "body", None)
+        if isinstance(body, dict):
+            error_data = body.get("error")
+            if isinstance(error_data, dict):
+                if error_data.get("code") == "unsupported_parameter":
+                    return True
+                message_text = error_data.get("message", "")
+                if isinstance(message_text, str) and "unsupported parameter" in message_text.lower():
+                    return True
+        return False
+
+    def _model_requires_default_temperature(self) -> bool:
+        if not self.model:
+            return False
+        lowered = self.model.lower()
+        return lowered.startswith("gpt-5-")
 
     def _build_graph(self):
         builder = StateGraph(PrincipalAgentState)
@@ -240,19 +301,210 @@ class PrincipalAgent:
         include_raw = state.get("include_raw_results", True)
 
         strategy_summary, usage = self._summarise_for_client(symbol, trading_results)
+        strategies, supplemental = self._normalise_strategy_summary(strategy_summary)
 
         payload: Dict[str, Any] = {
             "symbol": symbol,
             "generated_at": datetime.utcnow().isoformat(),
-            "strategies": strategy_summary,
+            "strategies": strategies,
             "model": self.model,
             "usage": usage,
         }
+
+        if supplemental:
+            payload["context"] = supplemental
+        if not strategies:
+            payload["strategies"] = self._fallback_strategies_from_trading_results(trading_results)
 
         if include_raw:
             payload["trading_agent_outputs"] = trading_results
 
         return {"principal_result": payload}
+
+    def _normalise_strategy_summary(self, summary: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        strategies: Dict[str, Any] = {}
+        supplemental: Dict[str, Any] = {}
+        if not isinstance(summary, dict):
+            return strategies, supplemental
+
+        working = summary.get("strategies") if isinstance(summary.get("strategies"), dict) else summary
+
+        alias_map = {
+            "day trading": "day_trading",
+            "day_trading": "day_trading",
+            "intraday": "day_trading",
+            "swing trading": "swing_trading",
+            "swing_trading": "swing_trading",
+            "swing": "swing_trading",
+            "longterm trading": "longterm_trading",
+            "longterm_trading": "longterm_trading",
+            "long term": "longterm_trading",
+            "long-term": "longterm_trading",
+        }
+
+        for key, value in working.items():
+            normalised_key = alias_map.get(key.lower()) if isinstance(key, str) else None
+            if normalised_key:
+                strategies[normalised_key] = value
+            else:
+                supplemental[key] = value
+
+        return strategies, supplemental
+
+    def _fallback_strategies_from_trading_results(self, trading_results: Dict[str, Any]) -> Dict[str, Any]:
+        fallback: Dict[str, Any] = {}
+        for strategy_key, result in trading_results.items():
+            summary_lines: List[str] = []
+            aggregated_levels: Dict[str, Any] = {}
+            next_actions: List[str] = []
+
+            if isinstance(result, dict):
+                bias = result.get("strategy")
+                if isinstance(bias, str) and bias:
+                    summary_lines.append(f"Strategy focus: {self._humanise_key(bias)}")
+
+                agent_data = result.get("experts")
+                if isinstance(agent_data, dict):
+                    for expert_key, expert_value in agent_data.items():
+                        summary_text, key_levels, actions = self._summarise_expert_output(expert_key, expert_value)
+                        if summary_text:
+                            summary_lines.append(f"{self._humanise_key(expert_key)}: {summary_text}")
+                        for level_key, level_value in key_levels.items():
+                            human_key = self._humanise_key(level_key)
+                            key_name = human_key if human_key not in aggregated_levels else f"{self._humanise_key(expert_key)} {human_key}"
+                            aggregated_levels[key_name] = level_value
+                        if actions:
+                            next_actions.extend(actions)
+
+            fallback[strategy_key] = {
+                "summary": " ".join(summary_lines) if summary_lines else "No summary available.",
+                "key_levels": aggregated_levels or None,
+                "next_actions": next_actions or ["Review expert diagnostics for details."],
+            }
+
+        return fallback
+
+    def _summarise_expert_output(
+        self,
+        expert_key: str,
+        expert_value: Any,
+    ) -> Tuple[str, Dict[str, Any], List[str]]:
+        if not isinstance(expert_value, dict):
+            return "", {}, []
+
+        output = expert_value.get("agent_output") or expert_value.get("agent_result")
+        if not isinstance(output, dict):
+            return "", {}, []
+
+        summary_candidates = (
+            "summary",
+            "overall_trend",
+            "momentum_state",
+            "volatility_state",
+            "wave_diagnosis",
+            "trade_bias",
+            "market_position",
+        )
+
+        summary_text = ""
+        for candidate in summary_candidates:
+            value = output.get(candidate)
+            summary_text = self._coerce_to_sentence(value)
+            if summary_text:
+                break
+
+        if not summary_text:
+            backup_sources = (
+                output.get("signals"),
+                output.get("timeframe_breakdown"),
+                output.get("indicator_details"),
+            )
+            for source in backup_sources:
+                summary_text = self._coerce_to_sentence(source)
+                if summary_text:
+                    break
+
+        key_levels: Dict[str, Any] = {}
+        levels_value = output.get("key_levels")
+        if isinstance(levels_value, dict):
+            key_levels = {self._humanise_key(k): v for k, v in levels_value.items()}
+        elif isinstance(levels_value, list):
+            key_levels = {str(idx + 1): item for idx, item in enumerate(levels_value)}
+
+        next_actions: List[str] = []
+        action_keys = (
+            "next_actions",
+            "actionable_setups",
+            "trade_plan",
+            "trade_ideas",
+            "risk_management",
+            "position_sizing",
+        )
+        for action_key in action_keys:
+            action_value = output.get(action_key)
+            if action_value:
+                next_actions.extend(self._coerce_to_list_of_strings(action_value))
+
+        if not summary_text and next_actions:
+            summary_text = next_actions[0]
+        if not summary_text and key_levels:
+            level_key, level_value = next(iter(key_levels.items()))
+            summary_text = f"{self._humanise_key(level_key)} at {self._coerce_to_sentence(level_value)}"
+
+        return summary_text, key_levels, next_actions
+
+    def _coerce_to_sentence(self, value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        items = self._coerce_to_list_of_strings(value)
+        return items[0] if items else ""
+
+    def _coerce_to_list_of_strings(self, value: Any, limit: int = 6) -> List[str]:
+        results: List[str] = []
+
+        def _collect(val: Any) -> None:
+            if len(results) >= limit or val is None:
+                return
+            if isinstance(val, str):
+                text = val.strip()
+                if text:
+                    results.append(text)
+                return
+            if isinstance(val, (int, float)):
+                results.append(str(val))
+                return
+            if isinstance(val, bool):
+                results.append("Yes" if val else "No")
+                return
+            if isinstance(val, list):
+                for item in val:
+                    _collect(item)
+                    if len(results) >= limit:
+                        break
+                return
+            if isinstance(val, dict):
+                for key, nested in val.items():
+                    nested_results = self._coerce_to_list_of_strings(nested, limit)
+                    if nested_results:
+                        label = self._humanise_key(key)
+                        if len(nested_results) == 1:
+                            results.append(f"{label}: {nested_results[0]}")
+                        else:
+                            results.append(f"{label}: {', '.join(nested_results)}")
+                    if len(results) >= limit:
+                        break
+
+        _collect(value)
+        deduped = list(dict.fromkeys(results))
+        return deduped[:limit]
+
+    @staticmethod
+    def _humanise_key(key: Any) -> str:
+        if not isinstance(key, str):
+            key = str(key)
+        return key.replace("_", " ").strip().title()
 
 
 __all__ = ["PrincipalAgent"]

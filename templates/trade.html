@@ -388,16 +388,16 @@
                     return;
                 }
 
-                const summary = strategy.summary || 'No summary provided.';
-                const keyLevels = strategy.key_levels;
-                const nextActions = strategy.next_actions;
+                const summaryHtml = formatPlanField('Summary', strategy.summary || 'No summary provided.');
+                const keyLevelsHtml = formatPlanField('Key Levels', strategy.key_levels);
+                const nextActionsHtml = formatPlanField('Next Actions', strategy.next_actions);
 
                 strategyHtml += `<div class="ai-section">
                     <div class="ai-section-title">${label}</div>
                     <div class="result-content">
-                        <p><strong>Summary:</strong> ${summary}</p>
-                        ${keyLevels ? formatKeyLevels(keyLevels) : ''}
-                        ${nextActions ? formatNextActions(nextActions) : ''}
+                        ${summaryHtml}
+                        ${keyLevelsHtml}
+                        ${nextActionsHtml}
                     </div>
                 </div>`;
             });
@@ -414,50 +414,64 @@
                    </details>`
                 : '';
 
+            const contextHtml = plan.context ? renderPlanContext(plan.context) : '';
+
             principalContent.innerHTML = `
-                <div class="result-item success ai-analysis">
+                <div class="result-item success ai-analysis plan-summary">
                     <div class="result-title">Principal Trading Plan</div>
-                    <div class="result-content">
-                        <p><strong>Symbol:</strong> ${plan.symbol || 'N/A'}</p>
-                        <p><strong>Generated:</strong> ${generatedAt}</p>
-                        ${usageHtml}
+                    <div class="result-content plan-summary__grid">
+                        <div><strong>Symbol:</strong> ${plan.symbol || 'N/A'}</div>
+                        <div><strong>Generated:</strong> ${generatedAt}</div>
+                        ${usageHtml ? `<div><strong>Tokens used:</strong> ${escapeHtml(String(usage.total_tokens ?? 'N/A'))}</div>` : ''}
                     </div>
                 </div>
                 ${strategyHtml || '<div class="result-item"><div class="result-content">No strategy breakdown available.</div></div>'}
+                ${contextHtml}
                 ${rawSection}
             `;
         }
 
-        function formatKeyLevels(keyLevels) {
-            if (!keyLevels) return '';
-            if (Array.isArray(keyLevels)) {
-                if (keyLevels.length === 0) return '';
-                return `<p><strong>Key Levels:</strong></p>
-                        <ul>${keyLevels.map(level => `<li>${escapeHtml(level)}</li>`).join('')}</ul>`;
-            }
-            if (typeof keyLevels === 'object') {
-                const entries = Object.entries(keyLevels);
-                if (!entries.length) return '';
-                return `<p><strong>Key Levels:</strong></p>
-                        <ul>${entries.map(([name, value]) => `<li>${escapeHtml(name)}: ${escapeHtml(value)}</li>`).join('')}</ul>`;
-            }
-            return `<p><strong>Key Levels:</strong> ${escapeHtml(keyLevels)}</p>`;
+        function formatPlanField(label, value) {
+            const rendered = renderPlanValue(value);
+            if (!rendered) return '';
+            return `<div class="plan-field"><strong>${escapeHtml(label)}:</strong> ${rendered}</div>`;
         }
 
-        function formatNextActions(nextActions) {
-            if (!nextActions) return '';
-            if (Array.isArray(nextActions)) {
-                if (!nextActions.length) return '';
-                return `<p><strong>Next Actions:</strong></p>
-                        <ul>${nextActions.map(action => `<li>${escapeHtml(action)}</li>`).join('')}</ul>`;
+        function renderPlanValue(value) {
+            if (value === null || value === undefined) {
+                return '';
             }
-            if (typeof nextActions === 'object') {
-                const entries = Object.entries(nextActions);
-                if (!entries.length) return '';
-                return `<p><strong>Next Actions:</strong></p>
-                        <ul>${entries.map(([name, value]) => `<li>${escapeHtml(name)}: ${escapeHtml(value)}</li>`).join('')}</ul>`;
+            if (typeof value === 'string') {
+                return `<span>${escapeHtml(value)}</span>`;
             }
-            return `<p><strong>Next Actions:</strong> ${escapeHtml(nextActions)}</p>`;
+            if (typeof value === 'number' || typeof value === 'boolean') {
+                return `<span>${escapeHtml(String(value))}</span>`;
+            }
+            if (Array.isArray(value)) {
+                if (value.length === 0) {
+                    return '';
+                }
+                return `<ul class="plan-list">${value.map(item => `<li>${renderPlanValue(item) || ''}</li>`).join('')}</ul>`;
+            }
+            if (typeof value === 'object') {
+                const entries = Object.entries(value);
+                if (entries.length === 0) {
+                    return '';
+                }
+                return `<ul class="plan-list">${entries.map(([key, val]) => `<li><strong>${escapeHtml(key)}:</strong> ${renderPlanValue(val) || ''}</li>`).join('')}</ul>`;
+            }
+            return `<span>${escapeHtml(String(value))}</span>`;
+        }
+
+        function renderPlanContext(context) {
+            const rendered = renderPlanValue(context);
+            if (!rendered) {
+                return '';
+            }
+            return `<div class="result-item info plan-context">
+                <div class="result-title">Portfolio Context</div>
+                <div class="result-content">${rendered}</div>
+            </div>`;
         }
 
     function escapeHtml(unsafe) {
