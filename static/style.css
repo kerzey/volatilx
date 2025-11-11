@@ -339,6 +339,63 @@ ul {
   margin-bottom: 0.3em;
 }
 
+/* PRICE ACTION ------------------------------------------------------------- */
+.price-action-summary {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  font-size: 0.95rem;
+}
+.price-action-summary div {
+  background: #f4f6fb;
+  padding: 0.65rem;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(102, 126, 234, 0.12);
+}
+.price-action-overview {
+  display: grid;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+}
+.price-action-overview strong {
+  color: #4b427a;
+}
+.price-action-overview__levels ul,
+.price-action-overview__patterns ul {
+  margin: 0.4rem 0 0.4rem 1.1rem;
+}
+.price-action-card {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.price-action-section {
+  background: #fdfdfd;
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: inset 0 0 0 1px rgba(104, 67, 158, 0.08);
+}
+.price-action-section strong {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: #68439e;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+}
+.price-action-section ul {
+  margin: 0.2rem 0 0.2rem 1.05rem;
+  font-size: 0.93rem;
+}
+.price-action-section li {
+  margin-bottom: 0.15rem;
+}
+.price-action-note {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: #666;
+}
+
 /* Table styles */
 table {
   border: 3px solid #667eea;

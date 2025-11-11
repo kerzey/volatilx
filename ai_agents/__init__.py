@@ -7,6 +7,7 @@ from .expert_agent import (
     TrendExpertAgent,
     VolatilityExpertAgent,
 )
+from .price_action import PriceActionAnalyzer
 from .principal_agent import PrincipalAgent
 from .trading_agents import (
     BaseTradingAgent,
@@ -26,4 +27,5 @@ __all__ = [
     "SwingTradingAgent",
     "LongTermTradingAgent",
     "PrincipalAgent",
+    "PriceActionAnalyzer",
 ]

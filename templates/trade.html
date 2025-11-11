@@ -63,12 +63,14 @@
                 <div class="tab active" onclick="showTab('technical', event)" id="technicalTab">Technical Analysis</div>
                 <div class="tab" onclick="showTab('ai', event)" id="aiTab" style="display:none;">AI Investment Strategy</div>
                 <div class="tab" onclick="showTab('principal', event)" id="principalTab" style="display:none;">Principal Plan</div>
+                <div class="tab" onclick="showTab('priceAction', event)" id="priceActionTab" style="display:none;">Price Action</div>
             </div>
             
             <div id="resultsContent">
                 <div id="technicalContent" class="tab-content active"></div>
                 <div id="aiContent" class="tab-content"></div>
                 <div id="principalContent" class="tab-content"></div>
+                <div id="priceActionContent" class="tab-content"></div>
             </div>
         </div>
     </div>
@@ -77,6 +79,7 @@
         let currentResults = null;
         const usePrincipalAgentInput = document.getElementById('usePrincipalAgent');
         const includePrincipalRawInput = document.getElementById('includePrincipalRaw');
+    const priceActionTab = document.getElementById('priceActionTab');
 
         includePrincipalRawInput.disabled = !usePrincipalAgentInput.checked;
 
@@ -101,6 +104,7 @@
             const aiTab = document.getElementById('aiTab');
             const principalTab = document.getElementById('principalTab');
             const technicalTab = document.getElementById('technicalTab');
+            const priceActionContent = document.getElementById('priceActionContent');
             
             if (!stockSymbol) {
                 alert('Please enter a stock symbol');
@@ -110,6 +114,7 @@
             // Show loading state
             analyzeBtn.disabled = true;
             const activeTasks = [];
+            activeTasks.push('Price Action');
             if (useAiAnalysis) activeTasks.push('AI');
             if (usePrincipalAgent) activeTasks.push('Principal');
             analyzeBtn.textContent = activeTasks.length
@@ -119,8 +124,10 @@
             resultTabs.classList.add('hidden');
             aiTab.style.display = 'none';
             principalTab.style.display = 'none';
+            priceActionTab.style.display = 'none';
             aiTab.classList.remove('active');
             principalTab.classList.remove('active');
+            priceActionTab.classList.remove('active');
             technicalTab.classList.add('active');
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById('technicalContent').classList.add('active');
@@ -133,6 +140,7 @@
             `;
             document.getElementById('aiContent').innerHTML = '';
             document.getElementById('principalContent').innerHTML = '';
+            priceActionContent.innerHTML = '';
             
             try {
                 const response = await fetch('/trade', {
@@ -150,6 +158,9 @@
                     currentResults = data;
                     displayResults(data, stockSymbol);
                     let extraTabs = 0;
+                    displayPriceAction(data.price_action);
+                    priceActionTab.style.display = 'block';
+                    extraTabs += 1;
                     if (useAiAnalysis) {
                         displayAiAnalysis(data.ai_analysis);
                         aiTab.style.display = 'block';
@@ -429,6 +440,309 @@
                 ${contextHtml}
                 ${rawSection}
             `;
+        }
+
+        function displayPriceAction(priceAction) {
+            const container = document.getElementById('priceActionContent');
+            if (!container) {
+                return;
+            }
+            if (!priceAction) {
+                container.innerHTML = `<div class="result-item">
+                    <div class="result-title">Price Action</div>
+                    <div class="result-content">No price action data available.</div>
+                </div>`;
+                return;
+            }
+
+            const headerMessage = priceAction.success
+                ? 'Price action insights generated.'
+                : (priceAction.error || 'Price action analysis failed.');
+
+            let html = `
+                <div class="result-item ${priceAction.success ? 'success' : 'error'}">
+                    <div class="result-title">Price Action Summary</div>
+                    <div class="result-content price-action-summary">
+                        <div><strong>Symbol:</strong> ${escapeHtml(priceAction.symbol || 'N/A')}</div>
+                        <div><strong>Generated:</strong> ${escapeHtml(formatDateTime(priceAction.generated_at))}</div>
+                        <div>${escapeHtml(headerMessage)}</div>
+                    </div>
+                </div>
+            `;
+
+            const overview = priceAction.overview || {};
+            const keyLevels = Array.isArray(overview.key_levels) ? overview.key_levels : [];
+            const recentPatterns = Array.isArray(overview.recent_patterns) ? overview.recent_patterns : [];
+
+            if (overview.trend_alignment || keyLevels.length || recentPatterns.length) {
+                const levelsHtml = keyLevels.length
+                    ? `<ul>${keyLevels.map(level => {
+                        const tfLabel = formatTimeframeLabel(level.timeframe);
+                        const tf = tfLabel ? escapeHtml(tfLabel) : 'Timeframe';
+                        const type = escapeHtml(capitalize(level.type || 'level'));
+                        const price = escapeHtml(formatPrice(level.price));
+                        const distance = escapeHtml(formatPercent(level.distance_pct));
+                        return `<li>${tf} · ${type} at ${price} (${distance})</li>`;
+                    }).join('')}</ul>`
+                    : '<div class="price-action-note">No shared support or resistance levels detected.</div>';
+
+                const patternsHtml = recentPatterns.length
+                    ? `<ul>${recentPatterns.map(pattern => {
+                        const label = escapeHtml(pattern.pattern || 'Pattern');
+                        const tfLabel = formatTimeframeLabel(pattern.timeframe);
+                        const tf = tfLabel ? escapeHtml(tfLabel) : '';
+                        const confidence = formatNumber(pattern.confidence, 2);
+                        const confidenceText = confidence === 'N/A' ? '' : ` (score ${confidence})`;
+                        return `<li>${label}${tf ? ` · ${tf}` : ''}${escapeHtml(confidenceText)}</li>`;
+                    }).join('')}</ul>`
+                    : '<div class="price-action-note">No notable candlestick patterns across timeframes.</div>';
+
+                html += `
+                    <div class="result-item info">
+                        <div class="result-title">Multi-Timeframe Alignment</div>
+                        <div class="result-content price-action-overview">
+                            <p><strong>Trend alignment:</strong> ${escapeHtml(overview.trend_alignment || 'Unknown')}</p>
+                            <div class="price-action-overview__levels">
+                                <strong>Key levels:</strong>
+                                ${levelsHtml}
+                            </div>
+                            <div class="price-action-overview__patterns">
+                                <strong>Recent patterns:</strong>
+                                ${patternsHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const perTimeframe = priceAction.per_timeframe && typeof priceAction.per_timeframe === 'object'
+                ? Object.entries(priceAction.per_timeframe)
+                : [];
+
+            if (perTimeframe.length) {
+                html += perTimeframe.map(([timeframe, details]) => renderPriceActionCard(timeframe, details)).join('');
+            } else {
+                html += `<div class="result-item">
+                    <div class="result-content">No timeframe-specific price action details available.</div>
+                </div>`;
+            }
+
+            const pipelineErrors = Array.isArray(priceAction.errors) ? priceAction.errors.filter(Boolean) : [];
+            if (pipelineErrors.length) {
+                html += `<div class="result-item info">
+                    <div class="result-title">Data Warnings</div>
+                    <div class="result-content"><ul>${pipelineErrors.map(msg => `<li>${escapeHtml(msg)}</li>`).join('')}</ul></div>
+                </div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderPriceActionCard(timeframe, details) {
+            const info = details || {};
+            const price = info.price || {};
+            const trend = info.trend || {};
+            const structure = info.structure || {};
+            const levels = info.levels || {};
+            const candlestick = info.candlestick || {};
+
+            const supportsHtml = renderPriceActionLevels(levels.supports, 'Supports');
+            const resistancesHtml = renderPriceActionLevels(levels.resistances, 'Resistances');
+            const recentPivots = levels.recent_pivots || {};
+            const pivotHighs = Array.isArray(recentPivots.highs) ? recentPivots.highs.length : 0;
+            const pivotLows = Array.isArray(recentPivots.lows) ? recentPivots.lows.length : 0;
+            const pivotSummary = pivotHighs || pivotLows
+                ? `<div class="price-action-note"><strong>Recent pivots:</strong> ${escapeHtml(`${pivotHighs} highs · ${pivotLows} lows`)}</div>`
+                : '';
+
+            const slopePct = formatNumber(trend.slope_pct, 2);
+            const slopePctDisplay = slopePct === 'N/A' ? 'N/A' : `${slopePct}%`;
+
+            const priceItems = [
+                `<li>Open: ${escapeHtml(formatPrice(price.open))}</li>`,
+                `<li>High: ${escapeHtml(formatPrice(price.high))}</li>`,
+                `<li>Low: ${escapeHtml(formatPrice(price.low))}</li>`,
+                `<li>Close: ${escapeHtml(formatPrice(price.close))}</li>`,
+                `<li>Change: ${escapeHtml(formatPercent(price.close_change_pct))}</li>`,
+                `<li>Volume: ${escapeHtml(formatInteger(price.volume))}</li>`,
+                `<li>Timestamp: ${escapeHtml(formatDateTime(price.timestamp))}</li>`,
+            ].join('');
+
+            const trendItems = [
+                `<li>Direction: ${escapeHtml(capitalize(trend.direction || 'unknown'))}</li>`,
+                `<li>Strength: ${escapeHtml(capitalize(trend.strength || 'unknown'))}</li>`,
+                `<li>Slope: ${escapeHtml(formatNumber(trend.slope, 6))}</li>`,
+                `<li>Slope %: ${escapeHtml(slopePctDisplay)}</li>`,
+                `<li>R²: ${escapeHtml(formatNumber(trend.r_squared, 3))}</li>`,
+                `<li>Window: ${escapeHtml(formatInteger(trend.window))}</li>`,
+            ].join('');
+
+            const structureItems = [
+                `<li>Bias: ${escapeHtml(capitalize(structure.bias || 'mixed'))}</li>`,
+                `<li>Higher highs: ${escapeHtml(formatBoolean(structure.higher_highs))}</li>`,
+                `<li>Higher lows: ${escapeHtml(formatBoolean(structure.higher_lows))}</li>`,
+                `<li>Lower highs: ${escapeHtml(formatBoolean(structure.lower_highs))}</li>`,
+                `<li>Lower lows: ${escapeHtml(formatBoolean(structure.lower_lows))}</li>`,
+                `<li>Range state: ${escapeHtml(capitalize(structure.range_state || 'unknown'))}</li>`,
+                `<li>Range ratio: ${escapeHtml(formatNumber(structure.range_ratio, 2))}</li>`,
+            ].join('');
+
+            const signalsHtml = renderPriceActionSignals(candlestick.signals);
+            const latestCandle = candlestick.latest_candle || {};
+            const latestStamp = latestCandle.timestamp
+                ? `<div class="price-action-note">Pattern candle: ${escapeHtml(formatDateTime(latestCandle.timestamp))}</div>`
+                : '';
+
+            const tfText = formatTimeframeLabel(timeframe) || 'Timeframe';
+            const tfLabel = escapeHtml(tfText);
+
+            return `<div class="result-item">
+                <div class="result-title">${tfLabel} Price Action</div>
+                <div class="result-content price-action-card">
+                    <div class="price-action-section">
+                        <strong>Last Candle</strong>
+                        <ul>${priceItems}</ul>
+                    </div>
+                    <div class="price-action-section">
+                        <strong>Trend Context</strong>
+                        <ul>${trendItems}</ul>
+                    </div>
+                    <div class="price-action-section">
+                        <strong>Market Structure</strong>
+                        <ul>${structureItems}</ul>
+                        ${pivotSummary}
+                    </div>
+                    <div class="price-action-section">
+                        <strong>Support &amp; Resistance</strong>
+                        ${supportsHtml}
+                        ${resistancesHtml}
+                    </div>
+                    <div class="price-action-section">
+                        <strong>Candlestick Signals</strong>
+                        ${signalsHtml}
+                        ${latestStamp}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderPriceActionLevels(levels, label) {
+            if (!Array.isArray(levels) || levels.length === 0) {
+                return `<p><strong>${escapeHtml(label)}:</strong> N/A</p>`;
+            }
+            const items = levels.map(level => {
+                const price = formatPrice(level.price);
+                const distance = formatPercent(level.distance_pct);
+                const tested = formatDateTime(level.tested_at);
+                return `<li>${escapeHtml(price)} · distance ${escapeHtml(distance)} · tested ${escapeHtml(tested)}</li>`;
+            }).join('');
+            return `<div><strong>${escapeHtml(label)}:</strong><ul>${items}</ul></div>`;
+        }
+
+        function renderPriceActionSignals(signals) {
+            if (!Array.isArray(signals) || signals.length === 0) {
+                return '<p>No strong candlestick patterns.</p>';
+            }
+            const items = signals.map(signal => {
+                const name = capitalize(signal.name || 'Pattern');
+                const confidence = formatNumber(signal.confidence, 2);
+                const confidenceText = confidence === 'N/A' ? '' : ` (${confidence})`;
+                return `<li>${escapeHtml(name)}${escapeHtml(confidenceText)}</li>`;
+            }).join('');
+            return `<ul>${items}</ul>`;
+        }
+
+        function formatDateTime(value) {
+            if (!value) {
+                return 'N/A';
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return typeof value === 'string' ? value : 'N/A';
+            }
+            return date.toLocaleString();
+        }
+
+        function formatNumber(value, digits = 2) {
+            const num = Number(value);
+            if (!Number.isFinite(num)) {
+                return 'N/A';
+            }
+            return num.toFixed(digits);
+        }
+
+        function formatInteger(value) {
+            const num = Number(value);
+            if (!Number.isFinite(num)) {
+                return 'N/A';
+            }
+            return Math.round(num).toLocaleString();
+        }
+
+        function formatPrice(value) {
+            const formatted = formatNumber(value, 2);
+            return formatted === 'N/A' ? 'N/A' : `$${formatted}`;
+        }
+
+        function formatPercent(value, digits = 2) {
+            const num = Number(value);
+            if (!Number.isFinite(num)) {
+                return 'N/A';
+            }
+            return `${num.toFixed(digits)}%`;
+        }
+
+        function formatBoolean(value) {
+            if (value === true) return 'Yes';
+            if (value === false) return 'No';
+            return 'Unknown';
+        }
+
+        function capitalize(value) {
+            if (value === null || value === undefined) {
+                return 'Unknown';
+            }
+            const str = String(value);
+            if (!str.length) {
+                return 'Unknown';
+            }
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        function formatTimeframeLabel(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            const str = String(value).trim();
+            if (!str) {
+                return '';
+            }
+            const match = str.match(/^(\d+)([a-zA-Z]+)$/);
+            if (!match) {
+                return str.toUpperCase();
+            }
+
+            const quantity = Number(match[1]);
+            const unitRaw = match[2].toLowerCase();
+            const lookup = {
+                m: 'Minute',
+                min: 'Minute',
+                h: 'Hour',
+                hr: 'Hour',
+                d: 'Day',
+                day: 'Day',
+                wk: 'Week',
+                w: 'Week',
+                mo: 'Month',
+                mon: 'Month'
+            };
+            const normalized = lookup[unitRaw]
+                || lookup[unitRaw.slice(0, 2)]
+                || lookup[unitRaw.charAt(0)]
+                || unitRaw.toUpperCase();
+            const plural = quantity !== 1 && !normalized.endsWith('s');
+            const unitLabel = plural ? `${normalized}s` : normalized;
+            return `${quantity} ${unitLabel}`;
         }
 
         function formatPlanField(label, value) {

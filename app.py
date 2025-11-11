@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import User, UserRead, UserCreate, UserUpdate, get_user_db, get_user_manager, init_db, get_current_user_sync
@@ -36,6 +36,7 @@ import jwt
 import hashlib
 from ai_agents.openai_service import openai_service
 from ai_agents.principal_agent import PrincipalAgent
+from ai_agents.price_action import PriceActionAnalyzer
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -367,6 +368,7 @@ async def unauthorized_handler(request: Request, exc):
 # Agent and Indicator Fetcher Initialization
 ##############################################################################################
 indicator_fetcher = ComprehensiveMultiTimeframeAnalyzer()
+price_action_analyzer = PriceActionAnalyzer(analyzer=indicator_fetcher)
 
 principal_agent_instance: Optional[PrincipalAgent] = None
 
@@ -407,6 +409,8 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         use_ai_analysis = data.get('use_ai_analysis', False)
         use_principal_agent = data.get('use_principal_agent', use_ai_analysis)
         include_principal_raw = bool(data.get('include_principal_raw_results', False))
+        price_action_timeframes_raw = data.get('price_action_timeframes')
+        price_action_period_overrides_raw = data.get('price_action_period_overrides')
         # language = data.get('language', 'en')
         
         print("Printing stock symbol:", stock_symbol)
@@ -428,6 +432,10 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
         secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
         agent.set_credentials(api_key=api_key, secret_key=secret_key)
+        try:
+            indicator_fetcher.set_credentials(api_key, secret_key)
+        except Exception as cred_error:  # noqa: BLE001 - log but do not fail primary analysis
+            logger.warning("Failed to configure shared indicator credentials: %s", cred_error)
         
         # Set trading parameters
         agent.set_trading_parameters(
@@ -507,11 +515,43 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                     "error": str(exc),
                 }
 
+        price_action_timeframes: Optional[List[str]] = None
+        if isinstance(price_action_timeframes_raw, str):
+            parts = [item.strip() for item in price_action_timeframes_raw.split(',') if item and item.strip()]
+            price_action_timeframes = parts or None
+        elif isinstance(price_action_timeframes_raw, (list, tuple, set)):
+            converted = [str(item).strip() for item in price_action_timeframes_raw if str(item).strip()]
+            price_action_timeframes = converted or None
+
+        price_action_period_overrides: Optional[Dict[str, str]] = None
+        if isinstance(price_action_period_overrides_raw, dict):
+            cleaned_overrides = {
+                str(key): str(value)
+                for key, value in price_action_period_overrides_raw.items()
+                if value is not None and str(value).strip()
+            }
+            price_action_period_overrides = cleaned_overrides or None
+
+        try:
+            price_action_analysis = price_action_analyzer.analyze(
+                stock_symbol,
+                timeframes=price_action_timeframes,
+                period_overrides=price_action_period_overrides,
+            )
+        except Exception as exc:  # noqa: BLE001 - return structured error information
+            logger.exception("Price action analysis failed for %s", stock_symbol)
+            price_action_analysis = {
+                "success": False,
+                "symbol": stock_symbol,
+                "error": str(exc),
+            }
+
         response = {
             'success': True,
             'result': result_data_json,
             'ai_analysis': ai_analysis,
             'principal_plan': principal_plan,
+            'price_action': price_action_analysis,
             'symbol': stock_symbol,
             'timestamp': str(datetime.now())
         }
