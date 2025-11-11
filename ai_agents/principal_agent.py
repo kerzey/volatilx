@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from langgraph.graph import END, START, StateGraph
-from openai import APIError, OpenAI
+from openai import APIError, BadRequestError, OpenAI
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 
 from .expert_agent import (
@@ -27,6 +27,200 @@ from .trading_agents import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _make_strategy_schema(key_levels_property: Dict[str, Any]) -> Dict[str, Any]:
+    key_levels_spec = {"description": "Support and resistance levels or comparable technical thresholds."}
+    key_levels_spec.update(key_levels_property)
+
+    return {
+        "type": "object",
+        "required": ["summary", "key_levels", "next_actions"],
+        "properties": {
+            "summary": {
+                "type": "string",
+                "description": "Concise description of the recommended trading stance.",
+            },
+            "key_levels": key_levels_spec,
+            "next_actions": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Prioritised sequence of client-ready actions.",
+            },
+        },
+        "additionalProperties": False,
+    }
+
+
+def _make_principal_plan_schema(strategy_schema: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "required": [
+            "day_trading",
+            "swing_trading",
+            "longterm_trading",
+            "global_risks",
+            "portfolio_guidance",
+        ],
+        "properties": {
+            "day_trading": strategy_schema,
+            "swing_trading": strategy_schema,
+            "longterm_trading": strategy_schema,
+            "global_risks": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Cross-strategy risk factors the client must monitor.",
+            },
+            "portfolio_guidance": {
+                "type": "object",
+                "required": ["summary"],
+                "properties": {
+                    "summary": {
+                        "type": "string",
+                        "description": "Top-level guidance synthesising the trading landscape.",
+                    },
+                    "asset_allocation": {
+                        "type": "string",
+                        "description": "Adjustments to position sizing and capital deployment.",
+                    },
+                    "risk_management": {
+                        "type": "string",
+                        "description": "Risk controls, hedges, or protective orders to consider.",
+                    },
+                    "positioning": {
+                        "type": "string",
+                        "description": "Suggested directional stance and timeframe alignment.",
+                    },
+                    "notes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Additional clarifications or implementation caveats.",
+                    },
+                },
+                "additionalProperties": True,
+            },
+            "context": {
+                "type": "object",
+                "description": "Optional supplemental data keyed by label.",
+                "additionalProperties": True,
+            },
+        },
+        "additionalProperties": False,
+    }
+
+
+def _make_response_format(schema: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "principal_trading_plan",
+            "schema": schema,
+            "strict": True,
+        },
+    }
+
+
+_KEY_LEVELS_PROPERTY_STANDARD: Dict[str, Any] = {
+    "oneOf": [
+        {
+            "type": "object",
+            "additionalProperties": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "number"},
+                    {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                ]
+            },
+        },
+        {
+            "type": "array",
+            "items": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "number"},
+                    {
+                        "type": "object",
+                        "additionalProperties": {"type": "string"},
+                    },
+                ]
+            },
+        },
+        {"type": "string"},
+        {"type": "null"},
+    ]
+}
+
+
+_KEY_LEVELS_PROPERTY_SIMPLE: Dict[str, Any] = {
+    "type": "object",
+    "default": {},
+    "additionalProperties": {
+        "type": "string",
+        "description": "Key level value or rationale in free-form text.",
+    },
+}
+
+
+_STRATEGY_SCHEMA: Dict[str, Any] = _make_strategy_schema(_KEY_LEVELS_PROPERTY_STANDARD)
+_STRATEGY_SCHEMA_SIMPLE: Dict[str, Any] = _make_strategy_schema(_KEY_LEVELS_PROPERTY_SIMPLE)
+
+
+_PRINCIPAL_PLAN_SCHEMA: Dict[str, Any] = _make_principal_plan_schema(_STRATEGY_SCHEMA)
+_PRINCIPAL_PLAN_SCHEMA_SIMPLE: Dict[str, Any] = _make_principal_plan_schema(_STRATEGY_SCHEMA_SIMPLE)
+
+
+_PRINCIPAL_PLAN_RESPONSE_FORMAT = _make_response_format(_PRINCIPAL_PLAN_SCHEMA)
+_PRINCIPAL_PLAN_RESPONSE_FORMAT_SIMPLE = _make_response_format(_PRINCIPAL_PLAN_SCHEMA_SIMPLE)
+
+_PRINCIPAL_PLAN_OUTPUT_TEMPLATE = json.dumps(  # Example shape for models without strict schema
+    {
+        "day_trading": {
+            "summary": "Clear guidance for intraday positioning",
+            "key_levels": {
+                "example_level": "123.45 - rationale",
+                "alternate_level": "Another key observation",
+            },
+            "next_actions": [
+                "First concrete step",
+                "Second concrete step",
+            ],
+        },
+        "swing_trading": {
+            "summary": "Swing outlook and bias",
+            "key_levels": {
+                "swing_support": "Support rationale",
+                "swing_resistance": "Resistance rationale",
+            },
+            "next_actions": [
+                "Swing action item",
+                "Another swing action item",
+            ],
+        },
+        "longterm_trading": {
+            "summary": "Position trade framing",
+            "key_levels": {
+                "long_support": "Support rationale",
+                "long_target": "Target rationale",
+            },
+            "next_actions": [
+                "Long-term action",
+                "Risk control action",
+            ],
+        },
+        "global_risks": ["Cross-horizon risk"],
+        "portfolio_guidance": {
+            "summary": "Top-level synthesis",
+            "asset_allocation": "Allocation advice",
+            "risk_management": "Risk management advice",
+            "positioning": "Directional stance",
+            "notes": ["Additional note"],
+        },
+    },
+    indent=2,
+)
 
 
 class PrincipalAgentState(TypedDict, total=False):
@@ -49,7 +243,7 @@ class PrincipalAgent:
         self,
         *,
         openai_client: Optional[OpenAI] = None,
-        openai_model: str = "gpt-4o-mini",#"gpt-5-nano",#
+    openai_model: str = "gpt-5-nano",#"gpt-4o-mini"
         temperature: float = 0.35,
         momentum_agent: Optional[MomentumExpertAgent] = None,
         volatility_agent: Optional[VolatilityExpertAgent] = None,
@@ -73,13 +267,13 @@ class PrincipalAgent:
         # Instantiate expert agents once and share across trading agents
         self.experts = {
             "momentum": momentum_agent
-            or MomentumExpertAgent(openai_client=self.client, analyzer=analyzer),
+            or MomentumExpertAgent(openai_client=self.client, analyzer=analyzer, model=self.model),
             "volatility": volatility_agent
-            or VolatilityExpertAgent(openai_client=self.client, analyzer=analyzer),
+            or VolatilityExpertAgent(openai_client=self.client, analyzer=analyzer, model=self.model),
             "pattern": pattern_agent
-            or PatternRecognitionExpertAgent(openai_client=self.client, analyzer=analyzer),
+            or PatternRecognitionExpertAgent(openai_client=self.client, analyzer=analyzer, model=self.model),
             "trend": trend_agent
-            or TrendExpertAgent(openai_client=self.client, analyzer=analyzer),
+            or TrendExpertAgent(openai_client=self.client, analyzer=analyzer, model=self.model),
         }
 
         self.trading_agents = {
@@ -159,21 +353,51 @@ class PrincipalAgent:
         system_prompt = (
             "You are the principal trading strategist for an AI-driven desk. "
             "The model outputs from subordinate trading agents (day, swing, long-term) are provided in JSON. "
-            "Return a strict JSON object with keys: 'day_trading', 'swing_trading', 'longterm_trading', "
-            "'global_risks', and 'portfolio_guidance'. Each strategy key should include entries for 'summary', "
-            "'key_levels', and 'next_actions'."
+            "Adhere exactly to the provided response JSON schema and populate every required field. "
+            "Each strategy must include a disciplined 'summary', the most actionable 'key_levels', and a sequenced "
+            "list of 'next_actions'. "
+            "Highlight risks that cut across horizons and conclude with portfolio-level guidance that balances "
+            "opportunity with capital protection."
+        )
+
+        if self.model and self.model.lower().startswith("gpt-5-"):
+            system_prompt += (
+                " For each strategy's 'key_levels', return an object that maps concise level names to short"
+                " descriptive strings (e.g., '402.5 - intraday resistance')."
+                " Respond with a single JSON object containing the keys 'day_trading', 'swing_trading',"
+                " 'longterm_trading', 'global_risks', and 'portfolio_guidance'. Each strategy key must include"
+                " 'summary', 'key_levels', and 'next_actions'."
+            )
+
+        template_instructions = (
+            "Return only JSON. Populate the following template with substantive values (replace all placeholder text):\n"
+            f"{_PRINCIPAL_PLAN_OUTPUT_TEMPLATE}\n"
+            "Use descriptive keys inside 'key_levels' and provide at least two actionable next steps per strategy."
         )
 
         try:
-            response = self._create_summary_completion(symbol, system_prompt, user_payload)
-        except APIError as exc:  # noqa: BLE001
+            response = self._create_summary_completion(
+                symbol,
+                system_prompt,
+                user_payload,
+                template_instructions,
+            )
+        except (APIError, BadRequestError) as exc:  # noqa: BLE001
             raise RuntimeError(f"Principal agent failed to summarise strategies: {exc}") from exc
 
-        content = response.choices[0].message.content or "{}"
-        try:
-            summary = json.loads(content)
-        except json.JSONDecodeError:
-            summary = {"raw_text": content}
+        content = self._extract_response_content(response) or "{}"
+        logger.debug("Principal summary raw response for %s: %s", symbol, content)
+        parsed_summary = self._parse_json_from_text(content)
+        if parsed_summary is None:
+            snippet = content.strip()
+            if len(snippet) > 1000:
+                snippet = snippet[:1000] + "..."
+            print(f"[PrincipalAgent] Unstructured summary for {symbol}: {snippet}")
+        else:
+            print(
+                f"[PrincipalAgent] Parsed summary for {symbol}: {list(parsed_summary.keys())}"
+            )
+        summary = parsed_summary if parsed_summary is not None else {"raw_text": content}
 
         usage = {
             "prompt_tokens": getattr(response.usage, "prompt_tokens", None),
@@ -183,7 +407,119 @@ class PrincipalAgent:
 
         return summary, usage
 
-    def _create_summary_completion(self, symbol: str, system_prompt: str, user_payload: str):
+    def _create_summary_completion(
+        self,
+        symbol: str,
+        system_prompt: str,
+        user_payload: str,
+        template_instructions: str,
+    ):
+        response_format = self._principal_plan_response_format()
+        schema_enabled = bool(response_format and response_format.get("type") == "json_schema")
+        responses_supported = self._responses_api_supported()
+
+        if responses_supported:
+            try:
+                return self._create_summary_with_responses_api(
+                    system_prompt,
+                    user_payload,
+                    symbol,
+                    response_format=response_format,
+                    template_instructions=template_instructions,
+                )
+            except AttributeError:  # pragma: no cover - defensive fallback for older clients
+                logger.debug("Responses API unavailable at runtime, falling back to chat completions")
+            except (APIError, BadRequestError) as exc:  # noqa: BLE001
+                if self._is_invalid_schema_error(exc):
+                    logger.warning(
+                        "Responses API rejected schema; reverting to json_object for chat completion: %s",
+                        exc,
+                    )
+                    schema_enabled = False
+                    response_format = None
+                else:
+                    raise
+
+        return self._create_summary_with_chat_api(
+            system_prompt,
+            user_payload,
+            symbol,
+            schema_enabled=schema_enabled,
+            response_format=response_format,
+            template_instructions=template_instructions,
+        )
+
+    def _create_summary_with_responses_api(
+        self,
+        system_prompt: str,
+        user_payload: str,
+        symbol: str,
+        *,
+        response_format: Optional[Dict[str, Any]],
+        template_instructions: str,
+    ):
+        messages = [
+            {
+                "role": "system",
+                "content": [{"type": "text", "text": system_prompt}],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"Symbol: {symbol.upper()}\n"
+                            "Trading agent outputs (JSON):\n"
+                            f"{user_payload}\n"
+                            "Craft disciplined, risk-aware guidance for the client.\n"
+                            f"{template_instructions}"
+                        ),
+                    }
+                ],
+            },
+        ]
+
+        base_kwargs = {
+            "model": self.model,
+            "input": messages,
+        }
+
+        if response_format is not None:
+            base_kwargs["response_format"] = response_format
+
+        if not self._model_requires_default_temperature():
+            base_kwargs["temperature"] = self.temperature
+
+        if self._model_supports_reasoning_controls():
+            base_kwargs.setdefault("reasoning", {"effort": "medium"})
+            base_kwargs.setdefault("text", {"verbosity": "medium"})
+            base_kwargs.setdefault("max_output_tokens", self._summary_token_limit)
+        else:
+            base_kwargs.setdefault("max_output_tokens", self._summary_token_limit)
+
+        try:
+            return self.client.responses.create(**base_kwargs)
+        except (APIError, BadRequestError) as exc:  # noqa: BLE001
+            if not self._is_unsupported_parameter_error(exc):
+                raise
+            param_name_error = self._extract_error_param_name(exc)
+            if param_name_error:
+                base_kwargs.pop(param_name_error, None)
+            if param_name_error == "response_format":
+                base_kwargs.pop("response_format", None)
+            return self.client.responses.create(**base_kwargs)
+
+    def _create_summary_with_chat_api(
+        self,
+        system_prompt: str,
+        user_payload: str,
+        symbol: str,
+        *,
+        schema_enabled: bool = True,
+        response_format: Optional[Dict[str, Any]] = None,
+        template_instructions: str,
+    ):
         messages = [
             {"role": "system", "content": system_prompt},
             {
@@ -192,43 +528,187 @@ class PrincipalAgent:
                     f"Symbol: {symbol.upper()}\n"
                     "Trading agent outputs (JSON):\n"
                     f"{user_payload}\n"
-                    "Craft disciplined, risk-aware guidance for the client."
+                    "Craft disciplined, risk-aware guidance for the client.\n"
+                    f"{template_instructions}"
                 ),
             },
         ]
 
+        if schema_enabled and response_format is None:
+            response_format = _PRINCIPAL_PLAN_RESPONSE_FORMAT
+
+        chat_response_format: Dict[str, Any]
+        if response_format is not None:
+            chat_response_format = response_format
+        else:
+            chat_response_format = {"type": "json_object"}
+
         base_kwargs = {
             "model": self.model,
             "messages": messages,
-            "temperature": self.temperature,
-            "response_format": {"type": "json_object"},
+            "response_format": chat_response_format,
         }
 
-        if self._model_requires_default_temperature():
-            base_kwargs.pop("temperature", None)
+        if not self._model_requires_default_temperature():
+            base_kwargs["temperature"] = self.temperature
 
-        token_params = ("max_completion_tokens", "max_tokens")
-        last_error: Optional[APIError] = None
-        for param_name in token_params:
+        token_params = list(self._token_param_candidates())
+        last_error: Optional[BaseException] = None
+        index = 0
+        while index < len(token_params):
+            param_name = token_params[index]
             try:
-                response = self.client.chat.completions.create(
+                return self.client.chat.completions.create(
                     **base_kwargs,
                     **{param_name: self._summary_token_limit},
                 )
-                return response
-            except APIError as exc:  # noqa: BLE001
+            except (APIError, BadRequestError) as exc:  # noqa: BLE001
                 last_error = exc
-                if not self._is_unsupported_parameter_error(exc):
-                    raise
-                continue
+                if self._is_invalid_schema_error(exc) and schema_enabled:
+                    logger.warning(
+                        "Chat completion rejected schema; retrying with json_object format: %s",
+                        exc,
+                    )
+                    schema_enabled = False
+                    base_kwargs["response_format"] = {"type": "json_object"}
+                    continue
+                if self._is_unsupported_parameter_error(exc):
+                    param_name_error = self._extract_error_param_name(exc)
+                    if param_name_error == "response_format":
+                        base_kwargs.pop("response_format", None)
+                        base_kwargs.setdefault("response_format", {"type": "json_object"})
+                        continue
+                    index += 1
+                    continue
+                raise
+            index += 1
 
         if last_error is not None:
             raise last_error
 
         raise RuntimeError("Failed to create summary completion: no completion attempted")
 
+    def _responses_api_supported(self) -> bool:
+        responses_attr = getattr(self.client, "responses", None)
+        return callable(getattr(responses_attr, "create", None))
+
     @staticmethod
-    def _is_unsupported_parameter_error(exc: APIError) -> bool:
+    def _extract_response_content(response: Any) -> str:
+        if response is None:
+            return ""
+
+        text = getattr(response, "output_text", None)
+        if isinstance(text, str) and text.strip():
+            return text
+
+        candidate_data: Any = None
+        if hasattr(response, "model_dump"):
+            try:
+                candidate_data = response.model_dump()
+            except Exception:  # noqa: BLE001
+                candidate_data = None
+        if candidate_data is None and hasattr(response, "to_dict"):
+            try:
+                candidate_data = response.to_dict()
+            except Exception:  # noqa: BLE001
+                candidate_data = None
+        if candidate_data is None:
+            candidate_data = response
+
+        if isinstance(candidate_data, dict):
+            output = candidate_data.get("output")
+            if isinstance(output, list):
+                fragments: List[str] = []
+                for node in output:
+                    if isinstance(node, dict):
+                        content_list = node.get("content")
+                    else:
+                        content_list = getattr(node, "content", None)
+                    if isinstance(content_list, list):
+                        for content_item in content_list:
+                            if isinstance(content_item, dict):
+                                text_value = content_item.get("text")
+                                if isinstance(text_value, str):
+                                    fragments.append(text_value)
+                                elif isinstance(text_value, dict):
+                                    value = text_value.get("value")
+                                    if isinstance(value, str):
+                                        fragments.append(value)
+                            else:
+                                text_value = getattr(content_item, "text", None)
+                                if isinstance(text_value, str):
+                                    fragments.append(text_value)
+                    if fragments:
+                        break
+                if fragments:
+                    return "\n".join(fragments).strip()
+
+            choices = candidate_data.get("choices")
+            if isinstance(choices, list) and choices:
+                message = choices[0].get("message") if isinstance(choices[0], dict) else None
+                if isinstance(message, dict):
+                    content_value = message.get("content")
+                    if isinstance(content_value, str):
+                        return content_value
+
+        return ""
+
+    @staticmethod
+    def _parse_json_from_text(raw_text: str) -> Optional[Dict[str, Any]]:
+        if not isinstance(raw_text, str):
+            return None
+
+        def _strip_code_fence(text: str) -> str:
+            lines = text.strip().splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            return "\n".join(lines).strip()
+
+        def _first_json_object(text: str) -> Optional[str]:
+            start = text.find("{")
+            if start == -1:
+                return None
+            depth = 0
+            for index in range(start, len(text)):
+                char = text[index]
+                if char == "{":
+                    depth += 1
+                elif char == "}":
+                    depth -= 1
+                    if depth == 0:
+                        return text[start : index + 1]
+            return None
+
+        candidates: List[str] = []
+        stripped = raw_text.strip()
+        if not stripped:
+            return None
+
+        fenced = _strip_code_fence(stripped)
+        if fenced:
+            candidates.append(fenced)
+
+        object_slice = _first_json_object(fenced)
+        if object_slice:
+            candidates.insert(0, object_slice)
+
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if isinstance(item, dict):
+                        return item
+        return None
+
+    @staticmethod
+    def _is_unsupported_parameter_error(exc: BaseException) -> bool:
         message = str(getattr(exc, "message", ""))
         if "unsupported parameter" in message.lower():
             return True
@@ -243,11 +723,72 @@ class PrincipalAgent:
                     return True
         return False
 
+    @staticmethod
+    def _extract_error_param_name(exc: BaseException) -> Optional[str]:
+        body = getattr(exc, "body", None)
+        if isinstance(body, dict):
+            error_data = body.get("error")
+            if isinstance(error_data, dict):
+                param = error_data.get("param")
+                if isinstance(param, str) and param:
+                    return param
+        message = str(getattr(exc, "message", exc))
+        lowered = message.lower()
+        for candidate in (
+            "max_tokens",
+            "max_completion_tokens",
+            "max_output_tokens",
+            "response_format",
+            "reasoning",
+            "text",
+        ):
+            if candidate in lowered:
+                return candidate
+        return None
+
+    @staticmethod
+    def _is_invalid_schema_error(exc: BaseException) -> bool:
+        message = str(getattr(exc, "message", ""))
+        if "invalid schema" in message.lower():
+            return True
+        body = getattr(exc, "body", None)
+        if isinstance(body, dict):
+            error_data = body.get("error")
+            if isinstance(error_data, dict):
+                message_text = error_data.get("message", "")
+                if isinstance(message_text, str) and "invalid schema" in message_text.lower():
+                    return True
+                param = error_data.get("param")
+                if param == "response_format":
+                    return True
+        return False
+
     def _model_requires_default_temperature(self) -> bool:
         if not self.model:
             return False
         lowered = self.model.lower()
         return lowered.startswith("gpt-5-")
+
+    def _token_param_candidates(self) -> Tuple[str, ...]:
+        if not self.model:
+            return ("max_completion_tokens", "max_tokens")
+        lowered = self.model.lower()
+        if lowered.startswith("gpt-5-"):
+            return ("max_completion_tokens",)
+        return ("max_completion_tokens", "max_tokens")
+
+    def _principal_plan_response_format(self) -> Optional[Dict[str, Any]]:
+        if not self.model:
+            return _PRINCIPAL_PLAN_RESPONSE_FORMAT
+        lowered = self.model.lower()
+        if lowered.startswith("gpt-5-"):
+            return {"type": "json_object"}
+        return _PRINCIPAL_PLAN_RESPONSE_FORMAT
+
+    def _model_supports_reasoning_controls(self) -> bool:
+        if not self.model:
+            return False
+        return self.model.lower().startswith("gpt-5-")
 
     def _build_graph(self):
         builder = StateGraph(PrincipalAgentState)
@@ -286,7 +827,13 @@ class PrincipalAgent:
         def _node(state: PrincipalAgentState) -> PrincipalAgentState:
             symbol = state["symbol"]
             logger.debug("Running trading agent '%s' for symbol %s", strategy, symbol)
+            print(f"[PrincipalAgent] Running trading agent '{strategy}' for {symbol}")
             result = agent.run(symbol)
+            try:
+                pretty_result = _json_dump(result)
+            except Exception:  # noqa: BLE001 - defensive for non-serialisable diagnostics
+                pretty_result = repr(result)
+            print(f"[PrincipalAgent] Result for '{strategy}' on {symbol}: {pretty_result}")
             results = dict(state.get("trading_results", {}))
             results[strategy] = result
             return {"symbol": symbol, "trading_results": results}
@@ -327,20 +874,56 @@ class PrincipalAgent:
         if not isinstance(summary, dict):
             return strategies, supplemental
 
-        working = summary.get("strategies") if isinstance(summary.get("strategies"), dict) else summary
+        if isinstance(summary.get("principal_trading_plan"), dict):
+            summary = summary["principal_trading_plan"]  # model may nest output under schema name
 
         alias_map = {
             "day trading": "day_trading",
             "day_trading": "day_trading",
+            "daytrading": "day_trading",
+            "daytrades": "day_trading",
             "intraday": "day_trading",
+            "daytradingplan": "day_trading",
+            "daytradingstrategy": "day_trading",
+            "daytradinginsights": "day_trading",
             "swing trading": "swing_trading",
             "swing_trading": "swing_trading",
+            "swingtrading": "swing_trading",
             "swing": "swing_trading",
+            "swingplan": "swing_trading",
             "longterm trading": "longterm_trading",
             "longterm_trading": "longterm_trading",
-            "long term": "longterm_trading",
             "long-term": "longterm_trading",
+            "long term": "longterm_trading",
+            "longterm": "longterm_trading",
+            "position trading": "longterm_trading",
+            "position": "longterm_trading",
         }
+
+        strategies_section = summary.get("strategies")
+        working: Any
+        if isinstance(strategies_section, dict):
+            working = strategies_section
+        else:
+            working = summary
+
+        if isinstance(working, list):
+            for item in working:
+                if not isinstance(item, dict):
+                    continue
+                key = item.get("name") or item.get("strategy") or item.get("label")
+                if not isinstance(key, str):
+                    continue
+                normalised_key = key.lower()
+                mapped = alias_map.get(normalised_key)
+                if mapped:
+                    strategies[mapped] = item
+                else:
+                    supplemental[key] = item
+            return strategies, supplemental
+
+        if not isinstance(working, dict):
+            return strategies, supplemental
 
         for key, value in working.items():
             normalised_key = alias_map.get(key.lower()) if isinstance(key, str) else None

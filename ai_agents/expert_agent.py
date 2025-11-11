@@ -17,14 +17,14 @@ import logging
 import math
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, TypedDict
 
 import pandas as pd
 import pandas_ta as ta
 from langgraph.graph import END, START, StateGraph
-from openai import APIError, OpenAI
+from openai import APIError, BadRequestError, OpenAI
 
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 
@@ -134,10 +134,20 @@ class BaseExpertAgent:
         *,
         analyzer: Optional[ComprehensiveMultiTimeframeAnalyzer] = None,
         openai_client: Optional[OpenAI] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
     ) -> None:
         self.analyzer = analyzer or self._build_analyzer()
         self.client = openai_client or self._build_openai_client()
-        self.assistant_id = self._ensure_assistant()
+        metadata_template = getattr(self.__class__, "metadata")
+        if model is not None or temperature is not None:
+            metadata_template = replace(
+                metadata_template,
+                model=model or metadata_template.model,
+                temperature=temperature if temperature is not None else metadata_template.temperature,
+            )
+        self.metadata = metadata_template
+        self.assistant_id = self._initialise_assistant_with_fallback()
         self.graph = self._build_graph()
 
     # ------------------------------------------------------------------
@@ -311,6 +321,41 @@ class BaseExpertAgent:
             assistant.id,
         )
         return assistant.id
+
+    def _initialise_assistant_with_fallback(self) -> str:
+        try:
+            return self._ensure_assistant()
+        except BadRequestError as exc:
+            if self._is_unsupported_model_error(exc) and self.metadata.model.lower().startswith("gpt-5-"):
+                fallback_model = "gpt-4o-mini"
+                logger.warning(
+                    "Assistant model %s unsupported; falling back to %s",
+                    self.metadata.model,
+                    fallback_model,
+                )
+                print(
+                    f"[ExpertAgent] Model {self.metadata.model} unsupported for Assistants API; "
+                    f"falling back to {fallback_model}."
+                )
+                self.metadata = replace(self.metadata, model=fallback_model)
+                return self._ensure_assistant()
+            raise
+
+    @staticmethod
+    def _is_unsupported_model_error(exc: BadRequestError) -> bool:
+        message = str(getattr(exc, "message", ""))
+        if "unsupported_model" in message or "cannot be used" in message:
+            return True
+        body = getattr(exc, "body", None)
+        if isinstance(body, dict):
+            error_data = body.get("error")
+            if isinstance(error_data, dict):
+                if error_data.get("code") == "unsupported_model":
+                    return True
+                detail = error_data.get("message", "")
+                if isinstance(detail, str) and "unsupported" in detail.lower():
+                    return True
+        return False
 
     # ------------------------------------------------------------------
     # Indicator collection helpers
