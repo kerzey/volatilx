@@ -497,24 +497,6 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                 "error": "Trading data was not generated; unable to run AI analysis.",
             }
 
-        principal_plan = None
-        if use_principal_agent:
-            try:
-                plan = get_principal_agent_instance().generate_trading_plan(
-                    stock_symbol,
-                    include_raw_results=include_principal_raw,
-                )
-                principal_plan = {
-                    "success": True,
-                    "data": plan,
-                }
-            except Exception as exc:  # noqa: BLE001 - surfaced in response for client visibility
-                logger.exception("Principal agent analysis failed for %s", stock_symbol)
-                principal_plan = {
-                    "success": False,
-                    "error": str(exc),
-                }
-
         price_action_timeframes: Optional[List[str]] = None
         if isinstance(price_action_timeframes_raw, str):
             parts = [item.strip() for item in price_action_timeframes_raw.split(',') if item and item.strip()]
@@ -532,6 +514,7 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             }
             price_action_period_overrides = cleaned_overrides or None
 
+        price_action_analysis: Optional[dict]
         try:
             price_action_analysis = price_action_analyzer.analyze(
                 stock_symbol,
@@ -545,6 +528,26 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                 "symbol": stock_symbol,
                 "error": str(exc),
             }
+
+        principal_plan = None
+        if use_principal_agent:
+            try:
+                plan = get_principal_agent_instance().generate_trading_plan(
+                    stock_symbol,
+                    technical_snapshot=result_data_json,
+                    price_action_snapshot=price_action_analysis,
+                    include_raw_results=include_principal_raw,
+                )
+                principal_plan = {
+                    "success": True,
+                    "data": plan,
+                }
+            except Exception as exc:  # noqa: BLE001 - surfaced in response for client visibility
+                logger.exception("Principal agent analysis failed for %s", stock_symbol)
+                principal_plan = {
+                    "success": False,
+                    "error": str(exc),
+                }
 
         response = {
             'success': True,

@@ -6,7 +6,7 @@ and reuse them. Each expert agent:
 
 * pulls market data through :mod:`indicator_fetcher`
 * extracts a domain-specific feature set
-* feeds that context into OpenAI Agent Builder via LangGraph
+* delivers the context to OpenAI's Responses API via LangGraph orchestration
 * returns a structured JSON analysis that downstream agents can rely on
 """
 
@@ -16,17 +16,21 @@ import json
 import logging
 import math
 import os
-import time
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, TypedDict
+from typing import Any, Dict, Iterable, List, Optional, Tuple, TypedDict
 
 import pandas as pd
 import pandas_ta as ta
 from langgraph.graph import END, START, StateGraph
-from openai import APIError, BadRequestError, OpenAI
+from openai import APIError, OpenAI
 
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
+
+try:  # noqa: SIM105 - optional dependency for HTTP fallback
+    import requests
+except ImportError:  # pragma: no cover - requests is optional
+    requests = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,123 @@ TIMEFRAME_DEFAULT_PERIOD: Dict[str, str] = {
 }
 
 
+def _normalise_base_url(raw: Optional[Any]) -> str:
+    """Ensure the OpenAI base URL ends with /v1 and has no trailing slash."""
+
+    if raw is None:
+        base = "https://api.openai.com/v1"
+    else:
+        base = str(raw).strip()
+        if not base:
+            base = "https://api.openai.com/v1"
+
+    base = base.rstrip("/")
+    if not base.endswith("/v1"):
+        base = f"{base}/v1"
+    return base
+
+
+class OpenAIResponsesMixin:
+    """Shared helpers to invoke the Responses API with SDK or HTTP fallback."""
+
+    client: OpenAI
+    _openai_api_key: Optional[str]
+    _openai_organization: Optional[str]
+    _openai_project: Optional[str]
+    _openai_base_url: str
+    _responses_timeout: float
+
+    def _init_openai_client(self, openai_client: Optional[OpenAI]) -> OpenAI:
+        organization_env = os.getenv("OPENAI_ORG") or os.getenv("OPENAI_ORGANIZATION")
+        project_env = os.getenv("OPENAI_PROJECT")
+        raw_base_url_env = os.getenv("OPENAI_BASE_URL")
+
+        timeout_env = os.getenv("OPENAI_TIMEOUT")
+        try:
+            self._responses_timeout = float(timeout_env) if timeout_env else 60.0
+        except ValueError:
+            self._responses_timeout = 60.0
+
+        if openai_client is not None:
+            base_candidate = getattr(openai_client, "base_url", None) or raw_base_url_env
+            self._openai_base_url = _normalise_base_url(base_candidate)
+            client_key = getattr(openai_client, "api_key", None) or os.getenv("OPENAI_API_KEY")
+            if not client_key:
+                raise ValueError(
+                    "OpenAI API key is required when providing a custom OpenAI client"
+                )
+            self._openai_api_key = client_key
+            self._openai_organization = getattr(openai_client, "organization", organization_env)
+            self._openai_project = getattr(openai_client, "project", project_env)
+            return openai_client
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+
+        self._openai_api_key = api_key
+        self._openai_organization = organization_env
+        self._openai_project = project_env
+        self._openai_base_url = _normalise_base_url(raw_base_url_env)
+
+        client_kwargs: Dict[str, Any] = {"api_key": api_key}
+        if organization_env:
+            client_kwargs["organization"] = organization_env
+        if project_env:
+            client_kwargs["project"] = project_env
+        if raw_base_url_env:
+            client_kwargs["base_url"] = raw_base_url_env
+
+        return OpenAI(**client_kwargs)
+
+    def _create_responses_call(self, body: Dict[str, Any]) -> Any:
+        payload = {key: value for key, value in body.items() if value is not None}
+        responses_resource = getattr(self.client, "responses", None)
+        if responses_resource is not None:
+            return responses_resource.create(**payload)
+        logger.debug("OpenAI client missing 'responses' resource; using HTTP fallback")
+        return self._fallback_responses_http(payload)
+
+    def _fallback_responses_http(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if requests is None:
+            raise RuntimeError(
+                "OpenAI SDK does not expose the Responses API and the 'requests' package is missing. "
+                "Install openai>=1.40 or add requests as a dependency."
+            )
+        if not self._openai_api_key:
+            raise RuntimeError("OpenAI API key unavailable for Responses API fallback")
+
+        headers = {
+            "Authorization": f"Bearer {self._openai_api_key}",
+            "Content-Type": "application/json",
+        }
+        if self._openai_organization:
+            headers["OpenAI-Organization"] = self._openai_organization
+        if self._openai_project:
+            headers["OpenAI-Project"] = self._openai_project
+
+        url = f"{self._openai_base_url.rstrip('/')}/responses"
+        try:
+            response = requests.post(  # type: ignore[call-arg]
+                url,
+                headers=headers,
+                json=payload,
+                timeout=self._responses_timeout,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"Failed to call OpenAI Responses endpoint: {exc}") from exc
+
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"OpenAI Responses API error {response.status_code}: {response.text}"
+            )
+
+        try:
+            return response.json()
+        except ValueError as exc:  # pragma: no cover - unlikely unless API misbehaves
+            raise RuntimeError("Failed to parse OpenAI Responses API JSON payload") from exc
+
+
 class AgentState(TypedDict, total=False):
     """State container shared across LangGraph nodes."""
 
@@ -69,6 +190,8 @@ class AgentState(TypedDict, total=False):
     indicator_summary: Dict[str, Any]
     agent_input: str
     agent_result: Dict[str, Any]
+    agent_raw_text: str
+    agent_usage: Dict[str, Any]
     period_overrides: Dict[str, str]
 
 
@@ -123,7 +246,90 @@ def _sanitize(value: Any) -> Any:
     return str(value)
 
 
-class BaseExpertAgent:
+
+def _extract_usage_details(response: Any) -> Dict[str, Any]:
+    """Normalize token usage metadata from OpenAI responses."""
+
+    usage: Dict[str, Any] = {}
+    response_usage = getattr(response, "usage", None)
+    if response_usage is None and isinstance(response, dict):
+        response_usage = response.get("usage")
+
+    if response_usage is not None:
+        for key in ("input_tokens", "output_tokens", "total_tokens"):
+            value = getattr(response_usage, key, None)
+            if value is None and isinstance(response_usage, dict):
+                value = response_usage.get(key)
+            if value is not None:
+                usage[key] = value
+
+    return usage
+
+
+def _extract_output_text(response: Any) -> str:
+    """Best-effort extraction of model text from Responses payloads."""
+
+    if response is None:
+        return ""
+
+    candidate = getattr(response, "output_text", None)
+    if isinstance(candidate, str) and candidate.strip():
+        return candidate
+
+    if isinstance(response, dict):
+        candidate = response.get("output_text")
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate
+        output_items = response.get("output")
+        collected: List[str] = []
+        if isinstance(output_items, list):
+            for item in output_items:
+                if not isinstance(item, dict):
+                    continue
+                item_type = item.get("type")
+                text_value = item.get("text")
+                if item_type == "output_text" and isinstance(text_value, str):
+                    collected.append(text_value)
+                    continue
+                content_list = item.get("content")
+                if isinstance(content_list, list):
+                    for content in content_list:
+                        if not isinstance(content, dict):
+                            continue
+                        content_type = content.get("type")
+                        if content_type == "output_text" and isinstance(content.get("text"), str):
+                            collected.append(str(content["text"]))
+                        elif content_type == "input_text" and item_type == "message" and content.get("role") == "assistant":
+                            text_candidate = content.get("text")
+                            if isinstance(text_candidate, str):
+                                collected.append(text_candidate)
+            if collected:
+                return "\n".join(collected)
+
+    output_attr = getattr(response, "output", None)
+    if isinstance(output_attr, list):
+        parts: List[str] = []
+        for item in output_attr:
+            if not isinstance(item, dict):
+                continue
+            text_value = getattr(item, "text", None)
+            item_type = getattr(item, "type", None)
+            if item_type == "output_text" and isinstance(text_value, str):
+                parts.append(text_value)
+            content_list = getattr(item, "content", None)
+            if isinstance(content_list, list):
+                for content in content_list:
+                    text_candidate = getattr(content, "text", None)
+                    content_type = getattr(content, "type", None)
+                    if content_type == "output_text" and isinstance(text_candidate, str):
+                        parts.append(text_candidate)
+        if parts:
+            return "\n".join(parts)
+
+    return ""
+
+
+class BaseExpertAgent(OpenAIResponsesMixin):
     """Shared scaffolding for domain-specific OpenAI agents."""
 
     metadata: AgentMetadata
@@ -138,7 +344,7 @@ class BaseExpertAgent:
         temperature: Optional[float] = None,
     ) -> None:
         self.analyzer = analyzer or self._build_analyzer()
-        self.client = openai_client or self._build_openai_client()
+        self.client = self._init_openai_client(openai_client)
         metadata_template = getattr(self.__class__, "metadata")
         if model is not None or temperature is not None:
             metadata_template = replace(
@@ -147,7 +353,6 @@ class BaseExpertAgent:
                 temperature=temperature if temperature is not None else metadata_template.temperature,
             )
         self.metadata = metadata_template
-        self.assistant_id = self._initialise_assistant_with_fallback()
         self.graph = self._build_graph()
 
     # ------------------------------------------------------------------
@@ -171,8 +376,7 @@ class BaseExpertAgent:
         if period_overrides:
             initial_state["period_overrides"] = dict(period_overrides)
 
-        compiled_graph = self.graph
-        final_state = compiled_graph.invoke(
+        final_state = self.graph.invoke(
             initial_state,
             config={
                 "metadata": {
@@ -192,6 +396,8 @@ class BaseExpertAgent:
             "indicator_summary": final_state.get("indicator_summary", {}),
             "agent_input": final_state.get("agent_input"),
             "agent_output": final_state.get("agent_result"),
+            "agent_output_text": final_state.get("agent_raw_text"),
+            "model_usage": final_state.get("agent_usage"),
             "model": self.metadata.model,
         }
 
@@ -225,61 +431,17 @@ class BaseExpertAgent:
             raise RuntimeError("Agent payload missing; indicator collection failed.")
 
         try:
-            thread = self.client.beta.threads.create(
-                messages=[{"role": "user", "content": payload}]
-            )
-            run = self.client.beta.threads.runs.create(
-                thread_id=thread.id,
-                assistant_id=self.assistant_id,
-                temperature=self.metadata.temperature,
-            )
-
-            while run.status in {"queued", "in_progress"}:
-                time.sleep(0.5)
-                run = self.client.beta.threads.runs.retrieve(
-                    thread_id=thread.id,
-                    run_id=run.id,
-                )
-
-            if run.status == "requires_action":
-                logger.error(
-                    "Assistant run requires action but no tool handling is implemented."
-                )
-                raise RuntimeError("Assistant run requires tool action")
-
-            if run.status == "failed":
-                details = getattr(run, "last_error", None)
-                message = getattr(details, "message", "unknown error")
-                logger.error("Assistant run failed: %s", message)
-                raise RuntimeError(f"Assistant run failed: {message}")
-
-            if run.status != "completed":
-                logger.error("Assistant run ended with unexpected status: %s", run.status)
-                raise RuntimeError(f"Assistant run ended with status: {run.status}")
-
-            messages = self.client.beta.threads.messages.list(
-                thread_id=thread.id,
-                run_id=run.id,
-            )
-
-            response_texts: List[str] = []
-            for message in reversed(messages.data):
-                if getattr(message, "role", "") != "assistant":
-                    continue
-                print()
-                for content in getattr(message, "content", []) or []:
-                    if getattr(content, "type", "") == "text":
-                        response_texts.append(content.text.value)
-
-            combined_response = "\n".join(chunk for chunk in response_texts if chunk).strip()
-            if not combined_response:
-                raise RuntimeError("Assistant returned no text content")
+            response_text, usage = self._invoke_responses(payload)
         except APIError as exc:  # noqa: BLE001
-            logger.error("OpenAI assistant invocation failed: %s", exc)
+            logger.error("OpenAI responses API invocation failed: %s", exc)
             raise
 
-        parsed = self._parse_agent_response(combined_response)
-        return {"agent_result": parsed}
+        parsed = self._parse_agent_response(response_text)
+        return {
+            "agent_result": parsed,
+            "agent_raw_text": response_text,
+            "agent_usage": usage,
+        }
 
     # ------------------------------------------------------------------
     # Agent setup helpers
@@ -301,61 +463,6 @@ class BaseExpertAgent:
                 "are configured."
             )
         return analyzer
-
-    def _build_openai_client(self) -> OpenAI:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        return OpenAI(api_key=api_key)
-
-    def _ensure_assistant(self) -> str:
-        assistant = self.client.beta.assistants.create(
-            name=self.metadata.name,
-            description=self.metadata.description,
-            instructions=self.metadata.instructions,
-            model=self.metadata.model,
-        )
-        logger.debug(
-            "Created OpenAI assistant '%s' with id %s",
-            self.metadata.name,
-            assistant.id,
-        )
-        return assistant.id
-
-    def _initialise_assistant_with_fallback(self) -> str:
-        try:
-            return self._ensure_assistant()
-        except BadRequestError as exc:
-            if self._is_unsupported_model_error(exc) and self.metadata.model.lower().startswith("gpt-5-"):
-                fallback_model = "gpt-4o-mini"
-                logger.warning(
-                    "Assistant model %s unsupported; falling back to %s",
-                    self.metadata.model,
-                    fallback_model,
-                )
-                print(
-                    f"[ExpertAgent] Model {self.metadata.model} unsupported for Assistants API; "
-                    f"falling back to {fallback_model}."
-                )
-                self.metadata = replace(self.metadata, model=fallback_model)
-                return self._ensure_assistant()
-            raise
-
-    @staticmethod
-    def _is_unsupported_model_error(exc: BadRequestError) -> bool:
-        message = str(getattr(exc, "message", ""))
-        if "unsupported_model" in message or "cannot be used" in message:
-            return True
-        body = getattr(exc, "body", None)
-        if isinstance(body, dict):
-            error_data = body.get("error")
-            if isinstance(error_data, dict):
-                if error_data.get("code") == "unsupported_model":
-                    return True
-                detail = error_data.get("message", "")
-                if isinstance(detail, str) and "unsupported" in detail.lower():
-                    return True
-        return False
 
     # ------------------------------------------------------------------
     # Indicator collection helpers
@@ -405,7 +512,13 @@ class BaseExpertAgent:
     # ------------------------------------------------------------------
     # Methods to customise per agent
     # ------------------------------------------------------------------
-    def _extract_features(self, symbol: str, timeframe: str, df: pd.DataFrame, indicators: Dict[str, Any]) -> Dict[str, Any]:  # noqa: D401
+    def _extract_features(
+        self,
+        symbol: str,
+        timeframe: str,
+        df: pd.DataFrame,
+        indicators: Dict[str, Any],
+    ) -> Dict[str, Any]:  # noqa: D401
         """Extract domain-specific features (override in subclasses)."""
 
         raise NotImplementedError
@@ -424,6 +537,45 @@ class BaseExpertAgent:
         except json.JSONDecodeError:
             parsed = {"raw_text": response_text}
         return parsed
+
+    def _build_system_prompt(self) -> str:
+        return (
+            f"You are {self.metadata.name}. {self.metadata.description} "
+            f"Follow these instructions:\n{self.metadata.instructions}"
+        )
+
+    def _build_responses_input(self, payload_text: str) -> List[Dict[str, Any]]:
+        return [
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": self._build_system_prompt()}],
+            },
+            {
+                "role": "user",
+                "content": [{"type": "input_text", "text": payload_text}],
+            },
+        ]
+
+    def _invoke_responses(self, payload_text: str) -> Tuple[str, Dict[str, Any]]:
+        request_payload: Dict[str, Any] = {
+            "model": self.metadata.model,
+            "input": self._build_responses_input(payload_text),
+        }
+        temperature = getattr(self.metadata, "temperature", None)
+        if (
+            temperature is not None
+            and not str(self.metadata.model).lower().startswith("gpt-5")
+        ):
+            request_payload["temperature"] = temperature
+
+        response = self._create_responses_call(request_payload)
+
+        response_text = _extract_output_text(response)
+        if not response_text:
+            raise RuntimeError("Model returned no text content")
+
+        usage = _extract_usage_details(response)
+        return response_text, usage
 
 
 class MomentumExpertAgent(BaseExpertAgent):
@@ -488,7 +640,13 @@ class VolatilityExpertAgent(BaseExpertAgent):
         ),
     )
 
-    def _extract_features(self, symbol: str, timeframe: str, df: pd.DataFrame, indicators: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_features(
+        self,
+        symbol: str,
+        timeframe: str,
+        df: pd.DataFrame,
+        indicators: Dict[str, Any],
+    ) -> Dict[str, Any]:
         basic = indicators.get("basic", {})
         bands = basic.get("Bollinger_Bands", {})
         current_price = _safe_numeric(df["Close"].iloc[-1])
@@ -517,6 +675,185 @@ class VolatilityExpertAgent(BaseExpertAgent):
             "bullish_signals": trading.get("entry_signals", []),
             "bearish_signals": trading.get("exit_signals", []),
         }
+class UIBackedExpertAgent(OpenAIResponsesMixin):
+    """OpenAI Responses API wrapper that consumes UI-provided analysis payloads."""
+
+    metadata: AgentMetadata
+
+    def __init__(
+        self,
+        *,
+        openai_client: Optional[OpenAI] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        include_payload: bool = False,
+    ) -> None:
+        self.client = self._init_openai_client(openai_client)
+        metadata_template = getattr(self.__class__, "metadata")
+        if model is not None or temperature is not None:
+            metadata_template = replace(
+                metadata_template,
+                model=model or metadata_template.model,
+                temperature=temperature if temperature is not None else metadata_template.temperature,
+            )
+        self.metadata = metadata_template
+        self.include_payload = include_payload
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def run(
+        self,
+        symbol: str,
+        payload: Any,
+        *,
+        include_payload: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        if payload is None:
+            return {
+                "success": False,
+                "agent": self.metadata.name,
+                "symbol": symbol.upper(),
+                "error": "No payload provided",
+            }
+
+        effective_include = self.include_payload if include_payload is None else include_payload
+        sanitized_payload = _sanitize(payload)
+        user_prompt = self._format_payload(symbol, sanitized_payload)
+
+        try:
+            response_text, usage = self._invoke_responses(user_prompt)
+        except Exception as exc:  # noqa: BLE001 - bubble structured error upwards
+            logger.exception("Expert '%s' failed for %s", self.metadata.name, symbol)
+            return {
+                "success": False,
+                "agent": self.metadata.name,
+                "symbol": symbol.upper(),
+                "error": str(exc),
+            }
+
+        parsed = self._parse_agent_response(response_text)
+        result: Dict[str, Any] = {
+            "success": True,
+            "agent": self.metadata.name,
+            "symbol": symbol.upper(),
+            "agent_output": parsed,
+            "raw_text": response_text,
+            "model": self.metadata.model,
+            "model_usage": usage,
+        }
+        if effective_include:
+            result["input_payload"] = sanitized_payload
+        return result
+
+    # ------------------------------------------------------------------
+    # Responses helpers
+    # ------------------------------------------------------------------
+    def _build_system_prompt(self) -> str:
+        return (
+            f"You are {self.metadata.name}. {self.metadata.description} "
+            f"Follow these instructions:\n{self.metadata.instructions}"
+        )
+
+    def _build_responses_input(self, payload_text: str) -> List[Dict[str, Any]]:
+        return [
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": self._build_system_prompt()}],
+            },
+            {
+                "role": "user",
+                "content": [{"type": "input_text", "text": payload_text}],
+            },
+        ]
+
+    def _invoke_responses(self, payload_text: str) -> Tuple[str, Dict[str, Any]]:
+        request_payload: Dict[str, Any] = {
+            "model": self.metadata.model,
+            "input": self._build_responses_input(payload_text),
+        }
+        temperature = getattr(self.metadata, "temperature", None)
+        if (
+            temperature is not None
+            and not str(self.metadata.model).lower().startswith("gpt-5")
+        ):
+            request_payload["temperature"] = temperature
+
+        response = self._create_responses_call(request_payload)
+
+        response_text = _extract_output_text(response)
+        if not response_text:
+            raise RuntimeError("Model returned no text content")
+
+        usage = _extract_usage_details(response)
+        return response_text, usage
+
+    def _format_payload(self, symbol: str, payload: Any) -> str:
+        context_json = json.dumps(payload, indent=2)
+        return (
+            f"Symbol: {symbol.upper()}\n"
+            "Input analysis JSON from UI:\n"
+            f"{context_json}\n"
+            "Return a JSON object with your insights."
+        )
+
+    def _parse_agent_response(self, response_text: str) -> Dict[str, Any]:
+        try:
+            parsed = json.loads(response_text)
+        except json.JSONDecodeError:
+            parsed = {"raw_text": response_text}
+        return parsed
+
+
+class TechnicalAnalysisSummaryAgent(UIBackedExpertAgent):
+    """Summarises indicator-based technical analysis produced in the UI."""
+
+    metadata = AgentMetadata(
+        name="Technical Analysis Expert",
+        description="Transforms UI-generated technical indicator digests into structured trading insights.",
+        instructions=(
+            "You are the technical analysis expert. The user provides comprehensive indicator data already computed "
+            "by upstream services (indicators, Elliott Wave, Fibonacci). Analyse the JSON and respond with a JSON "
+            "object containing keys: 'market_structure', 'indicator_signals', 'risk_management', and 'trade_setups'. "
+            "Each key should hold succinct, client-ready observations."
+        ),
+        model="gpt-5-nano",
+        temperature=0.3,
+    )
+
+    def _format_payload(self, symbol: str, payload: Any) -> str:
+        context_json = json.dumps(payload, indent=2)
+        return (
+            f"Symbol: {symbol.upper()}\n"
+            "The following JSON is the raw technical analysis produced in the UI (indicators, Elliott Wave, Fibonacci).\n"
+            f"{context_json}\n"
+            "Return JSON with keys: 'market_structure', 'indicator_signals', 'risk_management', 'trade_setups'."
+        )
+
+
+class PriceActionSummaryAgent(UIBackedExpertAgent):
+    """Summarises deterministic price action analysis from the UI."""
+
+    metadata = AgentMetadata(
+        name="Price Action Expert",
+        description="Converts deterministic price action analysis into consumable insights for the principal agent.",
+        instructions=(
+            "You are the price action specialist. Review the supplied JSON, which includes support/resistance levels, "
+            "market structure, and candlestick signals. Respond with a JSON object containing: 'structure', 'levels', "
+            "'candlestick_notes', and 'immediate_bias'. Provide concise, actionable language."
+        ),
+        model="gpt-5-nano",
+        temperature=0.3,
+    )
+
+    def _format_payload(self, symbol: str, payload: Any) -> str:
+        context_json = json.dumps(payload, indent=2)
+        return (
+            f"Symbol: {symbol.upper()}\n"
+            "The following JSON contains the deterministic price action analysis from the UI (trend, structure, levels, patterns).\n"
+            f"{context_json}\n"
+            "Return JSON with keys: 'structure', 'levels', 'candlestick_notes', 'immediate_bias'."
+        )
 
 
 class PatternRecognitionExpertAgent(BaseExpertAgent):
@@ -603,9 +940,13 @@ class TrendExpertAgent(BaseExpertAgent):
 
 
 __all__ = [
+    "OpenAIResponsesMixin",
     "BaseExpertAgent",
     "MomentumExpertAgent",
     "VolatilityExpertAgent",
     "PatternRecognitionExpertAgent",
     "TrendExpertAgent",
+    "UIBackedExpertAgent",
+    "TechnicalAnalysisSummaryAgent",
+    "PriceActionSummaryAgent",
 ]

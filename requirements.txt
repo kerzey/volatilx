@@ -7,6 +7,7 @@ fastapi-users[sqlalchemy]==15.0.1
 Flask==2.3.2
 gunicorn==20.1.0
 httpx
+requests>=2.32.0
 itsdangerous==2.1.2
 jinja2==3.1.2
 langgraph>=0.1.3
