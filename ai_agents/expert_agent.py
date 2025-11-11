@@ -255,15 +255,76 @@ def _extract_usage_details(response: Any) -> Dict[str, Any]:
     if response_usage is None and isinstance(response, dict):
         response_usage = response.get("usage")
 
+    if isinstance(response_usage, list):
+        list_usage: Dict[str, Any] = {}
+        for entry in response_usage:
+            if not isinstance(entry, dict):
+                continue
+            metric = entry.get("metric") or entry.get("name")
+            value = entry.get("value")
+            if isinstance(metric, str):
+                list_usage[metric] = value
+        response_usage = list_usage or response_usage
+
     if response_usage is not None:
         for key in ("input_tokens", "output_tokens", "total_tokens"):
             value = getattr(response_usage, key, None)
             if value is None and isinstance(response_usage, dict):
                 value = response_usage.get(key)
-            if value is not None:
-                usage[key] = value
+            normalized = _coerce_token_value(value)
+            if normalized is not None:
+                usage[key] = normalized
+
+    if isinstance(response_usage, dict):
+        synonym_map = {
+            "input_tokens": ("prompt_tokens", "prompt", "input", "accepted_tokens"),
+            "output_tokens": ("completion_tokens", "completion", "output", "generated_tokens"),
+            "total_tokens": ("total", "aggregate_tokens", "all_tokens"),
+        }
+        for target_key, synonyms in synonym_map.items():
+            if target_key in usage:
+                continue
+            for synonym in synonyms:
+                if synonym in response_usage:
+                    normalized = _coerce_token_value(response_usage.get(synonym))
+                    if normalized is not None:
+                        usage[target_key] = normalized
+                        break
+
+    if "total_tokens" not in usage:
+        input_tokens = usage.get("input_tokens")
+        output_tokens = usage.get("output_tokens")
+        if input_tokens is not None or output_tokens is not None:
+            usage["total_tokens"] = int((input_tokens or 0) + (output_tokens or 0))
 
     return usage
+
+
+def _coerce_token_value(value: Any) -> Optional[int]:
+    """Coerce varied token usage formats into integers."""
+
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value))
+        except ValueError:
+            return None
+    if isinstance(value, dict):
+        for candidate_key in ("total_tokens", "value", "tokens", "count", "total", "billable"):
+            candidate_val = value.get(candidate_key)
+            if isinstance(candidate_val, (int, float)):
+                return int(candidate_val)
+        numeric_parts = [int(v) for v in value.values() if isinstance(v, (int, float))]
+        if numeric_parts:
+            return int(sum(numeric_parts))
+    if isinstance(value, list):
+        numeric_parts = [int(v) for v in value if isinstance(v, (int, float))]
+        if numeric_parts:
+            return int(sum(numeric_parts))
+    return None
 
 
 def _extract_output_text(response: Any) -> str:

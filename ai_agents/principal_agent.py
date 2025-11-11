@@ -258,6 +258,9 @@ class PrincipalAgent(OpenAIResponsesMixin):
             "supplemental": supplemental,
         }
 
+        plan["generated_at"] = plan["generated"]
+        plan["usage"] = usage if usage else {}
+
         plan["formatted"] = self._render_human_plan(
             symbol,
             plan["generated_display"],
@@ -268,6 +271,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
         if include_raw:
             plan["expert_outputs"] = expert_outputs
             plan["raw_inputs"] = raw_inputs
+            plan["trading_agent_outputs"] = expert_outputs
 
         return {"principal_result": plan}
 
