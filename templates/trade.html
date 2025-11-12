@@ -44,7 +44,7 @@
                 </div>
                 <div class="checkbox-group">
                     <input type="checkbox" id="usePrincipalAgent" name="use_principal_agent" value="true" checked>
-                    <label for="usePrincipalAgent">Generate Principal Trading Plan</label>
+                    <label for="usePrincipalAgent">Generate Multi AI Agent Trading Strategy</label>
                 </div>
                 <div class="checkbox-group sub-option">
                     <input type="checkbox" id="includePrincipalRaw" name="include_principal_raw_results" value="true" disabled>
@@ -61,16 +61,17 @@
             
             <div class="tabs hidden" id="resultTabs">
                 <div class="tab active" onclick="showTab('technical', event)" id="technicalTab">Technical Analysis</div>
-                <div class="tab" onclick="showTab('ai', event)" id="aiTab" style="display:none;">AI Investment Strategy</div>
-                <div class="tab" onclick="showTab('principal', event)" id="principalTab" style="display:none;">Principal Plan</div>
-                <div class="tab" onclick="showTab('priceAction', event)" id="priceActionTab" style="display:none;">Price Action</div>
+                <div class="tab" onclick="showTab('priceAction', event)" id="priceActionTab" style="display:none;">Price Action Analysis</div>
+                <div class="tab" onclick="showTab('principal', event)" id="principalTab" style="display:none;">AI Agents Plan</div>
             </div>
-            
+
             <div id="resultsContent">
                 <div id="technicalContent" class="tab-content active"></div>
-                <div id="aiContent" class="tab-content"></div>
-                <div id="principalContent" class="tab-content"></div>
                 <div id="priceActionContent" class="tab-content"></div>
+                <div id="principalContent" class="tab-content">
+                    <div id="aiContent"></div>
+                    <div id="principalPlanContent"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -80,6 +81,8 @@
         const usePrincipalAgentInput = document.getElementById('usePrincipalAgent');
         const includePrincipalRawInput = document.getElementById('includePrincipalRaw');
     const priceActionTab = document.getElementById('priceActionTab');
+        const principalTab = document.getElementById('principalTab');
+    const LEGAL_NOTE_HTML = '<div class="legal-note">This content is for informational purposes only and does not constitute financial advice.</div>';
 
         includePrincipalRawInput.disabled = !usePrincipalAgentInput.checked;
 
@@ -99,12 +102,11 @@
             const includePrincipalRaw = includePrincipalRawInput.checked;
             const analyzeBtn = document.getElementById('analyzeBtn');
             const resultsPanel = document.getElementById('resultsPanel');
-            const resultsContent = document.getElementById('resultsContent');
             const resultTabs = document.getElementById('resultTabs');
-            const aiTab = document.getElementById('aiTab');
-            const principalTab = document.getElementById('principalTab');
             const technicalTab = document.getElementById('technicalTab');
             const priceActionContent = document.getElementById('priceActionContent');
+            const aiContent = document.getElementById('aiContent');
+            const principalPlanContent = document.getElementById('principalPlanContent');
             
             if (!stockSymbol) {
                 alert('Please enter a stock symbol');
@@ -122,10 +124,8 @@
                 : 'Analyzing...';
             resultsPanel.style.display = 'block';
             resultTabs.classList.add('hidden');
-            aiTab.style.display = 'none';
             principalTab.style.display = 'none';
             priceActionTab.style.display = 'none';
-            aiTab.classList.remove('active');
             principalTab.classList.remove('active');
             priceActionTab.classList.remove('active');
             technicalTab.classList.add('active');
@@ -138,8 +138,8 @@
                     <p>Analyzing ${stockSymbol}... This may take a few moments.</p>
                 </div>
             `;
-            document.getElementById('aiContent').innerHTML = '';
-            document.getElementById('principalContent').innerHTML = '';
+            aiContent.innerHTML = '';
+            principalPlanContent.innerHTML = '';
             priceActionContent.innerHTML = '';
             
             try {
@@ -161,15 +161,19 @@
                     displayPriceAction(data.price_action);
                     priceActionTab.style.display = 'block';
                     extraTabs += 1;
+                    let principalTabHasData = false;
                     if (useAiAnalysis) {
-                        displayAiAnalysis(data.ai_analysis);
-                        aiTab.style.display = 'block';
-                        extraTabs += 1;
+                        principalTabHasData = displayAiAnalysis(data.ai_analysis) || principalTabHasData;
                     }
                     if (usePrincipalAgent) {
-                        displayPrincipalPlan(data.principal_plan);
+                        principalTabHasData = displayPrincipalPlan(data.principal_plan) || principalTabHasData;
+                    }
+                    if (principalTabHasData) {
                         principalTab.style.display = 'block';
                         extraTabs += 1;
+                    } else {
+                        aiContent.innerHTML = '';
+                        principalPlanContent.innerHTML = '';
                     }
                     if (extraTabs > 0) {
                         resultTabs.classList.remove('hidden');
@@ -200,7 +204,7 @@
                         <div class="result-title">Result Not Found</div>
                         <div class="result-content">No analysis data for ${symbol}.</div>
                     </div>
-                `;
+                ` + LEGAL_NOTE_HTML;
                 return;
             }
             // Consensus summary table (no inline style)
@@ -288,23 +292,26 @@
                         ${decisionHtml}
                     </div>
                 </div>
-            `;
+            ` + LEGAL_NOTE_HTML;
         }
         function displayAiAnalysis(aiAnalysis) {
             const aiContent = document.getElementById('aiContent');
+            if (!aiContent) {
+                return false;
+            }
             if (!aiAnalysis) {
                 aiContent.innerHTML = `<div class="result-item">
                     <div class="result-title">AI Analysis</div>
                     <div class="result-content">AI analysis was not requested or failed.</div>
-                </div>`;
-                return;
+                </div>${LEGAL_NOTE_HTML}`;
+                return true;
             }
             if (!aiAnalysis.success) {
                 aiContent.innerHTML = `<div class="result-item error">
                     <div class="result-title">AI Analysis Failed</div>
                     <div class="result-content">${aiAnalysis.error}</div>
-                </div>`;
-                return;
+                </div>${LEGAL_NOTE_HTML}`;
+                return true;
             }
             const analysis = aiAnalysis.analysis;
             let html = `<div class="result-item success ai-analysis">
@@ -355,34 +362,40 @@
                     <div class="result-content">${aiAnalysis.raw_response}</div>
                 </div>`;
             }
+            html += LEGAL_NOTE_HTML;
             aiContent.innerHTML = html;
+            return true;
         }
         function displayPrincipalPlan(principalPlan) {
-            const principalContent = document.getElementById('principalContent');
+            const container = document.getElementById('principalPlanContent') || document.getElementById('principalContent');
+            if (!container) {
+                return false;
+            }
+
             if (!principalPlan) {
-                principalContent.innerHTML = `<div class="result-item">
+                container.innerHTML = `<div class="result-item">
                     <div class="result-title">Principal Plan</div>
                     <div class="result-content">Principal plan was not requested.</div>
-                </div>`;
-                return;
+                </div>${LEGAL_NOTE_HTML}`;
+                return true;
             }
 
             if (!principalPlan.success) {
                 const errorMessage = principalPlan.error || 'Principal agent failed to generate a plan.';
-                principalContent.innerHTML = `<div class="result-item error">
+                container.innerHTML = `<div class="result-item error">
                     <div class="result-title">Principal Plan Failed</div>
                     <div class="result-content">${errorMessage}</div>
-                </div>`;
-                return;
+                </div>${LEGAL_NOTE_HTML}`;
+                return true;
             }
 
             const plan = principalPlan.data;
             if (!plan) {
-                principalContent.innerHTML = `<div class="result-item">
+                container.innerHTML = `<div class="result-item">
                     <div class="result-title">Principal Plan</div>
                     <div class="result-content">Plan data unavailable.</div>
-                </div>`;
-                return;
+                </div>${LEGAL_NOTE_HTML}`;
+                return true;
             }
 
             const strategies = plan.strategies || {};
@@ -402,21 +415,36 @@
                 const summaryHtml = formatPlanField('Summary', strategy.summary || 'No summary provided.');
                 const keyLevelsHtml = formatPlanField('Key Levels', strategy.key_levels);
                 const nextActionsHtml = formatPlanField('Next Actions', strategy.next_actions);
+                const fieldsHtml = [summaryHtml, keyLevelsHtml, nextActionsHtml].filter(Boolean).join('');
 
-                strategyHtml += `<div class="ai-section">
+                if (!fieldsHtml) {
+                    return;
+                }
+
+                strategyHtml += `<div class="ai-section plan-section">
                     <div class="ai-section-title">${label}</div>
-                    <div class="result-content">
-                        ${summaryHtml}
-                        ${keyLevelsHtml}
-                        ${nextActionsHtml}
-                    </div>
+                    <div class="plan-section__content">${fieldsHtml}</div>
                 </div>`;
             });
 
             const usage = plan.usage;
-            const usageHtml = usage ? `<div class="plan-meta">Tokens used: ${usage.total_tokens ?? 'N/A'}</div>` : '';
+            const generatedAt = formatDateTime(plan.generated_at);
 
-            const generatedAt = plan.generated_at ? new Date(plan.generated_at).toLocaleString() : 'N/A';
+            const summaryCells = [
+                { label: 'Symbol', value: plan.symbol || 'N/A' },
+                { label: 'Generated', value: generatedAt },
+            ];
+
+            if (usage) {
+                summaryCells.push({ label: 'Tokens Used', value: usage.total_tokens ?? 'N/A' });
+            }
+
+            const summaryGridHtml = summaryCells
+                .map(({ label, value }) => `<div class="plan-summary__cell">
+                        <span class="plan-summary__label">${escapeHtml(label)}</span>
+                        <span class="plan-summary__value">${escapeHtml(String(value ?? 'N/A'))}</span>
+                    </div>`)
+                .join('');
 
             const rawSection = plan.trading_agent_outputs
                 ? `<details class="plan-raw">
@@ -427,19 +455,19 @@
 
             const contextHtml = plan.context ? renderPlanContext(plan.context) : '';
 
-            principalContent.innerHTML = `
+            container.innerHTML = `
                 <div class="result-item success ai-analysis plan-summary">
-                    <div class="result-title">Principal Trading Plan</div>
-                    <div class="result-content plan-summary__grid">
-                        <div><strong>Symbol:</strong> ${plan.symbol || 'N/A'}</div>
-                        <div><strong>Generated:</strong> ${generatedAt}</div>
-                        ${usageHtml ? `<div><strong>Tokens used:</strong> ${escapeHtml(String(usage.total_tokens ?? 'N/A'))}</div>` : ''}
+                    <div class="result-title">Multi AI Agent Trading Strategy</div>
+                    <div class="plan-summary__grid">
+                        ${summaryGridHtml}
                     </div>
                 </div>
                 ${strategyHtml || '<div class="result-item"><div class="result-content">No strategy breakdown available.</div></div>'}
                 ${contextHtml}
                 ${rawSection}
+                ${LEGAL_NOTE_HTML}
             `;
+            return true;
         }
 
         function displayPriceAction(priceAction) {
@@ -451,7 +479,7 @@
                 container.innerHTML = `<div class="result-item">
                     <div class="result-title">Price Action</div>
                     <div class="result-content">No price action data available.</div>
-                </div>`;
+                </div>${LEGAL_NOTE_HTML}`;
                 return;
             }
 
@@ -535,6 +563,7 @@
                 </div>`;
             }
 
+            html += LEGAL_NOTE_HTML;
             container.innerHTML = html;
         }
 
@@ -804,7 +833,7 @@
                     <div class="result-title">Analysis Failed</div>
                     <div class="result-content">${error}</div>
                 </div>
-            `;
+            ` + LEGAL_NOTE_HTML;
         }
         function showTab(tabName, evt) {
             document.querySelectorAll('.tab-content').forEach(content => {
