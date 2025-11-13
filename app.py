@@ -1,5 +1,8 @@
 import logging
 import os
+import asyncio
+import time
+from functools import partial
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, status, Depends, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
@@ -70,6 +73,8 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 
 logger = logging.getLogger(__name__)
+
+AI_ANALYSIS_TIMEOUT = float(os.getenv("AI_ANALYSIS_TIMEOUT_SECONDS", "45"))
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing", "past_due"}
 
@@ -646,17 +651,19 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         # AI Analysis if requested
         ai_analysis = None
         if use_ai_analysis and result_data is not None:
+            loop = asyncio.get_running_loop()
+            analysis_started = time.perf_counter()
             try:
                 print("=== STARTING AI ANALYSIS ===")
-                
-                # # Structure the data properly for AI analysis
-                # structured_data = structure_trading_data_for_ai(result_data, stock_symbol)
-                # print("Structured data for AI:", structured_data)
-                
-                # # Use the centralized OpenAI service with structured data
-                # ai_analysis = openai_service.analyze_trading_data(structured_data, stock_symbol)
-                # print("AI Analysis completed:", ai_analysis.get("success", False))
-                ai_analysis = openai_service.analyze_trading_data(result_data, stock_symbol)
+                ai_analysis = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        partial(openai_service.analyze_trading_data, result_data, stock_symbol),
+                    ),
+                    timeout=AI_ANALYSIS_TIMEOUT,
+                )
+                duration = time.perf_counter() - analysis_started
+                logger.info("AI analysis completed in %.2fs", duration)
                 print("AI Analysis completed:", ai_analysis.get("success", False))
                  # DEBUG: Print the full AI response
                 print("=== FULL AI ANALYSIS RESPONSE ===")
@@ -669,7 +676,16 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                     for section_name, section_content in ai_analysis["analysis"].items():
                         print(f"{section_name}: {section_content[:100]}..." if section_content else f"{section_name}: EMPTY")
 
+            except asyncio.TimeoutError:
+                duration = time.perf_counter() - analysis_started
+                logger.error("AI analysis timed out after %.2fs", duration)
+                ai_analysis = {
+                    "success": False,
+                    "error": "AI analysis timed out; please retry shortly.",
+                }
             except Exception as e:
+                duration = time.perf_counter() - analysis_started
+                logger.exception("AI analysis failed after %.2fs", duration)
                 print(f"AI Analysis failed: {e}")
                 ai_analysis = {
                     "success": False,
