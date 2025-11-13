@@ -145,6 +145,115 @@
         .status-inactive {
             background: #f44336;
         }
+
+        .subscription-status {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .subscription-status strong {
+            color: #333;
+        }
+
+        .plan-grid {
+            display: grid;
+            gap: 1.25rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        .plan-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.12);
+            padding: 1.5rem 1.4rem;
+            border: 1px solid rgba(102, 126, 234, 0.18);
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+
+        .plan-card--current {
+            border-color: #27ae60;
+            box-shadow: 0 10px 24px rgba(39, 174, 96, 0.16);
+        }
+
+        .plan-card h3 {
+            font-size: 1.3rem;
+            color: #4b4b7a;
+        }
+
+        .plan-price {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #2e2a4a;
+        }
+
+        .plan-price span {
+            font-size: 0.85rem;
+            font-weight: normal;
+            color: #666;
+        }
+
+        .plan-feature {
+            font-size: 0.92rem;
+            color: #555;
+        }
+
+        .plan-button {
+            margin-top: auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .plan-button:hover:not([disabled]) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .plan-button[disabled] {
+            background: #d2d3db;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .plan-badge {
+            display: inline-flex;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            background: rgba(102, 126, 234, 0.15);
+            color: #5a60d8;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .plan-grid-empty {
+            color: #666;
+            font-size: 0.95rem;
+            text-align: center;
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 1.5rem 1rem;
+        }
+
+        .subscription-message {
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #c0392b;
+            min-height: 1.2rem;
+        }
     </style>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC00YPJSRJ"></script>
@@ -182,6 +291,23 @@
                         Active
                     </p>
                     <p><strong>Member Since:</strong> {{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}</p>
+                </div>
+            </div>
+
+            <!-- Subscription Plans Section -->
+            <div class="section" id="subscriptionSection">
+                <h2 class="section-title">Subscription Plans</h2>
+                <p class="section-description">Choose a plan to unlock monthly AI agent strategy runs. Upgrade anytime.</p>
+
+                <div class="subscription-status" id="subscriptionStatus">
+                    <strong>Current Plan</strong>
+                    <div id="subscriptionStatusValue">Loading subscription details…</div>
+                </div>
+
+                <div class="subscription-message" id="subscriptionMessage" role="alert" aria-live="polite"></div>
+
+                <div class="plan-grid" id="planGrid">
+                    <div class="plan-grid-empty">Loading plans…</div>
                 </div>
             </div>
 
@@ -248,4 +374,181 @@
         </div>
     </div>
 </body>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const planGrid = document.getElementById('planGrid');
+    const statusValue = document.getElementById('subscriptionStatusValue');
+    const messageBox = document.getElementById('subscriptionMessage');
+    const priceFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+    function setMessage(text, tone = 'error') {
+        messageBox.textContent = text || '';
+        messageBox.style.color = tone === 'error' ? '#c0392b' : '#2e7d32';
+    }
+
+    function formatPrice(cents) {
+        return priceFormatter.format((cents || 0) / 100);
+    }
+
+    function formatStatus(status) {
+        if (!status) {
+            return 'unknown';
+        }
+        return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    function formatDate(value) {
+        if (!value) {
+            return 'N/A';
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return 'N/A';
+        }
+        return date.toLocaleString();
+    }
+
+    function renderSubscriptionStatus(subscription) {
+        if (!subscription || !subscription.plan) {
+            statusValue.textContent = 'No active subscription. Select a plan below to enable AI agent runs.';
+            return;
+        }
+
+        const parts = [
+            `${subscription.plan.name} · ${formatStatus(subscription.status)}`,
+            `Runs left: ${subscription.runs_remaining ?? 'N/A'}`,
+            `Renews: ${formatDate(subscription.current_period_end)}`,
+        ];
+        statusValue.textContent = parts.join(' | ');
+    }
+
+    function createPlanCard(plan, isCurrent) {
+        const card = document.createElement('div');
+        card.className = 'plan-card';
+        if (isCurrent) {
+            card.classList.add('plan-card--current');
+        }
+
+        const name = document.createElement('h3');
+        name.textContent = plan.name;
+        card.appendChild(name);
+
+        const badge = document.createElement('span');
+        badge.className = 'plan-badge';
+        badge.textContent = `${plan.ai_runs_included} AI runs / month`;
+        card.appendChild(badge);
+
+        const price = document.createElement('div');
+        price.className = 'plan-price';
+        price.innerHTML = `${formatPrice(plan.monthly_price_cents)} <span>/ month</span>`;
+        card.appendChild(price);
+
+        if (plan.description) {
+            const desc = document.createElement('p');
+            desc.className = 'plan-feature';
+            desc.textContent = plan.description;
+            card.appendChild(desc);
+        }
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'plan-button';
+
+        if (!plan.stripe_price_configured) {
+            button.textContent = 'Unavailable';
+            button.disabled = true;
+        } else if (isCurrent) {
+            button.textContent = 'Current Plan';
+            button.disabled = true;
+        } else {
+            button.textContent = 'Select Plan';
+            button.addEventListener('click', () => startCheckout(plan.slug, button));
+        }
+
+        card.appendChild(button);
+        return card;
+    }
+
+    function renderPlans(plans, subscription) {
+        planGrid.innerHTML = '';
+        if (!plans || plans.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'plan-grid-empty';
+            empty.textContent = 'No plans are available right now. Please check back later.';
+            planGrid.appendChild(empty);
+            return;
+        }
+
+        const currentSlug = subscription && subscription.plan ? subscription.plan.slug : null;
+        plans.forEach((plan) => {
+            const isCurrent = currentSlug === plan.slug;
+            const card = createPlanCard(plan, isCurrent);
+            planGrid.appendChild(card);
+        });
+    }
+
+    async function startCheckout(planSlug, trigger) {
+        if (!planSlug) {
+            return;
+        }
+
+        const originalText = trigger.textContent;
+        trigger.disabled = true;
+        trigger.textContent = 'Redirecting…';
+        setMessage('');
+
+        try {
+            const response = await fetch('/api/billing/checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ plan_slug: planSlug }),
+            });
+
+            if (!response.ok) {
+                const errorPayload = await response.json().catch(() => ({}));
+                const detail = errorPayload.detail || 'Unable to start checkout. Please try again.';
+                throw new Error(detail);
+            }
+
+            const data = await response.json();
+            if (data.checkout_url) {
+                window.location.href = data.checkout_url;
+                return;
+            }
+
+            throw new Error('Checkout session did not return a redirect URL.');
+        } catch (error) {
+            setMessage(error.message || 'Billing error. Please try again later.');
+        } finally {
+            trigger.disabled = false;
+            trigger.textContent = originalText;
+        }
+    }
+
+    async function loadBilling() {
+        try {
+            const response = await fetch('/api/billing/plans');
+            if (!response.ok) {
+                throw new Error('Failed to load subscription plans.');
+            }
+
+            const data = await response.json();
+            renderSubscriptionStatus(data.current_subscription);
+            renderPlans(data.plans, data.current_subscription);
+        } catch (error) {
+            setMessage(error.message || 'Unexpected error loading billing information.');
+            planGrid.innerHTML = '';
+            const empty = document.createElement('div');
+            empty.className = 'plan-grid-empty';
+            empty.textContent = 'Unable to load plans at this time.';
+            planGrid.appendChild(empty);
+            statusValue.textContent = 'Billing information is currently unavailable.';
+        }
+    }
+
+    loadBilling();
+});
+</script>
 </html>

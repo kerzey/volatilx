@@ -1,6 +1,9 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker
 import os
+
+from billing import sync_plan_catalogue
+from models import Base
 
 # Database URL - Use sync SQLite only
 # DATABASE_URL = "sqlite:///./data/users.db"
@@ -17,9 +20,6 @@ engine = create_engine(
 
 # Session maker for sync operations
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base class for models
-Base = declarative_base()
 
 # Database dependency function
 def get_db():
@@ -47,6 +47,9 @@ def create_tables():
     """
     ensure_data_directory()
     Base.metadata.create_all(bind=engine)
+
+    with SessionLocal() as session:
+        sync_plan_catalogue(session)
 
 # Test database connection
 def test_connection():

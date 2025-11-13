@@ -1,7 +1,7 @@
 import logging
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Form, status, Depends
+from fastapi import FastAPI, Request, Form, status, Depends, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -13,11 +13,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Import user-related components - UPDATED to include get_user_manager
-from user import User, UserRead, UserCreate, UserUpdate, get_user_db, get_user_manager, init_db, get_current_user_sync
+from user import (
+    User,
+    UserRead,
+    UserCreate,
+    UserUpdate,
+    get_user_db,
+    get_user_manager,
+    init_db,
+    get_current_user_sync,
+)
 from db import SessionLocal
+from billing import (
+    create_subscription_checkout_session,
+    ensure_customer,
+    get_publishable_key,
+    sync_plan_catalogue,
+    StripeWebhookConfig,
+    handle_checkout_session_completed,
+    handle_invoice_paid,
+    handle_subscription_deleted,
+    handle_subscription_updated,
+    parse_event,
+)
+from models import SubscriptionPlan, UserSubscription
+from sqlalchemy.orm import Session
 
 # FastAPI Users imports
 from fastapi_users import FastAPIUsers
@@ -46,11 +69,84 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 logger = logging.getLogger(__name__)
 
+ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing", "past_due"}
+
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+stripe_webhook_config = (
+    StripeWebhookConfig(signing_secret=STRIPE_WEBHOOK_SECRET)
+    if STRIPE_WEBHOOK_SECRET
+    else None
+)
+
+
+def _build_base_url(request: Request) -> str:
+    """Best-effort reconstruction of the public base URL for redirects."""
+
+    forwarded_host = request.headers.get("x-forwarded-host")
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    if forwarded_host:
+        scheme = forwarded_proto or request.url.scheme
+        return f"{scheme}://{forwarded_host}"
+
+    host = request.headers.get("host") or request.url.netloc
+    scheme = forwarded_proto or request.url.scheme
+    return f"{scheme}://{host}"
+
+
+def _serialize_plan(plan: SubscriptionPlan) -> Dict[str, Any]:
+    return {
+        "id": plan.id,
+        "slug": plan.slug,
+        "name": plan.name,
+        "description": plan.description,
+        "monthly_price_cents": plan.monthly_price_cents,
+        "monthly_price_dollars": plan.monthly_price_cents / 100,
+        "ai_runs_included": plan.ai_runs_included,
+        "is_active": plan.is_active,
+        "stripe_price_configured": bool(plan.stripe_price_id),
+    }
+
+
+def _serialize_subscription(subscription: Optional[UserSubscription]) -> Optional[Dict[str, Any]]:
+    if subscription is None:
+        return None
+
+    plan_payload = _serialize_plan(subscription.plan) if subscription.plan else None
+    return {
+        "id": subscription.id,
+        "status": subscription.status,
+        "runs_remaining": subscription.runs_remaining,
+        "auto_renew": subscription.auto_renew,
+        "cancel_at_period_end": subscription.cancel_at_period_end,
+        "current_period_start": subscription.current_period_start.isoformat()
+        if subscription.current_period_start
+        else None,
+        "current_period_end": subscription.current_period_end.isoformat()
+        if subscription.current_period_end
+        else None,
+        "plan": plan_payload,
+    }
+
+
+def _find_relevant_subscription(session: Session, user_id: int) -> Optional[UserSubscription]:
+    query = (
+        session.query(UserSubscription)
+        .filter(UserSubscription.user_id == user_id)
+        .order_by(UserSubscription.created_at.desc())
+    )
+    subscriptions = query.all()
+    for sub in subscriptions:
+        if sub.status in ACTIVE_SUBSCRIPTION_STATUSES:
+            return sub
+    return subscriptions[0] if subscriptions else None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         init_db()
+        with SessionLocal() as session:
+            sync_plan_catalogue(session)
         print("Database initialized successfully")
     except Exception as e:
         print(f"Database initialization failed: {e}")
@@ -734,9 +830,159 @@ def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:
     
     return structured
 
+##############################################################################################
+# Billing Endpoints
+##############################################################################################
+
+
+@app.get("/api/billing/plans")
+async def list_subscription_plans(user: User = Depends(get_current_user_sync)):
+    with SessionLocal() as session:
+        plans = (
+            session.query(SubscriptionPlan)
+            .filter(SubscriptionPlan.is_active.is_(True))
+            .order_by(SubscriptionPlan.monthly_price_cents.asc())
+            .all()
+        )
+        current_subscription = _find_relevant_subscription(session, user.id)
+
+    payload = {
+        "plans": [_serialize_plan(plan) for plan in plans],
+        "currency": "usd",
+        "current_subscription": _serialize_subscription(current_subscription),
+    }
+    return JSONResponse(content=payload)
+
+
+@app.get("/api/billing/subscription")
+async def get_current_subscription(user: User = Depends(get_current_user_sync)):
+    with SessionLocal() as session:
+        subscription = _find_relevant_subscription(session, user.id)
+
+    return JSONResponse(content={"subscription": _serialize_subscription(subscription)})
+
+
+@app.post("/api/billing/checkout-session")
+async def create_checkout_session(request: Request, user: User = Depends(get_current_user_sync)):
+    payload = await request.json()
+    plan_slug = payload.get("plan_slug")
+    if not plan_slug:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": "plan_slug is required."},
+        )
+
+    with SessionLocal() as session:
+        plan = (
+            session.query(SubscriptionPlan)
+            .filter(SubscriptionPlan.slug == plan_slug, SubscriptionPlan.is_active.is_(True))
+            .one_or_none()
+        )
+
+        if plan is None:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"detail": "Selected plan is unavailable."},
+            )
+
+        if not plan.stripe_price_id:
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "Plan is missing Stripe price configuration."},
+            )
+
+        try:
+            customer = ensure_customer(
+                email=user.email,
+                existing_customer_id=user.stripe_customer_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - want full context in logs
+            logger.exception("Failed to ensure Stripe customer for user %s", user.id)
+            return JSONResponse(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                content={"detail": "Unable to contact billing provider."},
+            )
+
+        if not user.stripe_customer_id:
+            db_user = session.query(User).filter(User.id == user.id).one()
+            db_user.stripe_customer_id = customer.id
+            session.commit()
+            user.stripe_customer_id = customer.id
+
+        base_url = _build_base_url(request)
+        success_url = f"{base_url}/settings?checkout=success"
+        cancel_url = f"{base_url}/settings?checkout=cancel"
+
+        try:
+            session_obj = create_subscription_checkout_session(
+                price_id=plan.stripe_price_id,
+                success_url=success_url,
+                cancel_url=cancel_url,
+                client_reference_id=str(user.id),
+                customer=customer.id,
+                metadata={
+                    "plan_id": str(plan.id),
+                    "plan_slug": plan.slug,
+                    "user_id": str(user.id),
+                },
+            )
+        except Exception as exc:  # noqa: BLE001 - propagate message via logs
+            logger.exception(
+                "Failed to create Stripe checkout session for user %s and plan %s",
+                user.id,
+                plan.slug,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                content={"detail": "Unable to initiate checkout session."},
+            )
+
+    return JSONResponse(content={"checkout_url": session_obj.url, "session_id": session_obj.id})
+
+
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, user: User = Depends(get_current_user_sync)):
-    return templates. TemplateResponse("settings.html", {"request": request, "user": user})
+    try:
+        publishable_key = get_publishable_key()
+    except RuntimeError:
+        publishable_key = None
+
+    context = {
+        "request": request,
+        "user": user,
+        "stripe_publishable_key": publishable_key,
+    }
+    return templates.TemplateResponse("settings.html", context)
+
+
+@app.post("/api/billing/stripe/webhook")
+async def stripe_webhook(request: Request):
+    if stripe_webhook_config is None:
+        raise HTTPException(status_code=503, detail="Stripe webhooks are not configured.")
+
+    payload = await request.body()
+    signature = request.headers.get("stripe-signature")
+    if not signature:
+        raise HTTPException(status_code=400, detail="Missing Stripe signature header.")
+
+    event = parse_event(payload, signature, stripe_webhook_config.signing_secret)
+    event_type = event.get("type")
+
+    logger.info("Stripe webhook received: %s", event_type)
+
+    with SessionLocal() as session:
+        if event_type in {"customer.subscription.created", "customer.subscription.updated"}:
+            handle_subscription_updated(session, event)
+        elif event_type == "customer.subscription.deleted":
+            handle_subscription_deleted(session, event)
+        elif event_type == "invoice.payment_succeeded":
+            handle_invoice_paid(session, event)
+        elif event_type == "checkout.session.completed":
+            handle_checkout_session_completed(session, event)
+        else:
+            logger.debug("Unhandled Stripe webhook event type: %s", event_type)
+
+    return JSONResponse(content={"received": True})
 
 @app.post("/api/analyze")
 async def analyze_trading_data(

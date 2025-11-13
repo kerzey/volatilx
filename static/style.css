@@ -26,10 +26,144 @@ body {
   position: sticky;
   top: 0;
 }
+
 .logo {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+/* SIGN-IN LAYOUT ------------------------------------------------------------ */
+.signin-wrapper {
+  width: min(960px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 2.7rem;
+  align-items: center;
+}
+
+.signin-helper {
+  margin-top: 1.35rem;
+  color: #4a4f72;
+  font-size: 0.95rem;
+}
+
+.signin-marketing {
+  width: min(780px, 100%);
+  background: linear-gradient(155deg, #f8f9ff 0%, #ecf0ff 100%);
+  border-radius: 20px;
+  padding: clamp(2.1rem, 5vw, 2.8rem) clamp(1.8rem, 5vw, 2.6rem);
+  box-shadow: 0 26px 60px rgba(84, 94, 175, 0.22);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+}
+
+.marketing-header h2 {
+  font-size: clamp(1.9rem, 4vw, 2.3rem);
+  color: #1f2a54;
+  margin-bottom: 0.8rem;
+  text-align: center;
+}
+
+.marketing-header p {
+  color: #3b4060;
+  line-height: 1.7;
+  font-size: 0.98rem;
+  text-align: center;
+  margin: 0 auto;
+  max-width: 560px;
+}
+
+.marketing-grid {
+  display: grid;
+  gap: 1.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.marketing-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 2.15rem 1.45rem 1.5rem 1.45rem;
+  box-shadow: 0 20px 40px rgba(102, 126, 234, 0.18);
+  border: 1px solid rgba(102, 126, 234, 0.16);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 0.85rem;
+  text-align: center;
+  position: relative;
+  justify-items: center;
+}
+
+.marketing-card h3 {
+  font-size: 1.05rem;
+  color: #1f2350;
+  margin-top: 0.25rem;
+}
+
+.marketing-card p {
+  color: #3d4261;
+  line-height: 1.55;
+  font-size: 0.95rem;
+  margin: 0 auto;
+}
+
+.marketing-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  box-shadow: 0 18px 28px rgba(102, 126, 234, 0.3);
+  position: absolute;
+  left: 0.95rem;
+  top: 0.75rem;
+}
+
+.marketing-icon span {
+  display: inline-block;
+}
+
+.icon-insights {
+  background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+}
+
+.icon-ai {
+  background: linear-gradient(135deg, #8f67ff 0%, #4b5dff 100%);
+}
+
+.icon-strategy {
+  background: linear-gradient(135deg, #ff9a5a 0%, #ff6a88 100%);
+}
+
+.icon-security {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.icon-decisions {
+  background: linear-gradient(135deg, #fddb92 0%, #d1fdff 100%);
+  color: #233348;
+}
+
+.marketing-note {
+  font-weight: 600;
+  color: #1f2a54;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.marketing-footnote {
+  font-size: 0.82rem;
+  color: #5d6283;
+  line-height: 1.6;
+  margin-top: 1.5rem;
+  text-align: center;
 }
 .logo img {
   display: block;
@@ -163,94 +297,102 @@ body {
 }
 
 .signin-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
 }
 
 .signin-container {
-    background: white;
-    padding: 3rem 2.5rem;
-    border-radius: 14px;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    max-width: 520px;
-    width: 100%;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f6ff 100%);
+  padding: clamp(2.6rem, 5vw, 3.4rem) clamp(2rem, 5vw, 3rem);
+  border-radius: 20px;
+  box-shadow: 0 28px 60px rgba(58, 70, 153, 0.22);
+  text-align: center;
+  max-width: 540px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  position: relative;
+}
+
+.signin-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  pointer-events: none;
 }
 
 .signin-container .logo {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    font-size: 3.2rem;
-    font-weight: bold;
-    color: #667eea;
-    margin-bottom: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  font-size: 3rem;
+  font-weight: 700;
+  color: #2f5dd7;
 }
 
 .signin-container .logo img {
-    width: 120px;
-    height: 120px;
-    margin-bottom: 8px;
+  width: 100px;
+  height: 100px;
+  margin-bottom: 4px;
+  border-radius: 22px;
+  box-shadow: 0 16px 24px rgba(46, 110, 214, 0.18);
 }
 
 .signin-container .logo span {
-    font-size: 2.5rem;
-    color: #2e6ed6;
+  font-size: 2.35rem;
+  letter-spacing: 0.05em;
+  color: #2d4fd0;
 }
 
 .signin-container .subtitle {
-    color: #666;
-    margin-bottom: 2.1rem;
-    font-size: 1.5rem;
+  color: #4a4f72;
+  font-size: 1.25rem;
+  font-weight: 500;
 }
 
 .google-signin-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #4285f4;
-    color: white;
-    padding: 18px 0;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.3rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    transition: background-color 0.3s;
-    width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #4a8bf5 0%, #3678f0 100%);
+  color: #fff;
+  padding: 0.95rem 0;
+  border: 1px solid rgba(66, 133, 244, 0.25);
+  border-radius: 14px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+  box-shadow: 0 20px 32px rgba(66, 133, 244, 0.28);
 }
 
 .google-signin-btn:hover {
-    background: #357ae8;
+  transform: translateY(-2px);
+  box-shadow: 0 26px 40px rgba(66, 133, 244, 0.35);
+}
+
+.google-signin-btn:focus-visible {
+  outline: 3px solid rgba(66, 133, 244, 0.35);
+  outline-offset: 3px;
 }
 
 .google-icon {
-    width: 28px;
-    height: 28px;
-    margin-right: 14px;
-}
-
-.features {
-    margin-top: 2.1rem;
-    text-align: left;
-}
-
-.feature {
-    margin: 1rem 0;
-    color: #666;
-}
-
-.feature::before {
-    content: "✓";
-    color: #4285f4;
-    font-weight: bold;
-    margin-right: 10px;
+  width: 26px;
+  height: 26px;
 }
 /* AI notice box */
 .ai-info {
