@@ -691,6 +691,19 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                     "success": False,
                     "error": f"AI analysis failed: {str(e)}"
                 }
+            finally:
+                if runs_remaining_after is not None:
+                    # Restore quota consumption when AI analysis fails or times out
+                    with SessionLocal() as refund_session:
+                        try:
+                            refund_sub = _find_relevant_subscription(refund_session, user.id)
+                            if refund_sub:
+                                refund_sub.runs_remaining = (refund_sub.runs_remaining or 0) + 1
+                                refund_session.commit()
+                                runs_remaining_after = refund_sub.runs_remaining
+                        except Exception as exc:
+                            logger.warning("Failed to refund AI run after analysis failure: %s", exc)
+                            refund_session.rollback()
         
         elif use_ai_analysis:
             ai_analysis = {

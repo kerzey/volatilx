@@ -17,6 +17,7 @@
     </script>
 </head>
 <body>
+
     <div class="header">
         <a class="logo" href="/trade">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
@@ -39,10 +40,12 @@
                     <label for="stockSymbol">Stock Symbol</label>
                     <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" required>
                 </div>
+                <!--
                 <div class="checkbox-group">
                     <input type="checkbox" id="useAiAnalysis" name="use_ai_analysis" value="true">
                     <label for="useAiAnalysis">Get AI Investment Strategy</label>
                 </div>
+                -->
                 <div class="checkbox-group">
                     <input type="checkbox" id="usePrincipalAgent" name="use_principal_agent" value="true" checked>
                     <label for="usePrincipalAgent">Generate Multi AI Agent Trading Strategy</label>
@@ -79,7 +82,8 @@
     
     <script>
         let currentResults = null;
-        const usePrincipalAgentInput = document.getElementById('usePrincipalAgent');
+    const usePrincipalAgentInput = document.getElementById('usePrincipalAgent');
+    const useAiAnalysisInput = document.getElementById('useAiAnalysis');
         const includePrincipalRawInput = document.getElementById('includePrincipalRaw');
     const priceActionTab = document.getElementById('priceActionTab');
         const principalTab = document.getElementById('principalTab');
@@ -98,7 +102,7 @@
         document.getElementById('tradingForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
-            const useAiAnalysis = document.getElementById('useAiAnalysis').checked;
+            const useAiAnalysis = useAiAnalysisInput ? useAiAnalysisInput.checked : false;
             const usePrincipalAgent = usePrincipalAgentInput.checked;
             const includePrincipalRaw = includePrincipalRawInput.checked;
             const analyzeBtn = document.getElementById('analyzeBtn');
