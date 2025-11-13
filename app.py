@@ -769,11 +769,11 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             for key, value in exc.headers.items():
                 response.headers[key] = value
         return response
-    except Exception as e:
-        print(f"Error in trade endpoint: {e}")
+    except Exception as exc:
+        logger.exception("Trade endpoint failed")
         response = {
             'success': False,
-            'error': str(e)
+            'error': str(exc)
         }
         return JSONResponse(content=response, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
