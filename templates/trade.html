@@ -18,12 +18,13 @@
 </head>
 <body>
     <div class="header">
-        <div class="logo">
+        <a class="logo" href="/trade">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
             <span>VolatilX</span>
-        </div>
+        </a>
         <div class="nav-links">
             <a href="/trade">Trading</a>
+            <a href="/subscribe">Plans</a>
             <a href="/settings">Settings</a>
             <span>{{ user.email }}</span>
             <a href="/logout">Logout</a>
@@ -153,8 +154,18 @@
                         include_principal_raw_results: includePrincipalRaw
                     })
                 });
-                const data = await response.json();
-                if (data.success) {
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    data = { success: false, error: 'Unexpected server response. Please try again.' };
+                }
+
+                if (data && typeof data === 'object' && !('status' in data)) {
+                    data.status = response.status;
+                }
+
+                if (response.ok && data.success) {
                     currentResults = data;
                     displayResults(data, stockSymbol);
                     let extraTabs = 0;
@@ -179,11 +190,11 @@
                         resultTabs.classList.remove('hidden');
                     }
                 } else {
-                    displayError(data.error || 'Analysis failed');
+                    displayError(data);
                 }
             } catch (error) {
                 console.error('Error:', error);
-                displayError('Network error occurred. Please try again.');
+                displayError({ error: 'Network error occurred. Please try again.' });
             } finally {
                 analyzeBtn.disabled = false;
                 analyzeBtn.textContent = 'Analyze Stock';
@@ -284,6 +295,10 @@
                 `;
             }
             decisionHtml += "</tbody></table>";
+            const runsRemaining = typeof data.runs_remaining === 'number' ? data.runs_remaining : null;
+            const runsMeta = runsRemaining !== null
+                ? `<div class="result-meta"><div>Runs remaining: <strong>${escapeHtml(String(runsRemaining))}</strong></div></div>`
+                : '';
             technicalContent.innerHTML = `
                 <div class="result-item success">
                     <div class="result-title">Technical Analysis Table for ${symbol}</div>
@@ -291,6 +306,7 @@
                         ${consensusHtml}
                         ${decisionHtml}
                     </div>
+                    ${runsMeta}
                 </div>
             ` + LEGAL_NOTE_HTML;
         }
@@ -817,23 +833,61 @@
             </div>`;
         }
 
-    function escapeHtml(unsafe) {
+        function escapeHtml(unsafe) {
             if (unsafe === null || unsafe === undefined) return '';
             return String(unsafe)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
-        function displayError(error) {
+        function displayError(payload) {
             const technicalContent = document.getElementById('technicalContent');
+            const detail = (typeof payload === 'string' || payload instanceof String)
+                ? { error: payload }
+                : (payload || {});
+            const errorText = detail.error || detail.detail || detail.message || 'Analysis failed.';
+            const runsRemaining = typeof detail.runs_remaining === 'number' ? detail.runs_remaining : null;
+            const renewsAt = detail.renews_at ? new Date(detail.renews_at).toLocaleString() : null;
+            const actionUrl = detail.action_url || (detail.code ? '/subscribe' : null);
+            const actionLabel = detail.action_label || 'Manage subscription';
+            const statusCode = detail.status;
+
+            const metaItems = [];
+            if (runsRemaining !== null) {
+                metaItems.push(`Runs remaining: <strong>${escapeHtml(String(runsRemaining))}</strong>`);
+            }
+            if (renewsAt) {
+                metaItems.push(`Renews: <strong>${escapeHtml(renewsAt)}</strong>`);
+            }
+            if (statusCode) {
+                metaItems.push(`Status: <strong>${escapeHtml(String(statusCode))}</strong>`);
+            }
+
+            const metaHtml = metaItems.length
+                ? `<div class="result-meta">${metaItems.join('<span aria-hidden="true">•</span>')}</div>`
+                : '';
+
+            const safeActionUrl = actionUrl ? encodeURI(actionUrl) : null;
+            const ctaHtml = safeActionUrl
+                ? `<div class="result-cta"><a class="cta-button" href="${safeActionUrl}">${escapeHtml(actionLabel)}</a></div>`
+                : '';
+
             technicalContent.innerHTML = `
                 <div class="result-item error">
-                    <div class="result-title">Analysis Failed</div>
-                    <div class="result-content">${error}</div>
+                    <div class="result-title">Analysis Unavailable</div>
+                    <div class="result-content">${escapeHtml(errorText)}</div>
+                    ${metaHtml}
+                    ${ctaHtml}
                 </div>
             ` + LEGAL_NOTE_HTML;
+
+            if (safeActionUrl && (detail.code === 'subscription_required' || detail.code === 'quota_exhausted')) {
+                setTimeout(() => {
+                    window.location.href = safeActionUrl;
+                }, 900);
+            }
         }
         function showTab(tabName, evt) {
             document.querySelectorAll('.tab-content').forEach(content => {

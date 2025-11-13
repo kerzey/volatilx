@@ -189,11 +189,19 @@ def handle_subscription_deleted(session: Session, event: stripe.Event) -> None:
     session.commit()
 
 
-def enqueue_usage(session: Session, subscription: UserSubscription, *, units: int = 1, notes: Optional[str] = None) -> None:
+def enqueue_usage(
+    session: Session,
+    subscription: UserSubscription,
+    *,
+    units: int = 1,
+    notes: Optional[str] = None,
+    usage_type: str = "ai_run",
+) -> None:
     usage = SubscriptionUsage(
         subscription_id=subscription.id,
         units_consumed=units,
         notes=notes,
+        usage_type=usage_type,
     )
     session.add(usage)
 

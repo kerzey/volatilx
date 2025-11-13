@@ -33,6 +33,7 @@ from billing import (
     get_publishable_key,
     sync_plan_catalogue,
     StripeWebhookConfig,
+    enqueue_usage,
     handle_checkout_session_completed,
     handle_invoice_paid,
     handle_subscription_deleted,
@@ -40,7 +41,7 @@ from billing import (
     parse_event,
 )
 from models import SubscriptionPlan, UserSubscription
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 # FastAPI Users imports
 from fastapi_users import FastAPIUsers
@@ -131,6 +132,7 @@ def _serialize_subscription(subscription: Optional[UserSubscription]) -> Optiona
 def _find_relevant_subscription(session: Session, user_id: int) -> Optional[UserSubscription]:
     query = (
         session.query(UserSubscription)
+        .options(joinedload(UserSubscription.plan))
         .filter(UserSubscription.user_id == user_id)
         .order_by(UserSubscription.created_at.desc())
     )
@@ -139,6 +141,70 @@ def _find_relevant_subscription(session: Session, user_id: int) -> Optional[User
         if sub.status in ACTIVE_SUBSCRIPTION_STATUSES:
             return sub
     return subscriptions[0] if subscriptions else None
+
+
+def _consume_subscription_units(
+    user_id: int,
+    *,
+    units: int = 1,
+    usage_type: str = "ai_run",
+    notes: Optional[str] = None,
+) -> int:
+    """Deduct subscription allowance for metered AI features.
+
+    Returns the remaining quota after consumption or raises an HTTPException
+    if the user is not eligible to run the requested workload.
+    """
+
+    with SessionLocal() as session:
+        subscription = _find_relevant_subscription(session, user_id)
+
+        if subscription is None or subscription.plan is None:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "You need an active VolatilX subscription to run premium AI strategies.",
+                    "code": "subscription_required",
+                    "runs_remaining": 0,
+                    "action_label": "View plans",
+                    "action_url": "/subscribe?reason=subscription_required",
+                },
+            )
+
+        if subscription.runs_remaining is None:
+            subscription.runs_remaining = 0
+
+        if subscription.runs_remaining < units:
+            reset_at = (
+                subscription.current_period_end.isoformat()
+                if subscription.current_period_end
+                else None
+            )
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": "You’ve used all AI runs included in your plan for this billing cycle.",
+                    "code": "quota_exhausted",
+                    "runs_remaining": max(subscription.runs_remaining, 0),
+                    "action_label": "Manage subscription",
+                    "action_url": "/subscribe?reason=quota_exhausted",
+                    "renews_at": reset_at,
+                },
+            )
+
+        subscription.runs_remaining -= units
+        enqueue_usage(
+            session,
+            subscription,
+            units=units,
+            notes=notes,
+            usage_type=usage_type,
+        )
+
+        session.commit()
+        remaining = subscription.runs_remaining
+
+    return remaining
 
 
 @asynccontextmanager
@@ -490,7 +556,18 @@ async def index(request: Request):
 
 @app.get("/trade", response_class=HTMLResponse)
 async def trade_page(request: Request, user: User = Depends(get_current_user_sync)):
-    return templates.TemplateResponse("trade.html", {"request": request, "user": user})
+    with SessionLocal() as session:
+        subscription = _find_relevant_subscription(session, user.id)
+
+    if subscription is None or subscription.plan is None:
+        return RedirectResponse(url="/subscribe?from=trade", status_code=status.HTTP_303_SEE_OTHER)
+
+    context = {
+        "request": request,
+        "user": user,
+        "subscription": _serialize_subscription(subscription),
+    }
+    return templates.TemplateResponse("trade.html", context)
 
 @app.post("/trade")
 async def trade(request: Request, user: User = Depends(get_current_user_sync)):
@@ -518,6 +595,15 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                 status_code=400
             )
         
+        runs_remaining_after: Optional[int] = None
+        should_meter = bool(use_ai_analysis or use_principal_agent)
+        if should_meter:
+            runs_remaining_after = _consume_subscription_units(
+                user.id,
+                usage_type="trade_analysis",
+                notes=f"Trade analysis for {stock_symbol}",
+            )
+
         # Initialize trading agent
         agent = MultiSymbolDayTraderAgent(
             symbols=stock_symbol,
@@ -654,7 +740,32 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             'symbol': stock_symbol,
             'timestamp': str(datetime.now())
         }
+        if runs_remaining_after is not None:
+            response['runs_remaining'] = runs_remaining_after
         return JSONResponse(content=response, status_code=status.HTTP_200_OK)
+    except HTTPException as exc:
+        error_payload: Dict[str, Any] = {"success": False}
+        detail = exc.detail
+        if isinstance(detail, dict):
+            error_payload.update(detail)
+            if "error" not in error_payload and "message" in error_payload:
+                error_payload["error"] = error_payload["message"]
+        elif isinstance(detail, str):
+            error_payload["error"] = detail
+        else:
+            error_payload["error"] = "Subscription validation failed."
+
+        if "runs_remaining" not in error_payload:
+            error_payload["runs_remaining"] = None
+
+        response = JSONResponse(
+            content=error_payload,
+            status_code=exc.status_code,
+        )
+        if exc.headers:
+            for key, value in exc.headers.items():
+                response.headers[key] = value
+        return response
     except Exception as e:
         print(f"Error in trade endpoint: {e}")
         response = {
@@ -704,6 +815,19 @@ async def generate_principal_plan(request: Request, user: User = Depends(get_cur
         },
         status_code=200,
     )
+
+
+@app.get("/subscribe", response_class=HTMLResponse)
+async def subscribe_page(request: Request, user: User = Depends(get_current_user_sync)):
+    with SessionLocal() as session:
+        subscription = _find_relevant_subscription(session, user.id)
+
+    context = {
+        "request": request,
+        "user": user,
+        "current_subscription": _serialize_subscription(subscription) if subscription else None,
+    }
+    return templates.TemplateResponse("subscription.html", context)
 
 def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:
     """Structure the trading agent result data for AI analysis"""
@@ -991,6 +1115,11 @@ async def analyze_trading_data(
 ):
     """Analyze trading data using AI"""
     try:
+        runs_remaining_after = _consume_subscription_units(
+            user.id,
+            usage_type="direct_ai_analysis",
+            notes="Direct AI analysis request",
+        )
         # Get the request data
         data = await request.json()
         symbol = data.get('symbol', 'UNKNOWN')
@@ -1019,6 +1148,7 @@ async def analyze_trading_data(
                 "analysis_timestamp": str(datetime.now()),
                 "symbol": symbol
             })
+            analysis_result["runs_remaining"] = runs_remaining_after
             
             return JSONResponse(
                 content=analysis_result,
@@ -1026,18 +1156,43 @@ async def analyze_trading_data(
             )
         else:
             print(f"AI analysis failed for {symbol}: {analysis_result.get('error', 'Unknown error')}")
+            analysis_result["runs_remaining"] = runs_remaining_after
             return JSONResponse(
                 content=analysis_result,
                 status_code=400
             )
             
+    except HTTPException as exc:
+        error_payload: Dict[str, Any] = {"success": False}
+        detail = exc.detail
+        if isinstance(detail, dict):
+            error_payload.update(detail)
+            if "error" not in error_payload and "message" in error_payload:
+                error_payload["error"] = error_payload["message"]
+        elif isinstance(detail, str):
+            error_payload["error"] = detail
+        else:
+            error_payload["error"] = "Subscription validation failed."
+
+        if "runs_remaining" not in error_payload:
+            error_payload["runs_remaining"] = None
+
+        response = JSONResponse(
+            content=error_payload,
+            status_code=exc.status_code,
+        )
+        if exc.headers:
+            for key, value in exc.headers.items():
+                response.headers[key] = value
+        return response
     except Exception as e:
         print(f"Error in AI analysis: {e}")
         return JSONResponse(
             content={
                 "success": False,
                 "error": f"Analysis failed: {str(e)}",
-                "timestamp": str(datetime.now())
+                "timestamp": str(datetime.now()),
+                "runs_remaining": runs_remaining_after if 'runs_remaining_after' in locals() else None,
             },
             status_code=500
         )

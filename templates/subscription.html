@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VolatilX - Choose Your Plan</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="subscription-body">
+    <div class="header">
+        <a class="logo" href="/trade">
+            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
+            <span>VolatilX</span>
+        </a>
+        <div class="nav-links">
+            <a href="/trade">Trading</a>
+            <a href="/subscribe" class="active">Plans</a>
+            <a href="/settings">Settings</a>
+            <span>{{ user.email }}</span>
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <main class="subscription-page">
+        <div class="subscription-hero">
+            <h1>Unlock VolatilX Premium Intelligence</h1>
+            <p>Select the plan that matches your trading cadence. Each tier includes access to our AI agents and strategy network. Upgrade anytime as your workflow expands.</p>
+            <div class="subscription-message" id="subscriptionMessage" role="alert" aria-live="polite"></div>
+        </div>
+
+        <div class="plan-grid" id="planGrid">
+            <div class="plan-grid-empty">Loading personalized plans…</div>
+        </div>
+    </main>
+
+    <script id="subscriptionData" type="application/json">{{ (current_subscription|default(none))|tojson|safe }}</script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const planGrid = document.getElementById('planGrid');
+        const messageBox = document.getElementById('subscriptionMessage');
+        const priceFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+        let currentSubscription = null;
+        const subscriptionDataEl = document.getElementById('subscriptionData');
+        if (subscriptionDataEl) {
+            try {
+                const raw = subscriptionDataEl.textContent?.trim();
+                currentSubscription = raw ? JSON.parse(raw) : null;
+            } catch (error) {
+                console.warn('Failed to parse subscription seed data', error);
+            }
+        }
+
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get('reason');
+    const fromTrade = params.get('from') === 'trade' || reason === 'subscription_required';
+    const outOfRuns = params.get('status') === 'out_of_runs' || reason === 'quota_exhausted';
+
+        const PLAN_META = {
+            alpha: {
+                themeClass: 'plan-card--alpha',
+                logo: '/static/Alpha.PNG',
+                tagline: 'Silver-tier intelligence for confident entries.',
+                features: [
+                    'Multi-timeframe AI technical breakdowns',
+                    'Access to principal agent trade plans',
+                    'Email support during market hours',
+                ],
+                badge: 'Starter',
+                ctaLabel: 'Activate Alpha',
+            },
+            sigma: {
+                themeClass: 'plan-card--sigma',
+                logo: '/static/Sigma.PNG',
+                tagline: 'Gold coverage for active swing & day traders.',
+                features: [
+                    'Expanded monthly AI run allowance',
+                    'Priority queueing near market opens',
+                    'Advanced price-action scenario modeling',
+                ],
+                badge: 'Most Popular',
+                ctaLabel: 'Upgrade to Sigma',
+            },
+            omega: {
+                themeClass: 'plan-card--omega',
+                logo: '/static/Omega.PNG',
+                tagline: 'Black titanium access for elite strategy teams.',
+                features: [
+                    'Maximum monthly AI collaborations included',
+                    'Early access to experimental VolatilX agents',
+                    'Concierge research and quarterly briefings',
+                ],
+                badge: 'Elite',
+                ctaLabel: 'Go Omega',
+                note: 'Includes executive briefings and roadmap previews.',
+            },
+        };
+
+        function setMessage(text, tone = 'info') {
+            const toneColors = {
+                error: '#c0392b',
+                success: '#2e7d32',
+                info: '#1f2937',
+            };
+            messageBox.textContent = text || '';
+            messageBox.style.color = toneColors[tone] || toneColors.info;
+        }
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatPrice(cents) {
+            return priceFormatter.format((cents || 0) / 100);
+        }
+
+        function createPlanCard(plan, isCurrent) {
+            const card = document.createElement('div');
+            card.className = 'plan-card';
+
+            const slug = (plan.slug || '').toLowerCase();
+            const meta = PLAN_META[slug] || {};
+
+            if (meta.themeClass) {
+                card.classList.add(meta.themeClass);
+            }
+            if (isCurrent) {
+                card.classList.add('plan-card--current');
+            }
+
+            const planName = escapeHtml(plan.name || 'VolatilX Plan');
+            const badgeLabel = isCurrent ? 'Current plan' : meta.badge;
+            const badgeMarkup = badgeLabel ? `<span class="plan-card__badge">${escapeHtml(badgeLabel)}</span>` : '';
+            const taglineMarkup = meta.tagline ? `<p class="plan-card__tagline">${escapeHtml(meta.tagline)}</p>` : '';
+            const descriptionSource = plan.description || meta.description || '';
+            const descriptionMarkup = descriptionSource
+                ? `<p class="plan-card__description">${escapeHtml(descriptionSource).replace(/\n/g, '<br>')}</p>`
+                : '';
+            const featuresHtml = (meta.features || [])
+                .map(feature => `<li>${escapeHtml(feature)}</li>`)
+                .join('');
+            const noteMarkup = meta.note
+                ? `<div class="plan-card__note">${escapeHtml(meta.note)}</div>`
+                : '';
+            const runsLabel = `${escapeHtml(String(plan.ai_runs_included ?? '0'))} AI agent runs monthly`;
+
+            card.innerHTML = `
+                <div class="plan-card__header">
+                    ${meta.logo ? `<div class="plan-card__logo"><img src="${meta.logo}" alt="${planName} logo"></div>` : ''}
+                    <div class="plan-card__title">
+                        <span class="plan-card__name">${planName}</span>
+                        ${taglineMarkup}
+                    </div>
+                    ${badgeMarkup}
+                </div>
+                <div class="plan-card__price">${formatPrice(plan.monthly_price_cents)} <span>/ month</span></div>
+                <div class="plan-card__runs">${runsLabel}</div>
+                ${descriptionMarkup}
+                ${featuresHtml ? `<ul class="plan-card__features">${featuresHtml}</ul>` : ''}
+                ${noteMarkup}
+            `;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'plan-button';
+
+            if (!plan.stripe_price_configured) {
+                button.textContent = 'Unavailable';
+                button.disabled = true;
+            } else if (isCurrent) {
+                button.textContent = 'Current Plan';
+                button.disabled = true;
+            } else {
+                button.textContent = meta.ctaLabel || 'Select Plan';
+                button.addEventListener('click', () => startCheckout(plan.slug, button));
+            }
+
+            card.appendChild(button);
+            return card;
+        }
+
+        function renderPlans(plans, subscription) {
+            planGrid.innerHTML = '';
+            if (!plans || plans.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'plan-grid-empty';
+                empty.textContent = 'No plans are available right now. Please check back later.';
+                planGrid.appendChild(empty);
+                return;
+            }
+
+            const currentSlug = subscription && subscription.plan ? subscription.plan.slug : null;
+            const order = ['alpha', 'sigma', 'omega'];
+            const sortedPlans = [...plans].sort((a, b) => {
+                const aSlug = (a.slug || '').toLowerCase();
+                const bSlug = (b.slug || '').toLowerCase();
+                const aIndex = order.indexOf(aSlug);
+                const bIndex = order.indexOf(bSlug);
+                const safeA = aIndex === -1 ? order.length : aIndex;
+                const safeB = bIndex === -1 ? order.length : bIndex;
+                if (safeA === safeB) {
+                    return (a.monthly_price_cents || 0) - (b.monthly_price_cents || 0);
+                }
+                return safeA - safeB;
+            });
+
+            sortedPlans.forEach(plan => {
+                const isCurrent = currentSlug === plan.slug;
+                const card = createPlanCard(plan, isCurrent);
+                planGrid.appendChild(card);
+            });
+        }
+
+        async function startCheckout(planSlug, trigger) {
+            if (!planSlug) {
+                return;
+            }
+
+            const originalText = trigger.textContent;
+            trigger.disabled = true;
+            trigger.textContent = 'Redirecting…';
+            setMessage('');
+
+            try {
+                const response = await fetch('/api/billing/checkout-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ plan_slug: planSlug }),
+                });
+
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => ({}));
+                    const detail = errorPayload.detail || 'Unable to start checkout. Please try again.';
+                    throw new Error(detail);
+                }
+
+                const data = await response.json();
+                if (data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                    return;
+                }
+
+                throw new Error('Checkout session did not return a redirect URL.');
+            } catch (error) {
+                setMessage(error.message || 'Billing error. Please try again later.', 'error');
+            } finally {
+                trigger.disabled = false;
+                trigger.textContent = originalText;
+            }
+        }
+
+        async function loadPlans() {
+            try {
+                const response = await fetch('/api/billing/plans');
+                if (!response.ok) {
+                    throw new Error('Failed to load subscription plans.');
+                }
+
+                const data = await response.json();
+                renderPlans(data.plans, data.current_subscription || currentSubscription);
+
+                if (!data.current_subscription || !data.current_subscription.plan) {
+                    if (outOfRuns) {
+                        setMessage('You have exhausted this cycle’s AI runs. Upgrade to continue immediately.', 'info');
+                    } else if (fromTrade) {
+                        setMessage('Activate a plan to launch your first VolatilX AI strategy run.', 'info');
+                    } else {
+                        setMessage('Select a plan to unlock your next AI strategy run.', 'info');
+                    }
+                } else {
+                    if (outOfRuns) {
+                        setMessage('Need more capacity? Upgrade for additional monthly AI runs.', 'info');
+                    } else {
+                        setMessage('You can upgrade or downgrade at any time.', 'success');
+                    }
+                }
+            } catch (error) {
+                setMessage(error.message || 'Unexpected error loading billing information.', 'error');
+                planGrid.innerHTML = '';
+                const empty = document.createElement('div');
+                empty.className = 'plan-grid-empty';
+                empty.textContent = 'Unable to load plans at this time.';
+                planGrid.appendChild(empty);
+            }
+        }
+
+        loadPlans();
+    });
+    </script>
+</body>
+</html>

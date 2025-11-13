@@ -4,273 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Settings</title>
-    <style>
-        /* Your existing styles */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            min-height: 100vh;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .logo {
-            font-size: 1.8rem;
-            font-weight: bold;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-        
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-        }
-        
-        .nav-links a:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        .nav-links a.active {
-            background: rgba(255, 255, 255, 0.3);
-            font-weight: bold;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 2rem auto;
-            padding: 0 2rem;
-        }
-        
-        .settings-panel {
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-        }
-        
-        .panel-title {
-            font-size: 1.5rem;
-            margin-bottom: 1.5rem;
-            color: #333;
-        }
-        
-        .section {
-            margin-bottom: 2rem;
-            padding-bottom: 2rem;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-            padding-bottom: 0;
-        }
-        
-        .section-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 1rem;
-        }
-        
-        .section-description {
-            color: #666;
-            margin-bottom: 1.5rem;
-            line-height: 1.5;
-        }
-        
-        .user-info {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 5px;
-            margin-bottom: 1rem;
-        }
-        
-        .user-info strong {
-            color: #333;
-        }
-        
-        .info-box {
-            background: #e8f5e8;
-            border-left: 4px solid #4caf50;
-            padding: 1rem;
-            margin: 1rem 0;
-            border-radius: 0 5px 5px 0;
-        }
-        
-        .info-box h4 {
-            margin-bottom: 0.5rem;
-            color: #2e7d32;
-        }
-        
-        .info-box p {
-            margin-bottom: 0.5rem;
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        
-        .status-active {
-            background: #4caf50;
-        }
-        
-        .status-inactive {
-            background: #f44336;
-        }
-
-        .subscription-status {
-            background: #f8f9ff;
-            border-left: 4px solid #667eea;
-            padding: 1rem 1.25rem;
-            border-radius: 0 8px 8px 0;
-            margin-bottom: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
-
-        .subscription-status strong {
-            color: #333;
-        }
-
-        .plan-grid {
-            display: grid;
-            gap: 1.25rem;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        }
-
-        .plan-card {
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.12);
-            padding: 1.5rem 1.4rem;
-            border: 1px solid rgba(102, 126, 234, 0.18);
-            display: flex;
-            flex-direction: column;
-            gap: 0.85rem;
-        }
-
-        .plan-card--current {
-            border-color: #27ae60;
-            box-shadow: 0 10px 24px rgba(39, 174, 96, 0.16);
-        }
-
-        .plan-card h3 {
-            font-size: 1.3rem;
-            color: #4b4b7a;
-        }
-
-        .plan-price {
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: #2e2a4a;
-        }
-
-        .plan-price span {
-            font-size: 0.85rem;
-            font-weight: normal;
-            color: #666;
-        }
-
-        .plan-feature {
-            font-size: 0.92rem;
-            color: #555;
-        }
-
-        .plan-button {
-            margin-top: auto;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .plan-button:hover:not([disabled]) {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
-        }
-
-        .plan-button[disabled] {
-            background: #d2d3db;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        .plan-badge {
-            display: inline-flex;
-            padding: 0.25rem 0.6rem;
-            border-radius: 999px;
-            background: rgba(102, 126, 234, 0.15);
-            color: #5a60d8;
-            font-size: 0.75rem;
-            letter-spacing: 0.02em;
-            text-transform: uppercase;
-        }
-
-        .plan-grid-empty {
-            color: #666;
-            font-size: 0.95rem;
-            text-align: center;
-            background: #f8f9ff;
-            border-radius: 10px;
-            padding: 1.5rem 1rem;
-        }
-
-        .subscription-message {
-            margin-bottom: 1rem;
-            font-size: 0.9rem;
-            color: #c0392b;
-            min-height: 1.2rem;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC00YPJSRJ"></script>
     <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
     gtag('config', 'G-BC00YPJSRJ');
     </script>
 </head>
-<body>
+<body class="settings-page">
     <div class="header">
-        <div class="logo">VolatilX</div>
+        <a class="logo" href="/trade">
+            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
+            <span>VolatilX</span>
+        </a>
         <div class="nav-links">
             <a href="/trade">Trading</a>
+            <a href="/subscribe">Plans</a>
             <a href="/settings" class="active">Settings</a>
+            <span>{{ user.email }}</span>
             <a href="/logout">Logout</a>
         </div>
     </div>
@@ -278,24 +32,18 @@
     <div class="container">
         <div class="settings-panel">
             <h1 class="panel-title">Account Settings</h1>
-            
-            <!-- User Information Section -->
-            <div class="section">
+
+            <section class="section">
                 <h2 class="section-title">Account Information</h2>
                 <p class="section-description">Your account details and status</p>
-                
                 <div class="user-info">
                     <p><strong>Email:</strong> {{ user.email }}</p>
-                    <p><strong>Account Status:</strong> 
-                        <span class="status-indicator status-active"></span>
-                        Active
-                    </p>
+                    <p><strong>Account Status:</strong> <span class="status-indicator status-active"></span>Active</p>
                     <p><strong>Member Since:</strong> {{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}</p>
                 </div>
-            </div>
+            </section>
 
-            <!-- Subscription Plans Section -->
-            <div class="section" id="subscriptionSection">
+            <section class="section" id="subscriptionSection">
                 <h2 class="section-title">Subscription Plans</h2>
                 <p class="section-description">Choose a plan to unlock monthly AI agent strategy runs. Upgrade anytime.</p>
 
@@ -309,37 +57,34 @@
                 <div class="plan-grid" id="planGrid">
                     <div class="plan-grid-empty">Loading plans…</div>
                 </div>
-            </div>
+            </section>
 
-            <!-- AI Analysis Status Section -->
-            <div class="section">
+            <section class="section">
                 <h2 class="section-title">AI Analysis</h2>
                 <p class="section-description">AI-powered investment analysis status</p>
-                
+
                 <div class="info-box">
                     <h4>✅ AI Analysis Available</h4>
                     <p>AI-powered investment analysis is enabled for all users.</p>
                     <p>Get detailed market insights, risk assessments, and trading recommendations powered by advanced AI.</p>
                     <p><strong>Features included:</strong></p>
-                    <ul style="margin-left: 20px; margin-top: 10px;">
+                    <ul class="info-list">
                         <li>Market position assessment</li>
                         <li>Short-term and long-term strategies</li>
                         <li>Risk analysis and mitigation</li>
                         <li>Actionable trading recommendations</li>
                     </ul>
                 </div>
-                
-                <div style="margin-top: 1rem;">
+
+                <div class="status-row">
                     <span class="status-indicator status-active"></span>
                     <strong>AI Analysis: Ready to use</strong>
                 </div>
-            </div>
+            </section>
 
-            <!-- Trading Preferences Section -->
-            <div class="section">
+            <section class="section">
                 <h2 class="section-title">Trading Preferences</h2>
                 <p class="section-description">Customize your trading analysis settings</p>
-                
                 <div class="info-box">
                     <h4>📊 Current Settings</h4>
                     <p><strong>Buy Threshold:</strong> 70% confidence</p>
@@ -347,43 +92,99 @@
                     <p><strong>Analysis Mode:</strong> High confidence only</p>
                     <p><strong>Timeframes:</strong> 1m, 5m, 15m, 30m, 1h, 1d, 1wk</p>
                 </div>
-            </div>
+            </section>
 
-            <!-- Security Section -->
-            <div class="section">
+            <section class="section">
                 <h2 class="section-title">Security</h2>
                 <p class="section-description">Account security and authentication</p>
-                
                 <div class="user-info">
-                    <p><strong>Authentication Method:</strong> 
+                    <p><strong>Authentication Method:</strong>
                         {% if user.oauth_provider %}
                             {{ user.oauth_provider.title() }} OAuth
                         {% else %}
                             Email & Password
                         {% endif %}
                     </p>
-                    <p><strong>Account Verified:</strong> 
+                    <p><strong>Account Verified:</strong>
                         {% if user.is_verified %}
-                            <span style="color: #4caf50;">✓ Verified</span>
+                            <span class="verified">✓ Verified</span>
                         {% else %}
-                            <span style="color: #f44336;">✗ Not Verified</span>
+                            <span class="not-verified">✗ Not Verified</span>
                         {% endif %}
                     </p>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
-</body>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
     const planGrid = document.getElementById('planGrid');
     const statusValue = document.getElementById('subscriptionStatusValue');
     const messageBox = document.getElementById('subscriptionMessage');
+    const subscriptionSection = document.getElementById('subscriptionSection');
     const priceFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
+    const PLAN_META = {
+        alpha: {
+            themeClass: 'plan-card--alpha',
+            logo: '/static/Alpha.PNG',
+            tagline: 'Silver-tier intelligence for confident entries.',
+            features: [
+                'Multi-timeframe AI technical breakdowns',
+                'Access to principal agent trade plans',
+                'Email support during market hours',
+            ],
+            badge: 'Starter',
+            ctaLabel: 'Activate Alpha',
+        },
+        sigma: {
+            themeClass: 'plan-card--sigma',
+            logo: '/static/Sigma.PNG',
+            tagline: 'Gold coverage for active swing & day traders.',
+            features: [
+                'Expanded monthly AI run allowance',
+                'Priority queueing around market opens',
+                'Advanced price-action scenario modeling',
+            ],
+            badge: 'Most Popular',
+            ctaLabel: 'Upgrade to Sigma',
+        },
+        omega: {
+            themeClass: 'plan-card--omega',
+            logo: '/static/Omega.PNG',
+            tagline: 'Black titanium access for elite strategy teams.',
+            features: [
+                'Maximum monthly AI collaborations included',
+                'Early access to experimental VolatilX agents',
+                'Concierge research and quarterly briefings',
+            ],
+            badge: 'Elite',
+            ctaLabel: 'Go Omega',
+            note: 'Includes executive briefings and roadmap previews.',
+        },
+    };
+
     function setMessage(text, tone = 'error') {
+        const toneColors = {
+            error: '#c0392b',
+            success: '#2e7d32',
+            info: '#2c3e50',
+        };
         messageBox.textContent = text || '';
-        messageBox.style.color = tone === 'error' ? '#c0392b' : '#2e7d32';
+        messageBox.style.color = toneColors[tone] || toneColors.error;
+    }
+
+    function escapeHtml(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function formatPrice(cents) {
@@ -425,30 +226,46 @@ document.addEventListener('DOMContentLoaded', () => {
     function createPlanCard(plan, isCurrent) {
         const card = document.createElement('div');
         card.className = 'plan-card';
+
+        const slug = (plan.slug || '').toLowerCase();
+        const meta = PLAN_META[slug] || {};
+
+        if (meta.themeClass) {
+            card.classList.add(meta.themeClass);
+        }
         if (isCurrent) {
             card.classList.add('plan-card--current');
         }
 
-        const name = document.createElement('h3');
-        name.textContent = plan.name;
-        card.appendChild(name);
+        const planName = escapeHtml(plan.name || 'VolatilX Plan');
+        const badgeLabel = isCurrent ? 'Current plan' : meta.badge;
+        const badgeMarkup = badgeLabel ? `<span class="plan-card__badge">${escapeHtml(badgeLabel)}</span>` : '';
+        const taglineMarkup = meta.tagline ? `<p class="plan-card__tagline">${escapeHtml(meta.tagline)}</p>` : '';
+        const descriptionSource = plan.description || meta.description || '';
+        const descriptionMarkup = descriptionSource
+            ? `<p class="plan-card__description">${escapeHtml(descriptionSource).replace(/\n/g, '<br>')}</p>`
+            : '';
+        const featuresHtml = (meta.features || [])
+            .map((feature) => `<li>${escapeHtml(feature)}</li>`)
+            .join('');
+        const noteMarkup = meta.note ? `<div class="plan-card__note">${escapeHtml(meta.note)}</div>` : '';
+        const runsLabel = `${escapeHtml(String(plan.ai_runs_included ?? '0'))} AI agent runs monthly`;
 
-        const badge = document.createElement('span');
-        badge.className = 'plan-badge';
-        badge.textContent = `${plan.ai_runs_included} AI runs / month`;
-        card.appendChild(badge);
-
-        const price = document.createElement('div');
-        price.className = 'plan-price';
-        price.innerHTML = `${formatPrice(plan.monthly_price_cents)} <span>/ month</span>`;
-        card.appendChild(price);
-
-        if (plan.description) {
-            const desc = document.createElement('p');
-            desc.className = 'plan-feature';
-            desc.textContent = plan.description;
-            card.appendChild(desc);
-        }
+        card.innerHTML = `
+            <div class="plan-card__header">
+                ${meta.logo ? `<div class="plan-card__logo"><img src="${meta.logo}" alt="${planName} logo"></div>` : ''}
+                <div class="plan-card__title">
+                    <span class="plan-card__name">${planName}</span>
+                    ${taglineMarkup}
+                </div>
+                ${badgeMarkup}
+            </div>
+            <div class="plan-card__price">${formatPrice(plan.monthly_price_cents)} <span>/ month</span></div>
+            <div class="plan-card__runs">${runsLabel}</div>
+            ${descriptionMarkup}
+            ${featuresHtml ? `<ul class="plan-card__features">${featuresHtml}</ul>` : ''}
+            ${noteMarkup}
+        `;
 
         const button = document.createElement('button');
         button.type = 'button';
@@ -461,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
             button.textContent = 'Current Plan';
             button.disabled = true;
         } else {
-            button.textContent = 'Select Plan';
+            button.textContent = meta.ctaLabel || 'Select Plan';
             button.addEventListener('click', () => startCheckout(plan.slug, button));
         }
 
@@ -480,7 +297,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const currentSlug = subscription && subscription.plan ? subscription.plan.slug : null;
-        plans.forEach((plan) => {
+        const order = ['alpha', 'sigma', 'omega'];
+        const sortedPlans = [...plans].sort((a, b) => {
+            const aSlug = (a.slug || '').toLowerCase();
+            const bSlug = (b.slug || '').toLowerCase();
+            const aIndex = order.indexOf(aSlug);
+            const bIndex = order.indexOf(bSlug);
+            const safeA = aIndex === -1 ? order.length : aIndex;
+            const safeB = bIndex === -1 ? order.length : bIndex;
+            if (safeA === safeB) {
+                return (a.monthly_price_cents || 0) - (b.monthly_price_cents || 0);
+            }
+            return safeA - safeB;
+        });
+
+        sortedPlans.forEach((plan) => {
             const isCurrent = currentSlug === plan.slug;
             const card = createPlanCard(plan, isCurrent);
             planGrid.appendChild(card);
@@ -527,6 +358,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function focusBillingTabIfNeeded(subscription) {
+        const params = new URLSearchParams(window.location.search);
+        const selectedTab = params.get('tab');
+        if (!selectedTab || selectedTab.toLowerCase() !== 'billing' || !subscriptionSection) {
+            return;
+        }
+
+        setTimeout(() => {
+            subscriptionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+
+        subscriptionSection.classList.add('section--spotlight');
+        setTimeout(() => subscriptionSection.classList.remove('section--spotlight'), 1800);
+
+        if (!subscription || !subscription.plan) {
+            setMessage('Choose a plan to unlock premium AI strategies.', 'info');
+        }
+    }
+
     async function loadBilling() {
         try {
             const response = await fetch('/api/billing/plans');
@@ -537,6 +387,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             renderSubscriptionStatus(data.current_subscription);
             renderPlans(data.plans, data.current_subscription);
+            setMessage('');
+            focusBillingTabIfNeeded(data.current_subscription);
         } catch (error) {
             setMessage(error.message || 'Unexpected error loading billing information.');
             planGrid.innerHTML = '';
@@ -545,10 +397,12 @@ document.addEventListener('DOMContentLoaded', () => {
             empty.textContent = 'Unable to load plans at this time.';
             planGrid.appendChild(empty);
             statusValue.textContent = 'Billing information is currently unavailable.';
+            focusBillingTabIfNeeded(null);
         }
     }
 
     loadBilling();
-});
-</script>
+    });
+    </script>
+</body>
 </html>
