@@ -53,6 +53,7 @@ from fastapi_users.password import PasswordHelper
 from day_trading_agent import MultiSymbolDayTraderAgent
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 import json
+import urllib.parse
 
 #OpenAI imports
 # from ai_agents.openai_service import OpenAIAnalysisService
@@ -355,8 +356,9 @@ async def azure_callback(request: Request):
             
         except Exception as e:
             db.rollback()
+            error_detail = urllib.parse.quote_plus(str(e))
             print(f"Database error in Azure callback: {e}")
-            return RedirectResponse(url="/signin?error=db_error")
+            return RedirectResponse(url=f"/signin?error=db_error&detail={error_detail}")
         finally:
             db.close()
             
@@ -446,8 +448,9 @@ async def google_callback(request: Request):
             
         except Exception as e:
             db.rollback()
+            error_detail = urllib.parse.quote_plus(str(e))
             print(f"Database error in Google callback: {e}")
-            return RedirectResponse(url="/signin?error=db_error")
+            return RedirectResponse(url=f"/signin?error=db_error&detail={error_detail}")
         finally:
             db.close()
             
