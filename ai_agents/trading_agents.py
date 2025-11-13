@@ -173,9 +173,9 @@ class DayTradingAgent(BaseTradingAgent):
     strategy_name = "day_trading"
 
     def _expert_plan(self) -> List[Dict[str, Any]]:
-        short_term = ["1m", "5m", "15m"]
+        short_term = ["5m", "15m", "30m"]
         return [
-            {"key": "momentum", "timeframes": short_term, "period_overrides": {"1m": "1d"}},
+            {"key": "momentum", "timeframes": short_term, "period_overrides": {"5m": "1d"}},
             {"key": "volatility", "timeframes": ["1m", "5m", "15m", "1h"]},
             {"key": "trend", "timeframes": ["5m", "15m", "1h"]},
         ]

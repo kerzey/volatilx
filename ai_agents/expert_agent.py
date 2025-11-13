@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover - requests is optional
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_TIMEFRAMES: List[str] = ["5m", "15m", "1h", "1d"]
+DEFAULT_TIMEFRAMES: List[str] = ["15m", "1h", "1d", "1wk"]
 
 
 try:
@@ -168,6 +168,11 @@ class OpenAIResponsesMixin:
                 json=payload,
                 timeout=self._responses_timeout,
             )
+        except requests.exceptions.Timeout as exc:  # type: ignore[attr-defined]
+            raise RuntimeError(
+                "OpenAI Responses request timed out after "
+                f"{int(self._responses_timeout)} seconds. Please retry shortly."
+            ) from exc
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(f"Failed to call OpenAI Responses endpoint: {exc}") from exc
 

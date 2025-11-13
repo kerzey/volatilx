@@ -462,7 +462,8 @@
                     </div>`)
                 .join('');
 
-            const rawSection = plan.trading_agent_outputs
+            const expertDiagnosticsHtml = renderExpertReports(plan.trading_agent_outputs);
+            const rawSection = !expertDiagnosticsHtml && plan.trading_agent_outputs
                 ? `<details class="plan-raw">
                         <summary>Expert Diagnostics</summary>
                         <pre>${escapeHtml(JSON.stringify(plan.trading_agent_outputs, null, 2))}</pre>
@@ -480,7 +481,7 @@
                 </div>
                 ${strategyHtml || '<div class="result-item"><div class="result-content">No strategy breakdown available.</div></div>'}
                 ${contextHtml}
-                ${rawSection}
+                ${expertDiagnosticsHtml || rawSection}
                 ${LEGAL_NOTE_HTML}
             `;
             return true;
@@ -790,40 +791,120 @@
             return `${quantity} ${unitLabel}`;
         }
 
+        function expandTimeframeTokens(text) {
+            if (typeof text !== 'string') {
+                return text;
+            }
+            const lookup = {
+                m: 'minute',
+                min: 'minute',
+                h: 'hour',
+                hr: 'hour',
+                d: 'day',
+                day: 'day',
+                wk: 'week',
+                w: 'week',
+                mo: 'month',
+                mon: 'month'
+            };
+            return text.replace(/(\d+)\s*(m|min|h|hr|d|day|wk|w|mo|mon)\b/gi, (match, qty, unitRaw) => {
+                const unit = lookup[unitRaw.toLowerCase()];
+                if (!unit) {
+                    return match;
+                }
+                const quantity = Number(qty);
+                const plural = Number.isFinite(quantity) && quantity !== 1;
+                const unitLabel = plural ? `${unit}s` : unit;
+                return `${quantity} ${unitLabel}`;
+            });
+        }
+
+        function contextSuggestsPrice(contextKey) {
+            if (!contextKey) {
+                return false;
+            }
+            const key = String(contextKey).toLowerCase();
+            const keywords = ['price', 'entry', 'exit', 'target', 'level', 'support', 'resistance', 'stop', 'take', 'trigger'];
+            return keywords.some(token => key.includes(token));
+        }
+
+        function formatNumericValue(value, contextKey) {
+            if (typeof value === 'boolean') {
+                return value ? 'Yes' : 'No';
+            }
+            if (!Number.isFinite(value)) {
+                return String(value);
+            }
+            if (contextSuggestsPrice(contextKey)) {
+                return Number(value).toFixed(2);
+            }
+            if (!Number.isInteger(value)) {
+                return Number(value).toFixed(2);
+            }
+            return String(value);
+        }
+
+        function formatPriceTokens(text, contextKey) {
+            if (typeof text !== 'string' || !text.trim()) {
+                return text;
+            }
+            let working = text;
+            if (contextSuggestsPrice(contextKey)) {
+                const numericOnly = working.match(/^\$?-?\d+(?:\.\d+)?$/);
+                if (numericOnly) {
+                    const numeric = Number(numericOnly[0].replace('$', ''));
+                    if (Number.isFinite(numeric)) {
+                        return (working.startsWith('$') ? '$' : '') + numeric.toFixed(2);
+                    }
+                }
+            }
+            working = working.replace(/\$(\s*-?\d+(?:\.\d+)?)/g, (_, amount) => {
+                const numeric = Number(amount.replace(/\s+/g, ''));
+                if (!Number.isFinite(numeric)) {
+                    return `$${amount.trim()}`;
+                }
+                return `$${numeric.toFixed(2)}`;
+            });
+            return working;
+        }
+
         function formatPlanField(label, value) {
-            const rendered = renderPlanValue(value);
+            const rendered = renderPlanValue(value, label);
             if (!rendered) return '';
             return `<div class="plan-field"><strong>${escapeHtml(label)}:</strong> ${rendered}</div>`;
         }
 
-        function renderPlanValue(value) {
+        function renderPlanValue(value, contextKey = '') {
             if (value === null || value === undefined) {
                 return '';
             }
             if (typeof value === 'string') {
-                return `<span>${escapeHtml(value)}</span>`;
+                const expanded = expandTimeframeTokens(value);
+                const formatted = formatPriceTokens(expanded, contextKey);
+                return `<span>${escapeHtml(formatted)}</span>`;
             }
             if (typeof value === 'number' || typeof value === 'boolean') {
-                return `<span>${escapeHtml(String(value))}</span>`;
+                const formatted = formatNumericValue(value, contextKey);
+                return `<span>${escapeHtml(formatted)}</span>`;
             }
             if (Array.isArray(value)) {
                 if (value.length === 0) {
                     return '';
                 }
-                return `<ul class="plan-list">${value.map(item => `<li>${renderPlanValue(item) || ''}</li>`).join('')}</ul>`;
+                return `<ul class="plan-list">${value.map(item => `<li>${renderPlanValue(item, contextKey) || ''}</li>`).join('')}</ul>`;
             }
             if (typeof value === 'object') {
                 const entries = Object.entries(value);
                 if (entries.length === 0) {
                     return '';
                 }
-                return `<ul class="plan-list">${entries.map(([key, val]) => `<li><strong>${escapeHtml(key)}:</strong> ${renderPlanValue(val) || ''}</li>`).join('')}</ul>`;
+                return `<ul class="plan-list">${entries.map(([key, val]) => `<li><strong>${escapeHtml(humanizeKey(key))}:</strong> ${renderPlanValue(val, key) || ''}</li>`).join('')}</ul>`;
             }
             return `<span>${escapeHtml(String(value))}</span>`;
         }
 
         function renderPlanContext(context) {
-            const rendered = renderPlanValue(context);
+            const rendered = renderPlanValue(context, 'context');
             if (!rendered) {
                 return '';
             }
@@ -831,6 +912,133 @@
                 <div class="result-title">Portfolio Context</div>
                 <div class="result-content">${rendered}</div>
             </div>`;
+        }
+
+        function renderExpertReports(expertOutputs) {
+            if (!expertOutputs || typeof expertOutputs !== 'object') {
+                return '';
+            }
+
+            const cards = Object.entries(expertOutputs)
+                .map(([key, data]) => {
+                    if (!data || typeof data !== 'object') {
+                        return '';
+                    }
+
+                    const isSuccess = data.success !== false;
+                    const statusClass = isSuccess ? 'success' : 'error';
+                    const statusLabel = isSuccess ? 'Ready' : 'Issue';
+                    const heading = typeof data.agent === 'string' && data.agent.trim()
+                        ? data.agent.trim()
+                        : humanizeKey(key);
+
+                    const metaItems = [];
+                    if (data.symbol) {
+                        metaItems.push(`Symbol ${String(data.symbol).toUpperCase()}`);
+                    }
+                    const usage = data.model_usage;
+                    const tokenCount = usage && (usage.total_tokens ?? usage.output_tokens ?? usage.input_tokens);
+                    if (tokenCount !== undefined) {
+                        metaItems.push(`Tokens ${tokenCount}`);
+                    }
+                    const timestamp = data.generated_at || data.collected_at || data.timestamp;
+                    if (timestamp) {
+                        metaItems.push(`Generated ${formatDateTime(timestamp)}`);
+                    }
+                    const metaHtml = metaItems.length
+                        ? `<div class="expert-card__meta">${metaItems
+                            .map(item => `<span class="expert-card__meta-item">${escapeHtml(item)}</span>`)
+                            .join('')}</div>`
+                        : '';
+
+                    const agentOutput = data.agent_output ?? data.agent_result;
+                    const renderedOutput = renderExpertOutputSections(agentOutput);
+                    const fallbackText = !renderedOutput && data.raw_text
+                        ? `<pre class="expert-card__note">${escapeHtml(data.raw_text)}</pre>`
+                        : '';
+                    const errorHtml = !isSuccess && data.error
+                        ? `<div class="expert-card__message expert-card__message--error">${escapeHtml(data.error)}</div>`
+                        : '';
+
+                    const content = [metaHtml, errorHtml, renderedOutput || fallbackText]
+                        .filter(Boolean)
+                        .join('');
+
+                    if (!content) {
+                        return '';
+                    }
+
+                    return `<details class="expert-card">
+                        <summary class="expert-card__summary">
+                            <span class="expert-card__title">${escapeHtml(heading)}</span>
+                            <span class="expert-card__status expert-card__status--${statusClass}">${escapeHtml(statusLabel)}</span>
+                        </summary>
+                        <div class="expert-card__content">
+                            ${content}
+                        </div>
+                    </details>`;
+                })
+                .filter(Boolean)
+                .join('');
+
+            if (!cards) {
+                return '';
+            }
+
+            return `<div class="ai-section plan-section">
+                <div class="ai-section-title">Expert Diagnostics</div>
+                <div class="plan-section__content expert-report">
+                    ${cards}
+                </div>
+            </div>`;
+        }
+
+        function humanizeKey(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            return String(value)
+                .replace(/[_\-]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        function renderExpertOutputSections(output) {
+            if (output === null || output === undefined) {
+                return '';
+            }
+            if (Array.isArray(output)) {
+                return renderPlanValue(output);
+            }
+            if (typeof output !== 'object') {
+                return renderPlanValue(output);
+            }
+
+            const entries = Object.entries(output);
+            if (entries.length === 0) {
+                return '';
+            }
+
+            const sections = entries
+                .map(([field, value]) => {
+                    const renderedValue = renderPlanValue(value, field);
+                    if (!renderedValue) {
+                        return '';
+                    }
+                    return `<div class="expert-field">
+                        <div class="expert-field__label">${escapeHtml(humanizeKey(field))}</div>
+                        <div class="expert-field__value">${renderedValue}</div>
+                    </div>`;
+                })
+                .filter(Boolean)
+                .join('');
+
+            if (sections) {
+                return sections;
+            }
+
+            return renderPlanValue(output, 'expert_output');
         }
 
         function escapeHtml(unsafe) {

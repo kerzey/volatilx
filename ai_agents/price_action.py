@@ -22,7 +22,7 @@ from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TIMEFRAMES: List[str] = ["15m", "1h", "1d"]
+DEFAULT_TIMEFRAMES: List[str] = ["30m", "1h", "1d","1wk"]
 
 TIMEFRAME_DEFAULT_PERIOD: Dict[str, str] = {
     "1m": "5d",
