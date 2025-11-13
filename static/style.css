@@ -48,65 +48,81 @@ body {
   font-size: 0.95rem;
 }
 
-.signin-marketing {
-  width: min(780px, 100%);
-  background: linear-gradient(155deg, #f8f9ff 0%, #ecf0ff 100%);
-  border-radius: 20px;
-  padding: clamp(2.1rem, 5vw, 2.8rem) clamp(1.8rem, 5vw, 2.6rem);
-  box-shadow: 0 26px 60px rgba(84, 94, 175, 0.22);
-  border: 1px solid rgba(102, 126, 234, 0.2);
+.signin-video {
+  width: min(960px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 1.8rem;
-}
-
-.marketing-header h2 {
-  font-size: clamp(1.9rem, 4vw, 2.3rem);
-  color: #1f2a54;
-  margin-bottom: 0.8rem;
+  align-items: center;
+  gap: 1rem;
   text-align: center;
 }
 
-.marketing-header p {
-  color: #3b4060;
+.signin-video-frame {
+  width: min(840px, 100%);
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgba(33, 64, 150, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: #000;
+}
+
+.signin-video-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.signin-video-caption {
+  color: #f5f6ff;
+  font-size: 0.95rem;
+  max-width: 720px;
+}
+
+.marketing-section {
+  width: min(960px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.6rem;
+  text-align: center;
+}
+
+.marketing-section h2 {
+  font-size: clamp(1.8rem, 3.8vw, 2.2rem);
+  color: #f8faff;
+  margin: 0;
+}
+
+.marketing-intro {
+  color: #e3e7ff;
   line-height: 1.7;
-  font-size: 0.98rem;
-  text-align: center;
-  margin: 0 auto;
-  max-width: 560px;
+  font-size: 1rem;
+  max-width: 640px;
+  margin: 0;
 }
 
 .marketing-grid {
+  width: 100%;
   display: grid;
   gap: 1.4rem;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .marketing-card {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 2.15rem 1.45rem 1.5rem 1.45rem;
-  box-shadow: 0 20px 40px rgba(102, 126, 234, 0.18);
-  border: 1px solid rgba(102, 126, 234, 0.16);
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 0.85rem;
-  text-align: center;
-  position: relative;
-  justify-items: center;
-}
-
-.marketing-card h3 {
-  font-size: 1.05rem;
-  color: #1f2350;
-  margin-top: 0.25rem;
-}
-
-.marketing-card p {
-  color: #3d4261;
-  line-height: 1.55;
-  font-size: 0.95rem;
-  margin: 0 auto;
+  border-radius: 20px;
+  padding: 2rem 1.5rem 1.6rem 1.5rem;
+  box-shadow: 0 24px 46px rgba(37, 52, 111, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 220px;
+  min-width: 0;
+  color: #ffffff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .marketing-icon {
@@ -116,18 +132,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.06em;
-  box-shadow: 0 18px 28px rgba(102, 126, 234, 0.3);
-  position: absolute;
-  left: 0.95rem;
-  top: 0.75rem;
+  color: #ffffff;
+  box-shadow: 0 18px 28px rgba(102, 126, 234, 0.26);
 }
 
 .marketing-icon span {
   display: inline-block;
+}
+
+.marketing-card h3 {
+  font-size: 1.08rem;
+  color: #ffffff;
+  margin: 0;
+}
+
+.marketing-card p {
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.55;
+  font-size: 0.95rem;
+  margin: 0;
 }
 
 .icon-insights {
@@ -151,20 +177,34 @@ body {
   color: #233348;
 }
 
-.marketing-note {
-  font-weight: 600;
-  color: #1f2a54;
-  font-size: 1rem;
-  text-align: center;
+.card-insights {
+  background: linear-gradient(135deg, #2f80ed 0%, #56ccf2 100%);
+}
+
+.card-ai {
+  background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%);
+}
+
+.card-strategy {
+  background: linear-gradient(135deg, #ff6a00 0%, #ee0979 100%);
+}
+
+.card-security {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.card-decisions {
+  background: linear-gradient(135deg, #ff5858 0%, #f09819 100%);
 }
 
 .marketing-footnote {
   font-size: 0.82rem;
-  color: #5d6283;
+  color: #ced5ff;
   line-height: 1.6;
-  margin-top: 1.5rem;
-  text-align: center;
+  margin: 0;
+  max-width: 640px;
 }
+
 .logo img {
   display: block;
   height: 56px;
@@ -174,6 +214,7 @@ body {
   background: rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
+
 .logo span {
   font-size: 1.85rem;
   font-weight: 700;
@@ -181,13 +222,13 @@ body {
   color: #fff;
 }
 
-/* NAVIGATION ------------------------------------------------------------- */
 .nav-links {
   display: flex;
   gap: 1rem;
   align-items: center;
   flex-wrap: wrap;
 }
+
 .nav-links a {
   color: #fff;
   text-decoration: none;
@@ -196,6 +237,7 @@ body {
   transition: background 0.22s;
   font-weight: 500;
 }
+
 .nav-links a:hover,
 .nav-links a:focus {
   background: rgba(255, 255, 255, 0.18);
