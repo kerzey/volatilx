@@ -22,6 +22,14 @@ class PlanDefinition:
 
 PLAN_DEFINITIONS: List[PlanDefinition] = [
     PlanDefinition(
+        slug="trial",
+        name="Starter Trial",
+        monthly_price_cents=0,
+        ai_runs_included=10,
+        stripe_price_id=None,
+        description="Complimentary first-month access with 10 AI analyses for new users.",
+    ),
+    PlanDefinition(
         slug="alpha",
         name="Alpha",
         monthly_price_cents=1999,

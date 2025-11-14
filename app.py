@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # from starlette.middleware.trustedhost import ForwardedMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 # Import user-related components - UPDATED to include get_user_manager
@@ -77,6 +77,8 @@ logger = logging.getLogger(__name__)
 AI_ANALYSIS_TIMEOUT = float(os.getenv("AI_ANALYSIS_TIMEOUT_SECONDS", "45"))
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing", "past_due"}
+TRIAL_PLAN_SLUG = os.getenv("TRIAL_PLAN_SLUG", "trial")
+TRIAL_DURATION_DAYS = int(os.getenv("TRIAL_DURATION_DAYS", "30"))
 
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 stripe_webhook_config = (
@@ -149,6 +151,59 @@ def _find_relevant_subscription(session: Session, user_id: int) -> Optional[User
     return subscriptions[0] if subscriptions else None
 
 
+def _ensure_trial_subscription(session: Session, user: User) -> None:
+    """Provision a complimentary trial subscription when none exists."""
+
+    active_subscription = (
+        session.query(UserSubscription)
+        .filter(UserSubscription.user_id == user.id)
+        .filter(UserSubscription.status.in_(ACTIVE_SUBSCRIPTION_STATUSES))
+        .order_by(UserSubscription.created_at.desc())
+        .first()
+    )
+    if active_subscription is not None:
+        return
+
+    trial_plan = (
+        session.query(SubscriptionPlan)
+        .filter(SubscriptionPlan.slug == TRIAL_PLAN_SLUG)
+        .one_or_none()
+    )
+    if trial_plan is None:
+        logger.warning(
+            "Trial plan '%s' not found; skipping trial provisioning for user %s",
+            TRIAL_PLAN_SLUG,
+            user.email,
+        )
+        return
+
+    prior_trial = (
+        session.query(UserSubscription)
+        .filter(UserSubscription.user_id == user.id)
+        .filter(UserSubscription.plan_id == trial_plan.id)
+        .first()
+    )
+    if prior_trial is not None:
+        return
+
+    now = datetime.utcnow()
+    trial_subscription = UserSubscription(
+        user_id=user.id,
+        plan_id=trial_plan.id,
+        stripe_customer_id=None,
+        stripe_subscription_id=None,
+        status="trialing",
+        current_period_start=now,
+        current_period_end=now + timedelta(days=TRIAL_DURATION_DAYS),
+        runs_remaining=trial_plan.ai_runs_included or 0,
+        auto_renew=False,
+        cancel_at_period_end=True,
+    )
+    session.add(trial_subscription)
+    user.tier = trial_plan.slug
+    session.commit()
+
+
 def _consume_subscription_units(
     user_id: int,
     *,
@@ -179,6 +234,30 @@ def _consume_subscription_units(
 
         if subscription.runs_remaining is None:
             subscription.runs_remaining = 0
+
+        now_utc = datetime.utcnow()
+        if (
+            subscription.current_period_end
+            and subscription.current_period_end < now_utc
+        ):
+            subscription.status = "expired"
+            subscription.runs_remaining = 0
+            session.commit()
+            is_trial = bool(subscription.plan and subscription.plan.slug == TRIAL_PLAN_SLUG)
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail={
+                    "error": (
+                        "Your trial period has ended. Upgrade to continue using AI analysis."
+                        if is_trial
+                        else "Your subscription period has ended. Please renew to continue."
+                    ),
+                    "code": "trial_expired" if is_trial else "subscription_expired",
+                    "runs_remaining": 0,
+                    "action_label": "Upgrade plan",
+                    "action_url": "/subscribe?reason=trial_expired" if is_trial else "/subscribe?reason=subscription_expired",
+                },
+            )
 
         if subscription.runs_remaining < units:
             reset_at = (
@@ -346,6 +425,8 @@ async def azure_callback(request: Request):
                 db.commit()
                 db.refresh(user)
             
+            _ensure_trial_subscription(db, user)
+
             # Issue JWT
             jwt_strategy = get_jwt_strategy()
             access_token = await jwt_strategy.write_token(user)
@@ -434,6 +515,8 @@ async def google_callback(request: Request):
             else:
                 print(f"Existing user found: {user.id}")
             
+            _ensure_trial_subscription(db, user)
+
             # Create JWT token
             jwt_strategy = get_jwt_strategy()
             access_token = await jwt_strategy.write_token(user)
