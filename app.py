@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # from starlette.middleware.trustedhost import ForwardedMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 # Import user-related components - UPDATED to include get_user_manager
@@ -186,7 +186,7 @@ def _ensure_trial_subscription(session: Session, user: User) -> None:
     if prior_trial is not None:
         return
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     trial_subscription = UserSubscription(
         user_id=user.id,
         plan_id=trial_plan.id,
@@ -235,29 +235,30 @@ def _consume_subscription_units(
         if subscription.runs_remaining is None:
             subscription.runs_remaining = 0
 
-        now_utc = datetime.utcnow()
-        if (
-            subscription.current_period_end
-            and subscription.current_period_end < now_utc
-        ):
-            subscription.status = "expired"
-            subscription.runs_remaining = 0
-            session.commit()
-            is_trial = bool(subscription.plan and subscription.plan.slug == TRIAL_PLAN_SLUG)
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail={
-                    "error": (
-                        "Your trial period has ended. Upgrade to continue using AI analysis."
-                        if is_trial
-                        else "Your subscription period has ended. Please renew to continue."
-                    ),
-                    "code": "trial_expired" if is_trial else "subscription_expired",
-                    "runs_remaining": 0,
-                    "action_label": "Upgrade plan",
-                    "action_url": "/subscribe?reason=trial_expired" if is_trial else "/subscribe?reason=subscription_expired",
-                },
-            )
+        period_end = subscription.current_period_end
+        now_utc = datetime.now(timezone.utc)
+        if period_end is not None:
+            if period_end.tzinfo is None:
+                period_end = period_end.replace(tzinfo=timezone.utc)
+            if period_end < now_utc:
+                subscription.status = "expired"
+                subscription.runs_remaining = 0
+                session.commit()
+                is_trial = bool(subscription.plan and subscription.plan.slug == TRIAL_PLAN_SLUG)
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail={
+                        "error": (
+                            "Your trial period has ended. Upgrade to continue using AI analysis."
+                            if is_trial
+                            else "Your subscription period has ended. Please renew to continue."
+                        ),
+                        "code": "trial_expired" if is_trial else "subscription_expired",
+                        "runs_remaining": 0,
+                        "action_label": "Upgrade plan",
+                        "action_url": "/subscribe?reason=trial_expired" if is_trial else "/subscribe?reason=subscription_expired",
+                    },
+                )
 
         if subscription.runs_remaining < units:
             reset_at = (
