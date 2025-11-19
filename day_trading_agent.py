@@ -887,8 +887,8 @@ class MultiSymbolDayTraderAgent:
                 for line in symbol_result['analysis']:
                     print(line)
         
-        # Print overall summary
-        self.print_portfolio_summary(results)
+        # # Print overall summary
+        # self.print_portfolio_summary(results)
         
         return results
     

@@ -162,6 +162,11 @@ def _ensure_trial_subscription(session: Session, user: User) -> None:
         .first()
     )
     if active_subscription is not None:
+        logger.debug(
+            "User %s already has active subscription %s",
+            user.email,
+            active_subscription.id,
+        )
         return
 
     trial_plan = (
@@ -184,6 +189,7 @@ def _ensure_trial_subscription(session: Session, user: User) -> None:
         .first()
     )
     if prior_trial is not None:
+        logger.debug("User %s previously used trial plan", user.email)
         return
 
     now = datetime.now(timezone.utc)
@@ -202,6 +208,12 @@ def _ensure_trial_subscription(session: Session, user: User) -> None:
     session.add(trial_subscription)
     user.tier = trial_plan.slug
     session.commit()
+    logger.info(
+        "Provisioned trial subscription %s for user %s with %s runs",
+        trial_subscription.id,
+        user.email,
+        trial_subscription.runs_remaining,
+    )
 
 
 def _consume_subscription_units(
@@ -289,6 +301,14 @@ def _consume_subscription_units(
 
         session.commit()
         remaining = subscription.runs_remaining
+        logger.info(
+            "Consumed %s units (%s) for user %s subscription %s; remaining=%s",
+            units,
+            usage_type,
+            user_id,
+            subscription.id,
+            remaining,
+        )
 
     return remaining
 
@@ -391,6 +411,8 @@ oauth.register(
 ##############################################################################################
 @app.get("/auth/azure/login")
 async def azure_login(request: Request):
+    client_host = request.client.host if request.client else "unknown"
+    logger.info("Azure login initiated from %s", client_host)
     redirect_uri = request.url_for("azure_callback")
     return await oauth.azure.authorize_redirect(request, redirect_uri)
 
@@ -405,6 +427,8 @@ async def azure_callback(request: Request):
         if not email:
             return RedirectResponse(url="/signin?error=no_email")
         
+        client_host = request.client.host if request.client else "unknown"
+        logger.info("Azure OAuth callback for %s from %s", email, client_host)
         # Use sync database operations
         db = SessionLocal()
         try:
@@ -413,6 +437,7 @@ async def azure_callback(request: Request):
             
             if user is None:
                 # Create new user
+                logger.info("Creating Azure user record for %s", email)
                 user = User(
                     email=email,
                     hashed_password=password_helper.hash(os.urandom(8).hex()),
@@ -444,12 +469,14 @@ async def azure_callback(request: Request):
         except Exception as e:
             db.rollback()
             error_detail = urllib.parse.quote_plus(str(e))
+            logger.exception("Database error in Azure callback for %s", email)
             print(f"Database error in Azure callback: {e}")
             return RedirectResponse(url=f"/signin?error=db_error&detail={error_detail}")
         finally:
             db.close()
             
     except Exception as e:
+        logger.exception("Azure OAuth error")
         print(f"OAuth error in Azure callback: {e}")
         return RedirectResponse(url="/signin?error=oauth_failed")
 
@@ -467,6 +494,8 @@ async def google_login(request: Request):
     scheme = "http" if is_local else "https"
 
     redirect_uri = f"{scheme}://{host}/auth/google/callback"
+    client_host = request.client.host if request.client else "unknown"
+    logger.info("Google login initiated from %s", client_host)
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/google/callback")
@@ -490,6 +519,8 @@ async def google_callback(request: Request):
             return RedirectResponse(url="/signin?error=no_email")
         
         print(f"Processing OAuth for email: {email}")
+        client_host = request.client.host if request.client else "unknown"
+        logger.info("Google OAuth callback for %s from %s", email, client_host)
         
         # Use sync database operations
         db = SessionLocal()
@@ -499,6 +530,7 @@ async def google_callback(request: Request):
             
             if user is None:
                 print(f"Creating new user for {email}")
+                logger.info("Creating Google user record for %s", email)
                 # Create new user
                 user = User(
                     email=email,
@@ -517,6 +549,7 @@ async def google_callback(request: Request):
                 print(f"Existing user found: {user.id}")
             
             _ensure_trial_subscription(db, user)
+            logger.info("Google user %s assigned to tier %s", user.email, user.tier)
 
             # Create JWT token
             jwt_strategy = get_jwt_strategy()
@@ -538,12 +571,14 @@ async def google_callback(request: Request):
         except Exception as e:
             db.rollback()
             error_detail = urllib.parse.quote_plus(str(e))
+            logger.exception("Database error in Google callback for %s", email)
             print(f"Database error in Google callback: {e}")
             return RedirectResponse(url=f"/signin?error=db_error&detail={error_detail}")
         finally:
             db.close()
             
     except Exception as e:
+        logger.exception("Google OAuth error")
         print(f"OAuth error in Google callback: {e}")
         return RedirectResponse(url="/signin?error=oauth_failed")
 
@@ -573,10 +608,14 @@ app.include_router(
 ##############################################################################################
 @app.get("/signin", response_class=HTMLResponse)
 async def signin_page(request: Request):
+    client_host = request.client.host if request.client else "unknown"
+    logger.info("Signin page viewed from %s", client_host)
     return templates. TemplateResponse("signin.html", {"request": request})
 
 @app.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
+    client_host = request.client.host if request.client else "unknown"
+    logger.info("Signup page viewed from %s", client_host)
     return templates. TemplateResponse("signup.html", {"request": request})
 
 # Basic demo handlers; customize for real authentication logic!
@@ -586,6 +625,8 @@ async def handle_signin(
     email: str = Form(...),
     password: str = Form(...),
 ):
+    client_host = request.client.host if request.client else "unknown"
+    logger.info("Form signin attempt for %s from %s", email, client_host)
     # Demo: Redirect to home; integrate FastAPI Users for actual sign in
     # You need to implement credential check!
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
@@ -598,12 +639,15 @@ async def handle_signup(
     password: str = Form(...),
     confirm_password: str = Form(...),
 ):
+    client_host = request.client.host if request.client else "unknown"
+    logger.info("Form signup attempt for %s from %s", email, client_host)
     # Demo: Redirect to sign-in. Implement FastAPI Users 'register' logic here!
     response = RedirectResponse(url="/signin", status_code=status.HTTP_303_SEE_OTHER)
     return response
 
 @app.get("/logout")
 async def logout():
+    logger.info("User initiated logout")
     response = RedirectResponse(url="/signin")
     response.delete_cookie("volatilx_cookie")
     return response
@@ -648,10 +692,12 @@ async def index(request: Request):
 
 @app.get("/trade", response_class=HTMLResponse)
 async def trade_page(request: Request, user: User = Depends(get_current_user_sync)):
+    logger.info("User %s (%s) opened trade page", user.id, user.email)
     with SessionLocal() as session:
         subscription = _find_relevant_subscription(session, user.id)
 
     if subscription is None or subscription.plan is None:
+        logger.info("Redirecting user %s to subscription page (no active plan)", user.id)
         return RedirectResponse(url="/subscribe?from=trade", status_code=status.HTTP_303_SEE_OTHER)
 
     context = {
@@ -678,8 +724,13 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         price_action_period_overrides_raw = data.get('price_action_period_overrides')
         # language = data.get('language', 'en')
         
-        print("Printing stock symbol:", stock_symbol)
-        print("Use AI Analysis:", use_ai_analysis)
+        logger.info(
+            "User %s requested trade analysis for %s (ai=%s principal=%s)",
+            user.id,
+            stock_symbol,
+            use_ai_analysis,
+            use_principal_agent,
+        )
         
         if not stock_symbol:
             return JSONResponse(
@@ -699,7 +750,7 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         # Initialize trading agent
         agent = MultiSymbolDayTraderAgent(
             symbols=stock_symbol,
-            timeframes=['2m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']
+            timeframes=['5m', '15m', '30m', '1h', '1d', '1wk','1mo']
         )
         
         # Set API credentials
@@ -731,7 +782,7 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             else:
                 result_data_json = result_data[1]
 
-        print("Raw result for AI:", result_data)
+        # print("Raw result for AI:", result_data)
         # AI Analysis if requested
         ai_analysis = None
         if use_ai_analysis and result_data is not None:
@@ -746,14 +797,18 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                     ),
                     timeout=AI_ANALYSIS_TIMEOUT,
                 )
+                logger.info(
+                    "AI analysis thread finished in %.2fs",
+                    time.perf_counter() - analysis_started,
+                )
                 duration = time.perf_counter() - analysis_started
                 logger.info("AI analysis completed in %.2fs", duration)
-                print("AI Analysis completed:", ai_analysis.get("success", False))
-                 # DEBUG: Print the full AI response
-                print("=== FULL AI ANALYSIS RESPONSE ===")
-                print("Success:", ai_analysis.get("success"))
-                print("Analysis keys:", list(ai_analysis.get("analysis", {}).keys()) if ai_analysis.get("analysis") else "No analysis key")
-                print("Raw response preview:", ai_analysis.get("raw_response", "")[:200] + "..." if ai_analysis.get("raw_response") else "No raw response")
+                # print("AI Analysis completed:", ai_analysis.get("success", False))
+                #  # DEBUG: Print the full AI response
+                # print("=== FULL AI ANALYSIS RESPONSE ===")
+                # print("Success:", ai_analysis.get("success"))
+                # print("Analysis keys:", list(ai_analysis.get("analysis", {}).keys()) if ai_analysis.get("analysis") else "No analysis key")
+                # print("Raw response preview:", ai_analysis.get("raw_response", "")[:200] + "..." if ai_analysis.get("raw_response") else "No raw response")
         
                 # Print each section
                 if ai_analysis.get("analysis"):
@@ -785,6 +840,11 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                                 refund_sub.runs_remaining = (refund_sub.runs_remaining or 0) + 1
                                 refund_session.commit()
                                 runs_remaining_after = refund_sub.runs_remaining
+                                logger.info(
+                                    "Refunded AI usage for user %s; runs_remaining=%s",
+                                    user.id,
+                                    runs_remaining_after,
+                                )
                         except Exception as exc:
                             logger.warning("Failed to refund AI run after analysis failure: %s", exc)
                             refund_session.rollback()
@@ -829,17 +889,28 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
 
         principal_plan = None
         if use_principal_agent:
+            principal_started = time.perf_counter()
+            logger.info("Principal agent started for %s", stock_symbol)
             try:
-                plan = get_principal_agent_instance().generate_trading_plan(
-                    stock_symbol,
-                    technical_snapshot=result_data_json,
-                    price_action_snapshot=price_action_analysis,
-                    include_raw_results=include_principal_raw,
+                loop = asyncio.get_running_loop()
+                plan = await loop.run_in_executor(
+                    None,
+                    partial(
+                        get_principal_agent_instance().generate_trading_plan,
+                        stock_symbol,
+                        technical_snapshot=result_data_json,
+                        price_action_snapshot=price_action_analysis,
+                        include_raw_results=include_principal_raw,
+                    ),
                 )
                 principal_plan = {
                     "success": True,
                     "data": plan,
                 }
+                logger.info(
+                    "Principal agent finished in %.2fs",
+                    time.perf_counter() - principal_started,
+                )
             except Exception as exc:  # noqa: BLE001 - surfaced in response for client visibility
                 logger.exception("Principal agent analysis failed for %s", stock_symbol)
                 principal_plan = {
@@ -858,8 +929,19 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
         }
         if runs_remaining_after is not None:
             response['runs_remaining'] = runs_remaining_after
+        logger.info(
+            "Trade analysis completed for %s by user %s (runs_remaining=%s)",
+            stock_symbol,
+            user.id,
+            response.get('runs_remaining'),
+        )
         return JSONResponse(content=response, status_code=status.HTTP_200_OK)
     except HTTPException as exc:
+        logger.warning(
+            "Trade analysis blocked for user %s: %s",
+            user.id,
+            exc.detail,
+        )
         error_payload: Dict[str, Any] = {"success": False}
         detail = exc.detail
         if isinstance(detail, dict):
@@ -935,6 +1017,7 @@ async def generate_principal_plan(request: Request, user: User = Depends(get_cur
 
 @app.get("/subscribe", response_class=HTMLResponse)
 async def subscribe_page(request: Request, user: User = Depends(get_current_user_sync)):
+    logger.info("User %s (%s) opened subscription page", user.id, user.email)
     with SessionLocal() as session:
         subscription = _find_relevant_subscription(session, user.id)
 

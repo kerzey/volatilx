@@ -2498,7 +2498,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
             df['Volume'] = bars['volume']
             df.index = bars.index
             
-            print(f"✅ Fetched {len(df)} {interval} candles for {symbol} over {period}")
+            # print(f"✅ Fetched {len(df)} {interval} candles for {symbol} over {period}")
             if self._cache_ttl.total_seconds() > 0:
                 self._data_cache[cache_key] = (df.copy(), datetime.utcnow())
             return df
@@ -3066,12 +3066,12 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         results = {}
         
-        print(f"\n🚀 Starting comprehensive multi-timeframe analysis for {symbol}...")
-        print(f"Timeframes: {', '.join(timeframes)}")
-        print("=" * 80)
+        # print(f"\n🚀 Starting comprehensive multi-timeframe analysis for {symbol}...")
+        # print(f"Timeframes: {', '.join(timeframes)}")
+        # print("=" * 80)
         
         for interval in timeframes:
-            print(f"\n📊 Analyzing {symbol} on {interval} timeframe...")
+            # print(f"\n📊 Analyzing {symbol} on {interval} timeframe...")
             
             # Adjust period based on interval
             if interval in ['1m', '2m']:
@@ -4246,10 +4246,10 @@ def run_comprehensive_analysis_example():
         return None
 
 def setup_analyzer_with_credentials():
-    """Helper function to set up analyzer with credentials"""
-    print("Setting up Comprehensive Stock Analyzer...")
-    print("You'll need Alpaca API credentials for live data.")
-    print("Get them from: https://alpaca.markets/")
+    # """Helper function to set up analyzer with credentials"""
+    # print("Setting up Comprehensive Stock Analyzer...")
+    # print("You'll need Alpaca API credentials for live data.")
+    # print("Get them from: https://alpaca.markets/")
     
     # You would replace these with your actual credentials
     api_key = "YOUR_ALPACA_API_KEY"
