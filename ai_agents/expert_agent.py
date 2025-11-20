@@ -98,9 +98,9 @@ class OpenAIResponsesMixin:
 
         timeout_env = os.getenv("OPENAI_TIMEOUT")
         try:
-            self._responses_timeout = float(timeout_env) if timeout_env else 60.0
+            self._responses_timeout = float(timeout_env) if timeout_env else 75.0
         except ValueError:
-            self._responses_timeout = 60.0
+            self._responses_timeout = 75.0
 
         if openai_client is not None:
             base_candidate = getattr(openai_client, "base_url", None) or raw_base_url_env

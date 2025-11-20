@@ -3,8 +3,9 @@ import os
 import asyncio
 import time
 from functools import partial
+import uuid
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Form, status, Depends, HTTPException
+from fastapi import FastAPI, Request, Form, status, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,6 +18,7 @@ from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+import uuid
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import (
@@ -86,6 +88,10 @@ stripe_webhook_config = (
     if STRIPE_WEBHOOK_SECRET
     else None
 )
+
+# In-memory store for AI analysis results (for demo; use Redis/db for production)
+# In-memory store for AI analysis results (for demo; use Redis/db for production)
+ai_analysis_jobs = {}
 
 
 def _build_base_url(request: Request) -> str:
@@ -405,8 +411,6 @@ oauth.register(
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"}
 )
-
-##############################################################################################
 # OAuth Routes - Azure
 ##############################################################################################
 @app.get("/auth/azure/login")
@@ -708,7 +712,7 @@ async def trade_page(request: Request, user: User = Depends(get_current_user_syn
     return templates.TemplateResponse("trade.html", context)
 
 @app.post("/trade")
-async def trade(request: Request, user: User = Depends(get_current_user_sync)):
+async def trade(request: Request, background_tasks: BackgroundTasks, user: User = Depends(get_current_user_sync)):
     try:
         # Get JSON data from request
         data = await request.json()
@@ -782,78 +786,6 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             else:
                 result_data_json = result_data[1]
 
-        # print("Raw result for AI:", result_data)
-        # AI Analysis if requested
-        ai_analysis = None
-        if use_ai_analysis and result_data is not None:
-            loop = asyncio.get_running_loop()
-            analysis_started = time.perf_counter()
-            try:
-                print("=== STARTING AI ANALYSIS ===")
-                ai_analysis = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        None,
-                        partial(openai_service.analyze_trading_data, result_data, stock_symbol),
-                    ),
-                    timeout=AI_ANALYSIS_TIMEOUT,
-                )
-                logger.info(
-                    "AI analysis thread finished in %.2fs",
-                    time.perf_counter() - analysis_started,
-                )
-                duration = time.perf_counter() - analysis_started
-                logger.info("AI analysis completed in %.2fs", duration)
-                # print("AI Analysis completed:", ai_analysis.get("success", False))
-                #  # DEBUG: Print the full AI response
-                # print("=== FULL AI ANALYSIS RESPONSE ===")
-                # print("Success:", ai_analysis.get("success"))
-                # print("Analysis keys:", list(ai_analysis.get("analysis", {}).keys()) if ai_analysis.get("analysis") else "No analysis key")
-                # print("Raw response preview:", ai_analysis.get("raw_response", "")[:200] + "..." if ai_analysis.get("raw_response") else "No raw response")
-        
-                # Print each section
-                if ai_analysis.get("analysis"):
-                    for section_name, section_content in ai_analysis["analysis"].items():
-                        print(f"{section_name}: {section_content[:100]}..." if section_content else f"{section_name}: EMPTY")
-
-            except asyncio.TimeoutError:
-                duration = time.perf_counter() - analysis_started
-                logger.error("AI analysis timed out after %.2fs", duration)
-                ai_analysis = {
-                    "success": False,
-                    "error": "AI analysis timed out; please retry shortly.",
-                }
-            except Exception as e:
-                duration = time.perf_counter() - analysis_started
-                logger.exception("AI analysis failed after %.2fs", duration)
-                print(f"AI Analysis failed: {e}")
-                ai_analysis = {
-                    "success": False,
-                    "error": f"AI analysis failed: {str(e)}"
-                }
-            finally:
-                if runs_remaining_after is not None:
-                    # Restore quota consumption when AI analysis fails or times out
-                    with SessionLocal() as refund_session:
-                        try:
-                            refund_sub = _find_relevant_subscription(refund_session, user.id)
-                            if refund_sub:
-                                refund_sub.runs_remaining = (refund_sub.runs_remaining or 0) + 1
-                                refund_session.commit()
-                                runs_remaining_after = refund_sub.runs_remaining
-                                logger.info(
-                                    "Refunded AI usage for user %s; runs_remaining=%s",
-                                    user.id,
-                                    runs_remaining_after,
-                                )
-                        except Exception as exc:
-                            logger.warning("Failed to refund AI run after analysis failure: %s", exc)
-                            refund_session.rollback()
-        
-        elif use_ai_analysis:
-            ai_analysis = {
-                "success": False,
-                "error": "Trading data was not generated; unable to run AI analysis.",
-            }
 
         price_action_timeframes: Optional[List[str]] = None
         if isinstance(price_action_timeframes_raw, str):
@@ -872,7 +804,7 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             }
             price_action_period_overrides = cleaned_overrides or None
 
-        price_action_analysis: Optional[dict]
+        price_action_analysis: Optional[dict] = None
         try:
             price_action_analysis = price_action_analyzer.analyze(
                 stock_symbol,
@@ -887,45 +819,101 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
                 "error": str(exc),
             }
 
-        principal_plan = None
-        if use_principal_agent:
-            principal_started = time.perf_counter()
-            logger.info("Principal agent started for %s", stock_symbol)
-            try:
-                loop = asyncio.get_running_loop()
-                plan = await loop.run_in_executor(
-                    None,
-                    partial(
-                        get_principal_agent_instance().generate_trading_plan,
-                        stock_symbol,
-                        technical_snapshot=result_data_json,
-                        price_action_snapshot=price_action_analysis,
-                        include_raw_results=include_principal_raw,
-                    ),
-                )
-                principal_plan = {
-                    "success": True,
-                    "data": plan,
+        # Prepare background job for AI / principal analysis if requested
+        ai_job_id = None
+        background_analysis_requested = (use_ai_analysis or use_principal_agent) and result_data is not None
+        if background_analysis_requested:
+            ai_job_id = str(uuid.uuid4())
+            ai_analysis_jobs[ai_job_id] = {"status": "pending", "result": None, "user_id": user.id}
+
+            def run_async_analysis(
+                job_id: str,
+                technical_data: Any,
+                technical_snapshot: Dict[str, Any],
+                price_action_snapshot: Optional[Dict[str, Any]],
+                symbol: str,
+                user_id: Any,
+                include_ai: bool,
+                include_principal: bool,
+                include_principal_raw: bool,
+            ) -> None:
+                logger.info("Background analysis job %s started for %s", job_id, symbol)
+                job_result: Dict[str, Any] = {
+                    "ai_analysis": None,
+                    "principal_plan": None,
                 }
-                logger.info(
-                    "Principal agent finished in %.2fs",
-                    time.perf_counter() - principal_started,
-                )
-            except Exception as exc:  # noqa: BLE001 - surfaced in response for client visibility
-                logger.exception("Principal agent analysis failed for %s", stock_symbol)
-                principal_plan = {
-                    "success": False,
-                    "error": str(exc),
-                }
+                try:
+                    if include_ai:
+                        try:
+                            logger.info("AI analysis started for %s (job %s)", symbol, job_id)
+                            analysis = openai_service.analyze_trading_data(technical_data, symbol)
+                            job_result["ai_analysis"] = analysis
+                            logger.info("AI analysis completed for %s (job %s)", symbol, job_id)
+                        except Exception as ai_exc:  # noqa: BLE001 - store failure in job result
+                            logger.exception("AI analysis failed for %s", symbol)
+                            job_result["ai_analysis"] = {
+                                "success": False,
+                                "error": str(ai_exc),
+                            }
+
+                    if include_principal:
+                        try:
+                            logger.info("Principal agent started for %s (job %s)", symbol, job_id)
+                            plan = get_principal_agent_instance().generate_trading_plan(
+                                symbol,
+                                technical_snapshot=technical_snapshot,
+                                price_action_snapshot=price_action_snapshot,
+                                include_raw_results=include_principal_raw,
+                            )
+                            job_result["principal_plan"] = {
+                                "success": True,
+                                "data": plan,
+                            }
+                            logger.info("Principal agent completed for %s (job %s)", symbol, job_id)
+                        except Exception as principal_exc:  # noqa: BLE001 - store failure in job result
+                            logger.exception("Principal agent failed for %s", symbol)
+                            job_result["principal_plan"] = {
+                                "success": False,
+                                "error": str(principal_exc),
+                            }
+
+                    ai_analysis_jobs[job_id] = {
+                        "status": "done",
+                        "result": job_result,
+                        "user_id": user_id,
+                    }
+                    logger.info("Background analysis job %s finished", job_id)
+                except Exception as exc:  # noqa: BLE001 - surface in job status
+                    logger.exception("Background analysis job %s failed", job_id)
+                    ai_analysis_jobs[job_id] = {
+                        "status": "error",
+                        "error": str(exc),
+                        "user_id": user_id,
+                    }
+
+            background_tasks.add_task(
+                run_async_analysis,
+                ai_job_id,
+                result_data,
+                result_data_json,
+                price_action_analysis,
+                stock_symbol,
+                user.id,
+                use_ai_analysis,
+                use_principal_agent,
+                include_principal_raw,
+            )
+
+        # ...existing code...
+
 
         response = {
             'success': True,
             'result': result_data_json,
-            'ai_analysis': ai_analysis,
-            'principal_plan': principal_plan,
             'price_action': price_action_analysis,
             'symbol': stock_symbol,
-            'timestamp': str(datetime.now())
+            'timestamp': str(datetime.now()),
+            'ai_job_id': ai_job_id,
         }
         if runs_remaining_after is not None:
             response['runs_remaining'] = runs_remaining_after
@@ -971,6 +959,22 @@ async def trade(request: Request, user: User = Depends(get_current_user_sync)):
             'error': str(exc)
         }
         return JSONResponse(content=response, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Endpoint to poll for AI analysis result
+@app.get("/api/ai-analysis-result/{job_id}")
+async def get_ai_analysis_result(job_id: str, user: User = Depends(get_current_user_sync)):
+    job = ai_analysis_jobs.get(job_id)
+    if not job:
+        return JSONResponse(content={"success": False, "error": "Job not found"}, status_code=404)
+    # Only allow the user who started the job to see the result
+    if job.get("user_id") != user.id:
+        return JSONResponse(content={"success": False, "error": "Unauthorized"}, status_code=403)
+    if job["status"] == "pending":
+        return JSONResponse(content={"success": False, "status": "pending"}, status_code=200)
+    if job["status"] == "done":
+        return JSONResponse(content={"success": True, "status": "done", "result": job["result"]}, status_code=200)
+    if job["status"] == "error":
+        return JSONResponse(content={"success": False, "status": "error", "error": job.get("error")}, status_code=200)
 
 @app.post("/api/principal/plan")
 async def generate_principal_plan(request: Request, user: User = Depends(get_current_user_sync)):

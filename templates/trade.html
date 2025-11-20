@@ -177,10 +177,11 @@
                     priceActionTab.style.display = 'block';
                     extraTabs += 1;
                     let principalTabHasData = false;
-                    if (useAiAnalysis) {
+                    // Show initial AI analysis if present (legacy synchronous responses)
+                    if (useAiAnalysis && Object.prototype.hasOwnProperty.call(data, 'ai_analysis') && data.ai_analysis) {
                         principalTabHasData = displayAiAnalysis(data.ai_analysis) || principalTabHasData;
                     }
-                    if (usePrincipalAgent) {
+                    if (usePrincipalAgent && Object.prototype.hasOwnProperty.call(data, 'principal_plan')) {
                         principalTabHasData = displayPrincipalPlan(data.principal_plan) || principalTabHasData;
                     }
                     if (principalTabHasData) {
@@ -192,6 +193,19 @@
                     }
                     if (extraTabs > 0) {
                         resultTabs.classList.remove('hidden');
+                    }
+
+                    // If ai_job_id is present, start polling for async analysis
+                    if (data.ai_job_id) {
+                        pollAiAnalysis({
+                            jobId: data.ai_job_id,
+                            includeAi: useAiAnalysis,
+                            includePrincipal: usePrincipalAgent,
+                            aiContent,
+                            principalTab,
+                            principalPlanContent,
+                            resultTabs,
+                        });
                     }
                 } else {
                     displayError(data);
@@ -550,7 +564,8 @@
                     <div class="result-item info">
                         <div class="result-title">Multi-Timeframe Alignment</div>
                         <div class="result-content price-action-overview">
-                            <p><strong>Trend alignment:</strong> ${escapeHtml(overview.trend_alignment || 'Unknown')}</p>
+                            <p><strong>Trend alignment:</strong> $
+                                {escapeHtml(overview.trend_alignment || 'Unknown')}</p>
                             <div class="price-action-overview__levels">
                                 <strong>Key levels:</strong>
                                 ${levelsHtml}
@@ -1112,6 +1127,83 @@
             if (evt && evt.currentTarget) {
                 evt.currentTarget.classList.add('active');
             }
+        }
+        // Polling function for async AI analysis
+        async function pollAiAnalysis({
+            jobId,
+            includeAi,
+            includePrincipal,
+            aiContent,
+            principalTab,
+            principalPlanContent,
+            resultTabs,
+        }) {
+            let attempts = 0;
+            const maxAttempts = 40; // ~2 minutes if interval is 3s
+            const intervalMs = 3000;
+
+            if (includeAi && aiContent) {
+                aiContent.innerHTML = `<div class="loading"><div class="spinner"></div><p>AI analysis is running... (Job ID: ${jobId})</p></div>`;
+            }
+            if (includePrincipal && principalPlanContent) {
+                principalPlanContent.innerHTML = `<div class="loading"><div class="spinner"></div><p>Multi-agent strategy is being prepared...</p></div>`;
+            }
+            if ((includeAi || includePrincipal) && principalTab) {
+                principalTab.style.display = 'block';
+            }
+            if (resultTabs) {
+                resultTabs.classList.remove('hidden');
+            }
+            async function poll() {
+                attempts++;
+                try {
+                    const resp = await fetch(`/api/ai-analysis-result/${jobId}`);
+                    if (resp.ok) {
+                        const result = await resp.json();
+                        if (result && result.success && result.status === 'done') {
+                            const payload = result.result || {};
+                            if (includeAi && aiContent && Object.prototype.hasOwnProperty.call(payload, 'ai_analysis')) {
+                                displayAiAnalysis(payload.ai_analysis);
+                            }
+                            if (includePrincipal && principalTab && Object.prototype.hasOwnProperty.call(payload, 'principal_plan')) {
+                                const hasPlan = displayPrincipalPlan(payload.principal_plan);
+                                if (hasPlan) {
+                                    principalTab.style.display = 'block';
+                                }
+                            }
+                            return;
+                        }
+                        if (result && result.status === 'error') {
+                            const rawError = (result.error || '').toString();
+                            const isTimeout = rawError.toLowerCase().includes('timeout');
+                            const friendlyMessage = isTimeout
+                                ? 'Our trading wizard took longer than expected. Give it another go in a moment—Principal Agent is already on the case!'
+                                : rawError || 'Our agent tripped over a market banana peel. Please try again soon!';
+                            if (includeAi && aiContent) {
+                                aiContent.innerHTML = `<div class="result-item error"><div class="result-title">AI Analysis Paused</div><div class="result-content">${escapeHtml(friendlyMessage)}</div></div>${LEGAL_NOTE_HTML}`;
+                            }
+                            if (includePrincipal && principalPlanContent) {
+                                principalPlanContent.innerHTML = `<div class="result-item error"><div class="result-title">Strategy Still Brewing</div><div class="result-content">${escapeHtml(friendlyMessage)}</div></div>${LEGAL_NOTE_HTML}`;
+                            }
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    // Optionally show error in aiContent
+                }
+                if (attempts < maxAttempts) {
+                    setTimeout(poll, intervalMs);
+                } else {
+                    const timeoutMessage = 'Our agent is working hard but needed a breather. Please try again shortly—Principal Agent will keep an eye on it!';
+                    if (includeAi && aiContent) {
+                        aiContent.innerHTML = `<div class="result-item error"><div class="result-title">AI Analysis Timeout</div><div class="result-content">${escapeHtml(timeoutMessage)}</div></div>${LEGAL_NOTE_HTML}`;
+                    }
+                    if (includePrincipal && principalPlanContent) {
+                        principalPlanContent.innerHTML = `<div class="result-item error"><div class="result-title">Strategy Timeout</div><div class="result-content">${escapeHtml(timeoutMessage)}</div></div>${LEGAL_NOTE_HTML}`;
+                    }
+                }
+            }
+            poll();
         }
         // To hide by default, add class="tabs hidden" in HTML and define .hidden in your CSS:
         // .hidden { display: none !important;}
