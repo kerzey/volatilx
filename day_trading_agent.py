@@ -1,3 +1,4 @@
+import os
 import time
 import threading
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
@@ -590,7 +591,7 @@ class MultiSymbolDayTraderAgent:
         print(f"📊 Symbols: {', '.join(self.symbols)}")
         print(f"⏰ Timeframes: {', '.join(self.timeframes)}")
     
-    def set_credentials(self, api_key, secret_key, base_url='https://paper-api.alpaca.markets'):
+    def set_credentials(self, api_key=None, secret_key=None, base_url=None):
         """Set Alpaca API credentials"""
         self.analyzer.set_credentials(api_key, secret_key, base_url)
         print("✅ API credentials updated")
@@ -1300,9 +1301,13 @@ if __name__ == "__main__":
         symbols=symbols,
         timeframes=['2m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']  # Removed 90m, 5d, 1wk for Alpaca compatibility
     )
-    api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
-    secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
-    multi_trader.set_credentials(api_key=api_key, secret_key=secret_key)
+    api_key = os.getenv("ALPACA_API_KEY")
+    secret_key = os.getenv("ALPACA_SECRET_KEY")
+    base_url = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+    if api_key and secret_key:
+        multi_trader.set_credentials(api_key=api_key, secret_key=secret_key, base_url=base_url)
+    else:
+        print("⚠️ Alpaca credentials not configured. Update your environment before running analysis.")
     
     # Set trading parameters
     multi_trader.set_trading_parameters(

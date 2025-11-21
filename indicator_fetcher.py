@@ -2188,25 +2188,35 @@ from symbol_map import DEFAULT_MARKET, SUPPORTED_MARKETS
 warnings.filterwarnings('ignore')
 
 class ComprehensiveIndicatorFetcher:
-    def __init__(self, api_key=None, secret_key=None, base_url='https://paper-api.alpaca.markets'):
+    def __init__(self, api_key=None, secret_key=None, base_url=None):
         """Initialize with Alpaca API credentials"""
-        api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
-        secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
-        self.api_key = api_key
-        self.secret_key = secret_key
-        self.base_url = base_url
+        resolved_api_key = api_key or os.getenv("ALPACA_API_KEY")
+        resolved_secret_key = secret_key or os.getenv("ALPACA_SECRET_KEY")
+        resolved_base_url = base_url or os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+        self.api_key = resolved_api_key
+        self.secret_key = resolved_secret_key
+        self.base_url = resolved_base_url
         self.api = None
         self.data_cache = {}
         
-        if api_key and secret_key:
-            self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
+        if resolved_api_key and resolved_secret_key:
+            self.api = tradeapi.REST(resolved_api_key, resolved_secret_key, resolved_base_url, api_version='v2')
     
-    def set_credentials(self, api_key, secret_key, base_url='https://paper-api.alpaca.markets'):
+    def set_credentials(self, api_key=None, secret_key=None, base_url=None):
         """Set Alpaca API credentials"""
-        self.api_key = api_key
-        self.secret_key = secret_key
-        self.base_url = base_url
-        self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
+        resolved_api_key = api_key or os.getenv("ALPACA_API_KEY")
+        resolved_secret_key = secret_key or os.getenv("ALPACA_SECRET_KEY")
+        resolved_base_url = base_url or os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+        self.api_key = resolved_api_key
+        self.secret_key = resolved_secret_key
+        self.base_url = resolved_base_url
+
+        if not (resolved_api_key and resolved_secret_key):
+            raise ValueError("Alpaca API credentials are not configured.")
+
+        self.api = tradeapi.REST(resolved_api_key, resolved_secret_key, resolved_base_url, api_version='v2')
     
     def _convert_period_to_dates(self, period):
         """Convert yfinance period format to start/end dates for Alpaca"""
@@ -2375,13 +2385,17 @@ class ComprehensiveMultiTimeframeAnalyzer:
         self,
         api_key=None,
         secret_key=None,
-        base_url='https://paper-api.alpaca.markets',
+        base_url=None,
         default_market: str = DEFAULT_MARKET,
     ):
         """Initialize with Alpaca API credentials"""
-        self.api_key = api_key
-        self.secret_key = secret_key
-        self.base_url = base_url
+        resolved_api_key = api_key or os.getenv("ALPACA_API_KEY")
+        resolved_secret_key = secret_key or os.getenv("ALPACA_SECRET_KEY")
+        resolved_base_url = base_url or os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+        self.api_key = resolved_api_key
+        self.secret_key = resolved_secret_key
+        self.base_url = resolved_base_url
         self.api = None
         self._data_cache = {}
         try:
@@ -2391,8 +2405,8 @@ class ComprehensiveMultiTimeframeAnalyzer:
         self._cache_ttl = timedelta(seconds=max(cache_seconds, 0))
         self.default_market = default_market if default_market in SUPPORTED_MARKETS else DEFAULT_MARKET
         
-        if api_key and secret_key:
-            self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
+        if resolved_api_key and resolved_secret_key:
+            self.api = tradeapi.REST(resolved_api_key, resolved_secret_key, resolved_base_url, api_version='v2')
         
         self.fib_analyzer = AdvancedFibonacciAnalyzer()
         self.wave_analyzer = ElliottWaveAnalyzer()
@@ -2429,12 +2443,19 @@ class ComprehensiveMultiTimeframeAnalyzer:
             '3mo': {'max_days': 'unlimited'}
         }
     
-    def set_credentials(self, api_key, secret_key, base_url='https://paper-api.alpaca.markets'):
+    def set_credentials(self, api_key=None, secret_key=None, base_url=None):
         """Set Alpaca API credentials"""
-        self.api_key = api_key
-        self.secret_key = secret_key
-        self.base_url = base_url
-        self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
+        resolved_api_key = api_key or os.getenv("ALPACA_API_KEY")
+        resolved_secret_key = secret_key or os.getenv("ALPACA_SECRET_KEY")
+        resolved_base_url = base_url or os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+        if not (resolved_api_key and resolved_secret_key):
+            raise ValueError("Alpaca API credentials are not configured.")
+
+        self.api_key = resolved_api_key
+        self.secret_key = resolved_secret_key
+        self.base_url = resolved_base_url
+        self.api = tradeapi.REST(resolved_api_key, resolved_secret_key, resolved_base_url, api_version='v2')
     
     def _convert_period_to_dates(self, period):
         """Convert period to start/end dates"""
@@ -3477,15 +3498,19 @@ class ComprehensiveMultiTimeframeAnalyzer:
         return consensus
 
 class MultiTimeframeAnalyzer:
-    def __init__(self, api_key=None, secret_key=None, base_url='https://paper-api.alpaca.markets'):
+    def __init__(self, api_key=None, secret_key=None, base_url=None):
         """Initialize with Alpaca API credentials"""
-        self.api_key = api_key
-        self.secret_key = secret_key
-        self.base_url = base_url
+        resolved_api_key = api_key or os.getenv("ALPACA_API_KEY")
+        resolved_secret_key = secret_key or os.getenv("ALPACA_SECRET_KEY")
+        resolved_base_url = base_url or os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+        self.api_key = resolved_api_key
+        self.secret_key = resolved_secret_key
+        self.base_url = resolved_base_url
         self.api = None
         
-        if api_key and secret_key:
-            self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
+        if resolved_api_key and resolved_secret_key:
+            self.api = tradeapi.REST(resolved_api_key, resolved_secret_key, resolved_base_url, api_version='v2')
         
         # Alpaca timeframe mapping
         self.alpaca_timeframes = {
@@ -3519,12 +3544,19 @@ class MultiTimeframeAnalyzer:
             '3mo': {'max_period': 'max', 'max_days': 'unlimited'}
         }
     
-    def set_credentials(self, api_key, secret_key, base_url='https://paper-api.alpaca.markets'):
+    def set_credentials(self, api_key=None, secret_key=None, base_url=None):
         """Set Alpaca API credentials"""
-        self.api_key = api_key
-        self.secret_key = secret_key
-        self.base_url = base_url
-        self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
+        resolved_api_key = api_key or os.getenv("ALPACA_API_KEY")
+        resolved_secret_key = secret_key or os.getenv("ALPACA_SECRET_KEY")
+        resolved_base_url = base_url or os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+        if not (resolved_api_key and resolved_secret_key):
+            raise ValueError("Alpaca API credentials are not configured.")
+
+        self.api_key = resolved_api_key
+        self.secret_key = resolved_secret_key
+        self.base_url = resolved_base_url
+        self.api = tradeapi.REST(resolved_api_key, resolved_secret_key, resolved_base_url, api_version='v2')
     
     def _convert_period_to_dates(self, period):
         """Convert period to start/end dates"""
@@ -4265,9 +4297,13 @@ def run_comprehensive_analysis_example():
     
     # Initialize the analyzer (you'll need to provide your Alpaca API credentials)
     analyzer = ComprehensiveMultiTimeframeAnalyzer()
-    api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
-    secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
-    analyzer.set_credentials(api_key,secret_key)
+    api_key = os.getenv("ALPACA_API_KEY")
+    secret_key = os.getenv("ALPACA_SECRET_KEY")
+    if not (api_key and secret_key):
+        print("Alpaca credentials are not configured; skipping example run.")
+        return None
+
+    analyzer.set_credentials(api_key, secret_key)
     # For demonstration, let's analyze a popular stock
     symbol = "ASML"
     timeframes = ['5m','15m','30m', '1h', '1d', '1wk','1mo']
@@ -4348,8 +4384,8 @@ if __name__ == "__main__":
     #     symbols=['DUOL'],
     #     timeframes=['1m','5m', '15m', '30m', '1h', '1d', '1wk','1mo']  # Removed 90m, 5d, 1wk for Alpaca compatibility
     # )
-    # api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
-    # secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
+    # api_key = os.getenv("ALPACA_API_KEY")
+    # secret_key = os.getenv("ALPACA_SECRET_KEY")
     # multi_trader.set_credentials(api_key=api_key, secret_key=secret_key)
     # run_comprehensive_analysis_example()
 

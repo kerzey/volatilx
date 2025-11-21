@@ -803,11 +803,22 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
         )
         
         # Set API credentials
-        api_key = "PKYJLOK4LZBY56NZKXZLNSG665"
-        secret_key = "4VVHMnrYEqVv4Jd1oMZMow15DrRVn5p8VD7eEK6TjYZ1"
-        agent.set_credentials(api_key=api_key, secret_key=secret_key)
+        api_key = os.getenv("ALPACA_API_KEY")
+        secret_key = os.getenv("ALPACA_SECRET_KEY")
+        base_url = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+        if not api_key or not secret_key:
+            logger.error("Alpaca credentials missing; cannot perform trade analysis")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "error": "Alpaca credentials are not configured.",
+                    "code": "alpaca_credentials_missing",
+                },
+            )
+
+        agent.set_credentials(api_key=api_key, secret_key=secret_key, base_url=base_url)
         try:
-            indicator_fetcher.set_credentials(api_key, secret_key)
+            indicator_fetcher.set_credentials(api_key, secret_key, base_url=base_url)
         except Exception as cred_error:  # noqa: BLE001 - log but do not fail primary analysis
             logger.warning("Failed to configure shared indicator credentials: %s", cred_error)
         
