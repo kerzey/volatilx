@@ -67,6 +67,7 @@ import hashlib
 from ai_agents.openai_service import openai_service
 from ai_agents.principal_agent import PrincipalAgent
 from ai_agents.price_action import PriceActionAnalyzer
+from azure_storage import store_ai_report
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -882,6 +883,18 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
                         "result": job_result,
                         "user_id": user_id,
                     }
+                    store_ai_report(
+                        symbol,
+                        user_id,
+                        {
+                            "ai_job_id": job_id,
+                            "status": "done",
+                            "ai_analysis": job_result.get("ai_analysis"),
+                            "principal_plan": job_result.get("principal_plan"),
+                            "technical_snapshot": technical_snapshot,
+                            "price_action_snapshot": price_action_snapshot,
+                        },
+                    )
                     logger.info("Background analysis job %s finished", job_id)
                 except Exception as exc:  # noqa: BLE001 - surface in job status
                     logger.exception("Background analysis job %s failed", job_id)
@@ -890,6 +903,17 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
                         "error": str(exc),
                         "user_id": user_id,
                     }
+                    store_ai_report(
+                        symbol,
+                        user_id,
+                        {
+                            "ai_job_id": job_id,
+                            "status": "error",
+                            "error": str(exc),
+                            "technical_snapshot": technical_snapshot,
+                            "price_action_snapshot": price_action_snapshot,
+                        },
+                    )
 
             background_tasks.add_task(
                 run_async_analysis,
