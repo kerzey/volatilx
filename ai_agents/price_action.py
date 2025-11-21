@@ -102,6 +102,7 @@ class PriceActionAnalyzer:
         *,
         timeframes: Optional[Iterable[str]] = None,
         period_overrides: Optional[Dict[str, str]] = None,
+        market: str = "equity",
     ) -> Dict[str, Any]:
         """Return price action summary keyed by timeframe."""
 
@@ -111,11 +112,19 @@ class PriceActionAnalyzer:
 
         analyses: Dict[str, Any] = {}
         errors: List[str] = []
+        latest_price: Optional[float] = None
+        latest_price_timeframe: Optional[str] = None
+        latest_price_timestamp: Optional[str] = None
 
         for timeframe in prepared_timeframes:
             period = period_map.get(timeframe, TIMEFRAME_DEFAULT_PERIOD.get(timeframe, "6mo"))
             try:
-                raw_df = self.analyzer.get_stock_data(cleaned_symbol, interval=timeframe, period=period)
+                raw_df = self.analyzer.get_stock_data(
+                    cleaned_symbol,
+                    interval=timeframe,
+                    period=period,
+                    market=market,
+                )
             except Exception as exc:  # noqa: BLE001 - propagate network diagnostics via errors list
                 message = f"Failed to fetch {timeframe} data for {cleaned_symbol}: {exc}"
                 logger.error(message)
@@ -134,6 +143,12 @@ class PriceActionAnalyzer:
             timeframe_result = self._analyze_timeframe(cleaned_symbol, timeframe, df)
             if timeframe_result:
                 analyses[timeframe] = timeframe_result
+                price_info = timeframe_result.get("price", {})
+                close_price = price_info.get("close")
+                if close_price is not None and latest_price is None:
+                    latest_price = close_price
+                    latest_price_timeframe = timeframe
+                    latest_price_timestamp = price_info.get("timestamp")
 
         overview = self._build_overview(analyses)
         return {
@@ -144,6 +159,9 @@ class PriceActionAnalyzer:
             "overview": overview,
             "per_timeframe": analyses,
             "errors": errors,
+            "latest_price": latest_price,
+            "latest_price_timeframe": latest_price_timeframe,
+            "latest_price_timestamp": latest_price_timestamp,
         }
 
     # ------------------------------------------------------------------

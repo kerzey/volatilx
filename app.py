@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import uuid
 
 # Import user-related components - UPDATED to include get_user_manager
@@ -68,9 +68,10 @@ from ai_agents.openai_service import openai_service
 from ai_agents.principal_agent import PrincipalAgent
 from ai_agents.price_action import PriceActionAnalyzer
 from symbol_map import (
-    TICKER_TO_COMPANY,
     SymbolNotFound,
-    get_symbol_catalog,
+    SUPPORTED_MARKETS,
+    get_all_symbol_catalogs,
+    get_ticker_map,
     normalize_symbol,
 )
 from azure_storage import store_ai_report
@@ -715,7 +716,7 @@ async def trade_page(request: Request, user: User = Depends(get_current_user_syn
         "request": request,
         "user": user,
         "subscription": _serialize_subscription(subscription),
-        "symbol_catalog": get_symbol_catalog(),
+        "symbol_catalogs": get_all_symbol_catalogs(),
     }
     return templates.TemplateResponse("trade.html", context)
 
@@ -730,6 +731,11 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
         # Extract variables from the request data
         raw_stock_symbol = data.get('stock_symbol')
         stock_symbol = raw_stock_symbol
+        market_raw = data.get('market')
+        market = str(market_raw).strip().lower() if market_raw is not None else 'equity'
+        if market not in SUPPORTED_MARKETS:
+            logger.debug("Unsupported market '%s' requested; defaulting to equities", market)
+            market = 'equity'
         use_ai_analysis = data.get('use_ai_analysis', False)
         use_principal_agent = data.get('use_principal_agent', use_ai_analysis)
         include_principal_raw = bool(data.get('include_principal_raw_results', False))
@@ -739,13 +745,13 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
 
         symbol_message: Optional[str] = None
         try:
-            stock_symbol, message = normalize_symbol(stock_symbol)
+            stock_symbol, message = normalize_symbol(stock_symbol, market=market)
             symbol_message = message
         except SymbolNotFound as exc:
             suggestion_company = None
             suggestion_symbol = exc.suggestion
             if suggestion_symbol:
-                suggestion_company = TICKER_TO_COMPANY.get(suggestion_symbol)
+                suggestion_company = get_ticker_map(market).get(suggestion_symbol)
             error_message = f"Unknown symbol '{raw_stock_symbol}'."
             if suggestion_symbol:
                 if suggestion_company:
@@ -765,9 +771,10 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
             )
         
         logger.info(
-            "User %s requested trade analysis for %s (ai=%s principal=%s)",
+            "User %s requested trade analysis for %s in %s market (ai=%s principal=%s)",
             user.id,
             stock_symbol,
+            market,
             use_ai_analysis,
             use_principal_agent,
         )
@@ -791,6 +798,8 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
         agent = MultiSymbolDayTraderAgent(
             symbols=stock_symbol,
             timeframes=['5m', '15m', '30m', '1h', '1d', '1wk','1mo']
+        ,
+            market=market,
         )
         
         # Set API credentials
@@ -846,6 +855,7 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
                 stock_symbol,
                 timeframes=price_action_timeframes,
                 period_overrides=price_action_period_overrides,
+                market=market,
             )
         except Exception as exc:  # noqa: BLE001 - return structured error information
             logger.exception("Price action analysis failed for %s", stock_symbol)
@@ -878,11 +888,18 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
                     "ai_analysis": None,
                     "principal_plan": None,
                 }
+                price_value, price_tf, price_timestamp = _extract_latest_price(technical_snapshot, symbol)
                 try:
                     if include_ai:
                         try:
                             logger.info("AI analysis started for %s (job %s)", symbol, job_id)
                             analysis = openai_service.analyze_trading_data(technical_data, symbol)
+                            if isinstance(analysis, dict) and price_value is not None:
+                                analysis["latest_price"] = price_value
+                                if price_tf:
+                                    analysis["latest_price_timeframe"] = price_tf
+                                if price_timestamp:
+                                    analysis["latest_price_timestamp"] = price_timestamp
                             job_result["ai_analysis"] = analysis
                             logger.info("AI analysis completed for %s (job %s)", symbol, job_id)
                         except Exception as ai_exc:  # noqa: BLE001 - store failure in job result
@@ -901,6 +918,13 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
                                 price_action_snapshot=price_action_snapshot,
                                 include_raw_results=include_principal_raw,
                             )
+                            if isinstance(plan, dict):
+                                if price_value is not None:
+                                    plan["latest_price"] = price_value
+                                if price_tf:
+                                    plan["latest_price_timeframe"] = price_tf
+                                if price_timestamp:
+                                    plan["latest_price_timestamp"] = price_timestamp
                             job_result["principal_plan"] = {
                                 "success": True,
                                 "data": plan,
@@ -971,6 +995,7 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
             'result': result_data_json,
             'price_action': price_action_analysis,
             'symbol': stock_symbol,
+            'market': market,
             'timestamp': str(datetime.now()),
             'ai_job_id': ai_job_id,
             'symbol_message': symbol_message,
@@ -1092,6 +1117,69 @@ async def subscribe_page(request: Request, user: User = Depends(get_current_user
         "current_subscription": _serialize_subscription(subscription) if subscription else None,
     }
     return templates.TemplateResponse("subscription.html", context)
+
+def _extract_latest_price(snapshot: Any, symbol: str) -> Tuple[Optional[float], Optional[str], Optional[str]]:
+    """Best-effort extraction of latest price metadata from analysis snapshots."""
+
+    if snapshot is None:
+        return (None, None, None)
+
+    material = snapshot
+    if isinstance(material, str):
+        try:
+            material = json.loads(material)
+        except (TypeError, ValueError):
+            return (None, None, None)
+
+    if not isinstance(material, dict):
+        return (None, None, None)
+
+    symbol_candidates = [symbol, symbol.upper(), symbol.lower()]
+    symbol_data = None
+    for candidate in symbol_candidates:
+        if candidate in material:
+            symbol_data = material.get(candidate)
+            break
+
+    if not isinstance(symbol_data, dict):
+        return (None, None, None)
+
+    price = symbol_data.get("latest_price")
+    timeframe = symbol_data.get("latest_price_timeframe")
+    timestamp = symbol_data.get("latest_price_timestamp")
+
+    price_map = symbol_data.get("price_by_timeframe")
+    if price is None and isinstance(price_map, dict):
+        preferred_order = ("1m", "2m", "5m", "15m", "30m", "1h", "1d", "1wk", "1mo")
+        for candidate_tf in preferred_order:
+            candidate_price = price_map.get(candidate_tf)
+            if candidate_price is not None:
+                price = candidate_price
+                if timeframe is None:
+                    timeframe = candidate_tf
+                break
+        if price is None:
+            for candidate_tf, candidate_price in price_map.items():
+                if candidate_price is not None:
+                    price = candidate_price
+                    if timeframe is None:
+                        timeframe = candidate_tf
+                    break
+
+    try:
+        price_value = float(price) if price is not None else None
+    except (TypeError, ValueError):
+        price_value = None
+
+    if timestamp is None:
+        timestamps_map = symbol_data.get("price_timestamps")
+        if isinstance(timestamps_map, dict) and timeframe:
+            timestamp = timestamps_map.get(timeframe)
+
+    if timestamp is not None:
+        timestamp = str(timestamp)
+
+    return (price_value, timeframe, timestamp)
 
 def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:
     """Structure the trading agent result data for AI analysis"""

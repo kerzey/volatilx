@@ -546,7 +546,14 @@ from datetime import datetime
 from indicator_fetcher import ComprehensiveMultiTimeframeAnalyzer
 
 class MultiSymbolDayTraderAgent:
-    def __init__(self, symbols, timeframes=['2m','5m', '15m', '30m', '1h', '1d'], api_key=None, secret_key=None):
+    def __init__(
+        self,
+        symbols,
+        timeframes=['2m','5m', '15m', '30m', '1h', '1d'],
+        api_key=None,
+        secret_key=None,
+        market: str = "equity",
+    ):
         """
         Initialize the Multi-Symbol Day Trader Agent
         
@@ -569,7 +576,8 @@ class MultiSymbolDayTraderAgent:
                 valid_timeframes.append(tf)
         
         self.timeframes = valid_timeframes
-        self.analyzer = ComprehensiveMultiTimeframeAnalyzer(api_key=api_key, secret_key=secret_key)
+        self.market = market
+        self.analyzer = ComprehensiveMultiTimeframeAnalyzer(api_key=api_key, secret_key=secret_key, default_market=market)
         self.running = True
         self.analysis_history = {}
         
@@ -610,7 +618,8 @@ class MultiSymbolDayTraderAgent:
             results = self.analyzer.analyze_comprehensive_multi_timeframe(
                 symbol=symbol, 
                 timeframes=self.timeframes,
-                base_period='5y'
+                base_period='5y',
+                market=self.market,
             )
             
             if not results:
@@ -625,6 +634,11 @@ class MultiSymbolDayTraderAgent:
             decision_results = self.make_trading_decisions(symbol, results)
             analysis_output["decisions"] = decision_results["timeframe_decisions"]
             analysis_output["consensus"] = decision_results["consensus"]
+            analysis_output["latest_price"] = decision_results.get("latest_price")
+            analysis_output["latest_price_timeframe"] = decision_results.get("latest_price_timeframe")
+            analysis_output["price_by_timeframe"] = decision_results.get("price_by_timeframe")
+            analysis_output["price_timestamps"] = decision_results.get("price_timestamps")
+            analysis_output["latest_price_timestamp"] = decision_results.get("latest_price_timestamp")
             
             # Format analysis output
             analysis_output["analysis"].extend(self.format_analysis_output(symbol, results, decision_results))
@@ -659,6 +673,11 @@ class MultiSymbolDayTraderAgent:
                 "reasoning": []
             }
         }
+
+        latest_price = None
+        latest_price_timeframe = None
+        price_by_timeframe = {}
+        price_timestamps = {}
         
         buy_count = 0
         sell_count = 0
@@ -678,11 +697,29 @@ class MultiSymbolDayTraderAgent:
                 "risk_reward_ratio": None
             }
             
-            # Extract indicators and signals
+            # Extract indicators, signals, and normalize pricing
             indicators = data.get('indicators', {})
             trading_signals = indicators.get('trading_signals', {})
             fibonacci = indicators.get('fibonacci', {})
-            current_price = data.get('current_price', 0)
+            raw_price = data.get('current_price')
+            try:
+                current_price = float(raw_price) if raw_price is not None else None
+            except (TypeError, ValueError):
+                current_price = None
+
+            if current_price is not None:
+                timeframe_decision["current_price"] = current_price
+                timeframe_decision["entry_price"] = current_price
+                if latest_price is None:
+                    latest_price = current_price
+                    latest_price_timeframe = timeframe
+            else:
+                timeframe_decision["entry_price"] = raw_price
+
+            price_by_timeframe[timeframe] = current_price
+            timeframe_timestamp = data.get('timestamp')
+            price_timestamps[timeframe] = timeframe_timestamp
+            timeframe_decision["price_timestamp"] = timeframe_timestamp
             
             if trading_signals:
                 bias = trading_signals.get('overall_bias', 'neutral')
@@ -728,27 +765,35 @@ class MultiSymbolDayTraderAgent:
                     timeframe_decision["reasoning"].append(f"Neutral or weak signal: {bias} ({strength:.0f}%)")
                 
                 # Additional Fibonacci-based decisions
-                if 'error' not in fibonacci:
+                if 'error' not in fibonacci and current_price is not None:
                     nearest_support = fibonacci.get('nearest_support')
                     nearest_resistance = fibonacci.get('nearest_resistance')
                     
                     if nearest_support and isinstance(nearest_support, dict):
-                        support_price = nearest_support.get('price', 0)
-                        if current_price <= support_price * 1.02:  # Within 2% of support
+                        support_price = nearest_support.get('price')
+                        try:
+                            support_value = float(support_price) if support_price is not None else None
+                        except (TypeError, ValueError):
+                            support_value = None
+                        if support_value is not None and current_price <= support_value * 1.02:  # Within 2% of support
                             if timeframe_decision["recommendation"] == "HOLD":
                                 timeframe_decision["recommendation"] = "BUY"
                                 buy_count += 1
                                 hold_count -= 1
-                            timeframe_decision["reasoning"].append(f"Near Fibonacci support at ${support_price:.2f}")
+                            timeframe_decision["reasoning"].append(f"Near Fibonacci support at ${support_value:.2f}")
                     
                     if nearest_resistance and isinstance(nearest_resistance, dict):
-                        resistance_price = nearest_resistance.get('price', 0)
-                        if current_price >= resistance_price * 0.98:  # Within 2% of resistance
+                        resistance_price = nearest_resistance.get('price')
+                        try:
+                            resistance_value = float(resistance_price) if resistance_price is not None else None
+                        except (TypeError, ValueError):
+                            resistance_value = None
+                        if resistance_value is not None and current_price >= resistance_value * 0.98:  # Within 2% of resistance
                             if timeframe_decision["recommendation"] == "HOLD":
                                 timeframe_decision["recommendation"] = "SELL"
                                 sell_count += 1
                                 hold_count -= 1
-                            timeframe_decision["reasoning"].append(f"Near Fibonacci resistance at ${resistance_price:.2f}")
+                            timeframe_decision["reasoning"].append(f"Near Fibonacci resistance at ${resistance_value:.2f}")
                 
                 total_strength += strength
             
@@ -790,6 +835,15 @@ class MultiSymbolDayTraderAgent:
             if high_confidence_signals > 0:
                 decision_output["consensus"]["reasoning"].append(f"{high_confidence_signals} high-confidence signals detected")
         
+        decision_output["latest_price"] = latest_price
+        decision_output["latest_price_timeframe"] = latest_price_timeframe
+        decision_output["price_by_timeframe"] = price_by_timeframe
+        decision_output["price_timestamps"] = price_timestamps
+        if latest_price_timeframe is not None and isinstance(price_timestamps, dict):
+            decision_output["latest_price_timestamp"] = price_timestamps.get(latest_price_timeframe)
+        else:
+            decision_output["latest_price_timestamp"] = None
+
         return decision_output
     
     def format_analysis_output(self, symbol, results, decisions):
@@ -1036,8 +1090,41 @@ class MultiSymbolDayTraderAgent:
             filename = f"trading_analysis_{timestamp}.json"
         
         # Prepare data for export (remove non-serializable objects)
+        def _safe_float(value):
+            try:
+                if value is None:
+                    return None
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
         export_data = {}
         for symbol, result in results.items():
+            latest_price = _safe_float(result.get('latest_price'))
+            latest_price_timeframe = result.get('latest_price_timeframe')
+
+            price_map = {}
+            price_source = result.get('price_by_timeframe') or {}
+            if isinstance(price_source, dict):
+                for timeframe, value in price_source.items():
+                    safe_value = _safe_float(value)
+                    if safe_value is not None:
+                        price_map[timeframe] = safe_value
+
+            timestamps_map = {}
+            raw_timestamps = result.get('price_timestamps') or {}
+            if isinstance(raw_timestamps, dict):
+                for timeframe, ts_value in raw_timestamps.items():
+                    if ts_value is None:
+                        continue
+                    timestamps_map[timeframe] = str(ts_value)
+
+            latest_price_timestamp = result.get('latest_price_timestamp')
+            if latest_price_timestamp is not None:
+                latest_price_timestamp = str(latest_price_timestamp)
+            if latest_price_timestamp is None and latest_price_timeframe and isinstance(timestamps_map, dict):
+                latest_price_timestamp = timestamps_map.get(latest_price_timeframe)
+
             export_data[symbol] = {
                 'symbol': result['symbol'],
                 'timestamp': result['timestamp'],
@@ -1045,7 +1132,12 @@ class MultiSymbolDayTraderAgent:
                 'consensus': result.get('consensus'),
                 'decisions': result.get('decisions'),
                 'error': result.get('error'),
-                'analysis_time_seconds': result.get('analysis_time_seconds')
+                'analysis_time_seconds': result.get('analysis_time_seconds'),
+                'latest_price': latest_price,
+                'latest_price_timeframe': latest_price_timeframe,
+                'latest_price_timestamp': latest_price_timestamp,
+                'price_by_timeframe': price_map,
+                'price_timestamps': timestamps_map,
             }
         
         try:

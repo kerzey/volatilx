@@ -2184,6 +2184,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import warnings
 import os
+from symbol_map import DEFAULT_MARKET, SUPPORTED_MARKETS
 warnings.filterwarnings('ignore')
 
 class ComprehensiveIndicatorFetcher:
@@ -2370,7 +2371,13 @@ class ComprehensiveIndicatorFetcher:
         return {'error': 'Insufficient data for pattern detection'}
 
 class ComprehensiveMultiTimeframeAnalyzer:
-    def __init__(self, api_key=None, secret_key=None, base_url='https://paper-api.alpaca.markets'):
+    def __init__(
+        self,
+        api_key=None,
+        secret_key=None,
+        base_url='https://paper-api.alpaca.markets',
+        default_market: str = DEFAULT_MARKET,
+    ):
         """Initialize with Alpaca API credentials"""
         self.api_key = api_key
         self.secret_key = secret_key
@@ -2382,6 +2389,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
         except ValueError:
             cache_seconds = 120
         self._cache_ttl = timedelta(seconds=max(cache_seconds, 0))
+        self.default_market = default_market if default_market in SUPPORTED_MARKETS else DEFAULT_MARKET
         
         if api_key and secret_key:
             self.api = tradeapi.REST(api_key, secret_key, base_url, api_version='v2')
@@ -2445,15 +2453,19 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return start_date, end_date
     
-    def get_stock_data(self, symbol, interval='1d', period='5y'):
+    def get_stock_data(self, symbol, interval='1d', period='5y', market: str = None):
         """Fetch stock data with specified interval using Alpaca API"""
         if not self.api:
             raise ValueError("Alpaca API credentials not set. Use set_credentials() method.")
         
         if interval not in self.valid_intervals:
             raise ValueError(f"Invalid interval. Must be one of: {self.valid_intervals}")
-        
-        cache_key = (symbol.upper(), interval, period)
+
+        market_key = (market or self.default_market or DEFAULT_MARKET).lower()
+        if market_key not in SUPPORTED_MARKETS:
+            market_key = DEFAULT_MARKET
+
+        cache_key = (symbol.upper(), interval, period, market_key)
         if self._cache_ttl.total_seconds() > 0:
             cached_entry = self._data_cache.get(cache_key)
             if cached_entry:
@@ -2477,18 +2489,54 @@ class ComprehensiveMultiTimeframeAnalyzer:
             timeframe = self.alpaca_timeframes[interval]
             
             # Fetch data from Alpaca
-            bars = self.api.get_bars(
-                symbol,
-                timeframe,
-                start=start_date.strftime('%Y-%m-%d'),
-                end=end_date.strftime('%Y-%m-%d'),
-                adjustment='raw'
-            ).df
+            if market_key == 'crypto':
+                # Crypto endpoints expect RFC3339 or YYYY-MM-DD; drop microseconds for compatibility
+                start_str = start_date.strftime('%Y-%m-%d')
+                end_str = end_date.strftime('%Y-%m-%d')
+                crypto_market = os.getenv('ALPACA_CRYPTO_LOCATION', 'us')
+                try:
+                    bars = self.api.get_crypto_bars(
+                        symbol,
+                        timeframe,
+                        start=start_str,
+                        end=end_str,
+                        market=crypto_market,
+                    ).df
+                except TypeError:
+                    bars = self.api.get_crypto_bars(
+                        symbol,
+                        timeframe,
+                        start=start_str,
+                        end=end_str,
+                    ).df
+                if isinstance(bars.index, pd.MultiIndex):
+                    try:
+                        bars = bars.xs(symbol, level=0)
+                    except Exception:
+                        bars = bars.reset_index()
+                        if 'symbol' in bars.columns:
+                            bars = bars[bars['symbol'] == symbol]
+                        bars = bars.set_index('timestamp') if 'timestamp' in bars.columns else bars
+            else:
+                bars = self.api.get_bars(
+                    symbol,
+                    timeframe,
+                    start=start_date.strftime('%Y-%m-%d'),
+                    end=end_date.strftime('%Y-%m-%d'),
+                    adjustment='raw'
+                ).df
             
             if bars.empty:
                 print(f"No data returned for {symbol} with interval {interval} and period {period}")
                 return None
             
+            if not isinstance(bars.index, pd.DatetimeIndex):
+                if 'timestamp' in bars.columns:
+                    bars['timestamp'] = pd.to_datetime(bars['timestamp'])
+                    bars = bars.set_index('timestamp')
+                else:
+                    bars.index = pd.to_datetime(bars.index)
+
             # Convert to yfinance-like format
             df = pd.DataFrame()
             df['Open'] = bars['open']
@@ -3059,7 +3107,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
         
         return bullish_score, bearish_score, signals
     
-    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='5y'):
+    def analyze_comprehensive_multi_timeframe(self, symbol, timeframes=None, base_period='5y', market: str = None):
         """Comprehensive analysis across multiple timeframes"""
         if timeframes is None:
             timeframes = ['5m', '15m', '1h', '1d']
@@ -3090,7 +3138,7 @@ class ComprehensiveMultiTimeframeAnalyzer:
                 period = base_period
 
             # Get data
-            df = self.get_stock_data(symbol, interval=interval, period=period)
+            df = self.get_stock_data(symbol, interval=interval, period=period, market=market)
             
             if df is not None:
                 # Calculate comprehensive indicators

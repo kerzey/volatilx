@@ -772,7 +772,8 @@ body {
 }
 .input-group input[type="text"],
 .input-group input[type="email"],
-.input-group input[type="password"] {
+.input-group input[type="password"],
+.input-group select {
   width: 100%;
   padding: 0.8rem 1rem;
   border: 2px solid #eee;
@@ -781,10 +782,17 @@ body {
   background: #f7faff;
   transition: border 0.23s;
 }
-.input-group input:focus {
+.input-group input:focus,
+.input-group select:focus {
   outline: none;
   border-color: #667eea;
   background: #fffffc;
+}
+
+.market-select {
+  appearance: none;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.9));
+  cursor: pointer;
 }
 
 .symbol-input-wrapper {

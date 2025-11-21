@@ -37,7 +37,14 @@
             <h2 class="panel-title">AI Trading Analysis</h2>
             <form id="tradingForm">
                 <div class="input-group">
-                    <label for="stockSymbol">Stock Symbol</label>
+                    <label for="marketSelect">Market</label>
+                    <select id="marketSelect" name="market" class="market-select">
+                        <option value="equity" selected>Stocks (Equities)</option>
+                        <option value="crypto">Crypto</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="stockSymbol">Symbol</label>
                     <div class="symbol-input-wrapper">
                         <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" autocomplete="off" required>
                         <div id="symbolSuggestions" class="symbol-suggestions hidden" role="listbox" aria-label="Ticker suggestions"></div>
@@ -86,24 +93,36 @@
     </div>
     
     <script id="symbolCatalogData" type="application/json">
-        {{ (symbol_catalog or []) | tojson | safe }}
+        {{ (symbol_catalogs or {}) | tojson | safe }}
     </script>
 
     <script>
         const symbolCatalogElement = document.getElementById('symbolCatalogData');
-        let symbolCatalog = [];
+        let symbolCatalogs = { equity: [], crypto: [] };
         if (symbolCatalogElement) {
             try {
-                symbolCatalog = JSON.parse(symbolCatalogElement.textContent || '[]');
+                const parsed = JSON.parse(symbolCatalogElement.textContent || '{}');
+                if (Array.isArray(parsed)) {
+                    symbolCatalogs.equity = parsed;
+                } else if (parsed && typeof parsed === 'object') {
+                    for (const [marketKey, entries] of Object.entries(parsed)) {
+                        const normalizedKey = String(marketKey || '').toLowerCase();
+                        if (Array.isArray(entries) && (normalizedKey === 'equity' || normalizedKey === 'crypto')) {
+                            symbolCatalogs[normalizedKey] = entries;
+                        }
+                    }
+                }
             } catch (error) {
                 console.error('Failed to parse symbol catalog JSON', error);
-                symbolCatalog = [];
+                symbolCatalogs = { equity: [], crypto: [] };
             }
             symbolCatalogElement.remove();
         }
 
         const stockSymbolInput = document.getElementById('stockSymbol');
         const symbolSuggestionsEl = document.getElementById('symbolSuggestions');
+        const marketSelect = document.getElementById('marketSelect');
+        const analyzeBtn = document.getElementById('analyzeBtn');
         const usePrincipalAgentInput = document.getElementById('usePrincipalAgent');
         const useAiAnalysisInput = document.getElementById('useAiAnalysis');
         const includePrincipalRawInput = document.getElementById('includePrincipalRaw');
@@ -115,6 +134,33 @@
         const MAX_SUGGESTIONS = 9;
         let currentSymbolSuggestions = [];
         let activeSuggestionIndex = -1;
+        let currentMarket = marketSelect ? marketSelect.value : 'equity';
+
+        const MARKET_UI_CONFIG = {
+            equity: {
+                placeholder: 'Enter stock symbol (e.g., AAPL, TSLA, MSFT)',
+                buttonText: 'Analyze Stock',
+            },
+            crypto: {
+                placeholder: 'Enter crypto symbol (e.g., BTC/USD, ETH/USD)',
+                buttonText: 'Analyze Crypto',
+            },
+        };
+
+        function getActiveCatalog() {
+            return symbolCatalogs[currentMarket] || [];
+        }
+
+        function updateMarketUI() {
+            const config = MARKET_UI_CONFIG[currentMarket] || MARKET_UI_CONFIG.equity;
+            if (stockSymbolInput) {
+                stockSymbolInput.placeholder = config.placeholder;
+                stockSymbolInput.setAttribute('aria-label', `${config.buttonText} symbol input`);
+            }
+            if (analyzeBtn) {
+                analyzeBtn.textContent = config.buttonText;
+            }
+        }
 
         function filterSymbolSuggestions(query) {
             const normalized = (query || '').trim().toLowerCase();
@@ -124,8 +170,9 @@
 
             const tickerMatches = [];
             const otherMatches = [];
+            const catalog = getActiveCatalog();
 
-            for (const item of symbolCatalog) {
+            for (const item of catalog) {
                 if (!item || !item.ticker || !item.company) {
                     continue;
                 }
@@ -297,6 +344,16 @@
             });
         }
 
+        if (marketSelect) {
+            marketSelect.addEventListener('change', (event) => {
+                currentMarket = event.target.value || 'equity';
+                hideSymbolSuggestions();
+                updateMarketUI();
+            });
+        }
+
+        updateMarketUI();
+
         includePrincipalRawInput.disabled = !usePrincipalAgentInput.checked;
 
         usePrincipalAgentInput.addEventListener('change', (event) => {
@@ -313,7 +370,6 @@
             const useAiAnalysis = useAiAnalysisInput ? useAiAnalysisInput.checked : false;
             const usePrincipalAgent = usePrincipalAgentInput.checked;
             const includePrincipalRaw = includePrincipalRawInput.checked;
-            const analyzeBtn = document.getElementById('analyzeBtn');
             const resultsPanel = document.getElementById('resultsPanel');
             const resultTabs = document.getElementById('resultTabs');
             const technicalTab = document.getElementById('technicalTab');
@@ -329,9 +385,11 @@
             }
             
             if (!stockSymbol) {
-                alert('Please enter a stock symbol');
+                alert('Please enter a symbol to analyze');
                 return;
             }
+
+            const marketValue = currentMarket;
             
             // Show loading state
             analyzeBtn.disabled = true;
@@ -368,6 +426,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         stock_symbol: stockSymbol,
+                        market: marketValue,
                         use_ai_analysis: useAiAnalysis,
                         use_principal_agent: usePrincipalAgent,
                         include_principal_raw_results: includePrincipalRaw
@@ -385,6 +444,13 @@
                 }
 
                 if (response.ok && data.success) {
+                    if (data.market && typeof data.market === 'string' && data.market !== currentMarket) {
+                        currentMarket = data.market;
+                        if (marketSelect) {
+                            marketSelect.value = data.market;
+                        }
+                        updateMarketUI();
+                    }
                     currentResults = data;
                     displayResults(data, stockSymbol);
                     let extraTabs = 0;
@@ -440,7 +506,7 @@
                 displayError({ error: 'Network error occurred. Please try again.' });
             } finally {
                 analyzeBtn.disabled = false;
-                analyzeBtn.textContent = 'Analyze Stock';
+                updateMarketUI();
             }
         });
 
@@ -462,46 +528,69 @@
                 return;
             }
             // Consensus summary table (no inline style)
-            const cons = symbolData.consensus;
+            const cons = symbolData.consensus || {};
+            const latestPriceCell = `${escapeHtml(formatPrice(symbolData.latest_price))}`;
+
+            const reasoningItems = Array.isArray(cons.reasoning)
+                ? cons.reasoning.map(item => `<li>${escapeHtml(String(item))}</li>`).join('')
+                : '<li>No additional context.</li>';
+
+            const strengthText = (() => {
+                const strengthValue = Number(cons.strength);
+                if (Number.isFinite(strengthValue)) {
+                    return `${strengthValue.toFixed(2)}%`;
+                }
+                return 'N/A';
+            })();
+
             let consensusHtml = `<table>
                 <tr>
                     <th colspan="2">Consensus Summary</th>
                 </tr>
                 <tr>
+                    <td>Symbol</td>
+                    <td><strong>${escapeHtml(symbol)}</strong></td>
+                </tr>
+                <tr>
+                    <td>Current Price</td>
+                    <td>${latestPriceCell}</td>
+                </tr>
+                <tr>
                     <td>Overall Recommendation</td>
-                    <td><strong>${cons.overall_recommendation}</strong></td>
+                    <td><strong>${escapeHtml(cons.overall_recommendation || 'N/A')}</strong></td>
                 </tr>
                 <tr>
                     <td>Confidence</td>
-                    <td>${cons.confidence}</td>
+                    <td>${escapeHtml(cons.confidence || 'N/A')}</td>
                 </tr>
                 <tr>
                     <td>Strength</td>
-                    <td>${cons.strength.toFixed(2)}%</td>
+                    <td>${escapeHtml(strengthText)}</td>
                 </tr>
                 <tr>
                     <td>Buy Signals</td>
-                    <td>${cons.buy_signals}</td>
+                    <td>${escapeHtml(String(cons.buy_signals ?? 'N/A'))}</td>
                 </tr>
                 <tr>
                     <td>Sell Signals</td>
-                    <td>${cons.sell_signals}</td>
+                    <td>${escapeHtml(String(cons.sell_signals ?? 'N/A'))}</td>
                 </tr>
                 <tr>
                     <td>Hold Signals</td>
-                    <td>${cons.hold_signals}</td>
+                    <td>${escapeHtml(String(cons.hold_signals ?? 'N/A'))}</td>
                 </tr>
                 <tr>
                     <td>Reasoning</td>
                     <td>
                     <ul>
-                    ${cons.reasoning.map(item => `<li>${item}</li>`).join('')}
+                    ${reasoningItems}
                     </ul>
                     </td>
                 </tr>
             </table>`;
+
             // Decisions by timeframe (no inline style)
-            const decisions = symbolData.decisions;
+            const decisions = symbolData.decisions || {};
             let decisionHtml = `<table class="decisions-table">
                 <thead>
                 <tr>
@@ -521,7 +610,7 @@
             for (const [tf, d] of Object.entries(decisions)) {
                 decisionHtml += `
                 <tr>
-                    <td data-label="Timeframe">${tf}</td>
+                    <td data-label="Timeframe">${escapeHtml(tf)}</td>
                     <td data-label="Sig." style="color:${d.recommendation === 'BUY' ? '#27ae60' : d.recommendation === 'SELL' ? '#e74c3c' : '#333'};font-weight:bold">${d.recommendation}</td>
                     <td data-label="Conf.">${d.confidence}</td>
                     <td data-label="Strength">${safeToFixed(d.strength)}%</td>
@@ -573,9 +662,12 @@
                 return true;
             }
             const analysis = aiAnalysis.analysis;
+            const aiPriceSummary = typeof aiAnalysis.latest_price !== 'undefined'
+                ? `<div class="result-meta">Current Price: <strong>${escapeHtml(formatPrice(aiAnalysis.latest_price))}</strong></div>`
+                : '';
             let html = `<div class="result-item success ai-analysis">
                 <div class="result-title">AI Investment strategy</div>
-                <div class="result-content">AI analysis completed successfully using ${aiAnalysis.tokens_used || 'N/A'} tokens.</div>
+                <div class="result-content">AI analysis completed successfully using ${escapeHtml(String(aiAnalysis.tokens_used || 'N/A'))} tokens.${aiPriceSummary}</div>
             </div>`;
             if (analysis) {
                 if (analysis.market_position) {
@@ -691,8 +783,16 @@
 
             const summaryCells = [
                 { label: 'Symbol', value: plan.symbol || 'N/A' },
-                { label: 'Generated', value: generatedAt },
             ];
+
+            if (typeof plan.latest_price !== 'undefined') {
+                summaryCells.push({
+                    label: 'Current Price',
+                    value: formatPrice(plan.latest_price),
+                });
+            }
+
+            summaryCells.push({ label: 'Generated', value: generatedAt });
 
             if (usage) {
                 summaryCells.push({ label: 'Tokens Used', value: usage.total_tokens ?? 'N/A' });
@@ -747,12 +847,18 @@
                 ? 'Price action insights generated.'
                 : (priceAction.error || 'Price action analysis failed.');
 
+            let currentPriceHtml = '';
+            if (typeof priceAction.latest_price !== 'undefined') {
+                currentPriceHtml = `<div><strong>Current Price:</strong> ${escapeHtml(formatPrice(priceAction.latest_price))}</div>`;
+            }
+
             let html = `
                 <div class="result-item ${priceAction.success ? 'success' : 'error'}">
                     <div class="result-title">Price Action Summary</div>
                     <div class="result-content price-action-summary">
                         <div><strong>Symbol:</strong> ${escapeHtml(priceAction.symbol || 'N/A')}</div>
                         <div><strong>Generated:</strong> ${escapeHtml(formatDateTime(priceAction.generated_at))}</div>
+                        ${currentPriceHtml}
                         <div>${escapeHtml(headerMessage)}</div>
                     </div>
                 </div>
