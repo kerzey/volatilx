@@ -787,6 +787,141 @@ body {
   background: #fffffc;
 }
 
+.symbol-input-wrapper {
+  position: relative;
+}
+
+.symbol-suggestions {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 24px 46px rgba(79, 70, 229, 0.18);
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 0.65rem 0.55rem;
+  z-index: 40;
+  backdrop-filter: blur(6px);
+}
+
+.symbol-suggestions.hidden {
+  display: none;
+}
+
+.symbol-suggestion {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.15rem 1.3rem 1.1rem 1.45rem;
+  margin: 0.34rem 0;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1.52;
+  border-radius: 16px;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+.symbol-suggestion:hover,
+.symbol-suggestion.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(59, 130, 246, 0.12));
+  box-shadow: 0 14px 30px rgba(79, 70, 229, 0.22);
+  transform: translateX(4px) scale(1.01);
+}
+
+
+.symbol-suggestion::after {
+  content: '➜';
+  font-size: 1.16rem;
+  color: #1e1b4b;
+  position: absolute;
+  right: 1.05rem;
+  top: 50%;
+  opacity: 0;
+  transform: translateY(-50%) translateX(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.symbol-suggestion:hover::after,
+.symbol-suggestion.active::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.symbol-suggestion:first-child {
+  margin-top: 0;
+}
+
+.symbol-suggestion:last-child {
+  margin-bottom: 0;
+}
+
+.symbol-suggestion::before {
+  content: '';
+  position: absolute;
+  left: 0.55rem;
+  top: 50%;
+  width: 4px;
+  height: 58%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6366f1, #38bdf8);
+  opacity: 0;
+  transform: translateY(-50%) scaleY(0.3);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.symbol-suggestion:hover::before,
+.symbol-suggestion.active::before {
+  opacity: 1;
+  transform: translateY(-50%) scaleY(1);
+}
+
+.symbol-suggestion__ticker {
+  font-weight: 600;
+  color: #1e1b4b;
+  min-width: 3.75rem;
+  transition: color 0.18s ease;
+}
+
+.symbol-suggestion__separator {
+  color: #64748b;
+  font-weight: 500;
+  margin: 0 0.25rem;
+  transition: color 0.18s ease;
+}
+
+.symbol-suggestion__company {
+  flex: 1;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.18s ease;
+}
+
+.symbol-suggestion:hover .symbol-suggestion__ticker,
+.symbol-suggestion.active .symbol-suggestion__ticker,
+.symbol-suggestion:hover .symbol-suggestion__company,
+.symbol-suggestion.active .symbol-suggestion__company,
+.symbol-suggestion:hover .symbol-suggestion__separator,
+.symbol-suggestion.active .symbol-suggestion__separator {
+  color: #0f172a;
+}
+
+@media (max-width: 600px) {
+  .symbol-suggestions {
+    max-height: 200px;
+  }
+
+  .symbol-suggestion {
+    padding: 1rem 1.05rem 0.95rem 1.25rem;
+    margin: 0.3rem 0;
+  }
+}
+
 /* Checkbox (align row) */
 .checkbox-group {
   flex-direction: row;

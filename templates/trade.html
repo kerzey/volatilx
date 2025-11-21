@@ -38,7 +38,10 @@
             <form id="tradingForm">
                 <div class="input-group">
                     <label for="stockSymbol">Stock Symbol</label>
-                    <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" required>
+                    <div class="symbol-input-wrapper">
+                        <input type="text" id="stockSymbol" name="stock_symbol" placeholder="Enter stock symbol (e.g., AAPL, TSLA, MSFT)" autocomplete="off" required>
+                        <div id="symbolSuggestions" class="symbol-suggestions hidden" role="listbox" aria-label="Ticker suggestions"></div>
+                    </div>
                 </div>
                 <!--
                 <div class="checkbox-group">
@@ -69,6 +72,8 @@
                 <div class="tab" onclick="showTab('principal', event)" id="principalTab" style="display:none;">AI Agents Plan</div>
             </div>
 
+            <div id="symbolMessage" class="result-item info hidden"></div>
+
             <div id="resultsContent">
                 <div id="technicalContent" class="tab-content active"></div>
                 <div id="priceActionContent" class="tab-content"></div>
@@ -80,14 +85,217 @@
         </div>
     </div>
     
+    <script id="symbolCatalogData" type="application/json">
+        {{ (symbol_catalog or []) | tojson | safe }}
+    </script>
+
     <script>
-        let currentResults = null;
-    const usePrincipalAgentInput = document.getElementById('usePrincipalAgent');
-    const useAiAnalysisInput = document.getElementById('useAiAnalysis');
+        const symbolCatalogElement = document.getElementById('symbolCatalogData');
+        let symbolCatalog = [];
+        if (symbolCatalogElement) {
+            try {
+                symbolCatalog = JSON.parse(symbolCatalogElement.textContent || '[]');
+            } catch (error) {
+                console.error('Failed to parse symbol catalog JSON', error);
+                symbolCatalog = [];
+            }
+            symbolCatalogElement.remove();
+        }
+
+        const stockSymbolInput = document.getElementById('stockSymbol');
+        const symbolSuggestionsEl = document.getElementById('symbolSuggestions');
+        const usePrincipalAgentInput = document.getElementById('usePrincipalAgent');
+        const useAiAnalysisInput = document.getElementById('useAiAnalysis');
         const includePrincipalRawInput = document.getElementById('includePrincipalRaw');
-    const priceActionTab = document.getElementById('priceActionTab');
+        const priceActionTab = document.getElementById('priceActionTab');
         const principalTab = document.getElementById('principalTab');
-    const LEGAL_NOTE_HTML = '<div class="legal-note">This content is for informational purposes only and does not constitute financial advice.</div>';
+        const symbolMessageEl = document.getElementById('symbolMessage');
+        const LEGAL_NOTE_HTML = '<div class="legal-note">This content is for informational purposes only and does not constitute financial advice.</div>';
+        let currentResults = null;
+        const MAX_SUGGESTIONS = 9;
+        let currentSymbolSuggestions = [];
+        let activeSuggestionIndex = -1;
+
+        function filterSymbolSuggestions(query) {
+            const normalized = (query || '').trim().toLowerCase();
+            if (!normalized) {
+                return [];
+            }
+
+            const tickerMatches = [];
+            const otherMatches = [];
+
+            for (const item of symbolCatalog) {
+                if (!item || !item.ticker || !item.company) {
+                    continue;
+                }
+                const tickerLower = String(item.ticker).toLowerCase();
+                const companyLower = String(item.company).toLowerCase();
+
+                if (tickerLower.startsWith(normalized)) {
+                    tickerMatches.push(item);
+                } else if (tickerLower.includes(normalized) || companyLower.includes(normalized)) {
+                    otherMatches.push(item);
+                }
+            }
+
+            const combined = tickerMatches.concat(otherMatches);
+            const seenTickers = new Set();
+            const results = [];
+
+            for (const item of combined) {
+                const ticker = item.ticker;
+                if (seenTickers.has(ticker)) {
+                    continue;
+                }
+                seenTickers.add(ticker);
+                results.push(item);
+                if (results.length >= MAX_SUGGESTIONS) {
+                    break;
+                }
+            }
+
+            return results;
+        }
+
+        function hideSymbolSuggestions() {
+            if (!symbolSuggestionsEl) {
+                return;
+            }
+            symbolSuggestionsEl.classList.add('hidden');
+            symbolSuggestionsEl.innerHTML = '';
+            currentSymbolSuggestions = [];
+            activeSuggestionIndex = -1;
+        }
+
+        function renderSymbolSuggestions(items) {
+            if (!symbolSuggestionsEl) {
+                return;
+            }
+            if (!items.length) {
+                hideSymbolSuggestions();
+                return;
+            }
+
+            currentSymbolSuggestions = items;
+            activeSuggestionIndex = -1;
+
+            symbolSuggestionsEl.innerHTML = items
+                .map((item, index) => {
+                    const tickerLabel = escapeHtml(String(item.ticker || '').toUpperCase());
+                    const companyLabel = escapeHtml(String(item.company || ''));
+                    return `<div class="symbol-suggestion" role="option" data-index="${index}" aria-selected="false">`
+                        + `<span class="symbol-suggestion__ticker">${tickerLabel}</span>`
+                        + `<span class="symbol-suggestion__separator"> - </span>`
+                        + `<span class="symbol-suggestion__company">${companyLabel}</span>`
+                        + '</div>';
+                })
+                .join('');
+
+            symbolSuggestionsEl.classList.remove('hidden');
+        }
+
+        function setActiveSymbolSuggestion(index) {
+            if (!symbolSuggestionsEl) {
+                return;
+            }
+            const options = symbolSuggestionsEl.querySelectorAll('.symbol-suggestion');
+            if (!options.length) {
+                return;
+            }
+            options.forEach((option, idx) => {
+                if (idx === index) {
+                    option.classList.add('active');
+                    option.setAttribute('aria-selected', 'true');
+                    option.scrollIntoView({ block: 'nearest' });
+                } else {
+                    option.classList.remove('active');
+                    option.setAttribute('aria-selected', 'false');
+                }
+            });
+        }
+
+        function moveSymbolSuggestionFocus(direction) {
+            if (!currentSymbolSuggestions.length) {
+                return;
+            }
+
+            const nextIndex = activeSuggestionIndex + direction;
+            if (nextIndex < 0) {
+                activeSuggestionIndex = currentSymbolSuggestions.length - 1;
+            } else if (nextIndex >= currentSymbolSuggestions.length) {
+                activeSuggestionIndex = 0;
+            } else {
+                activeSuggestionIndex = nextIndex;
+            }
+
+            setActiveSymbolSuggestion(activeSuggestionIndex);
+        }
+
+        function selectSymbolSuggestion(item) {
+            if (!stockSymbolInput || !item) {
+                return;
+            }
+            stockSymbolInput.value = String(item.ticker || '').toUpperCase();
+            hideSymbolSuggestions();
+            stockSymbolInput.focus();
+        }
+
+        function handleSymbolInput(event) {
+            if (!event || !stockSymbolInput) {
+                return;
+            }
+            const suggestions = filterSymbolSuggestions(event.target.value);
+            renderSymbolSuggestions(suggestions);
+        }
+
+        function handleSymbolKeydown(event) {
+            if (!symbolSuggestionsEl || symbolSuggestionsEl.classList.contains('hidden')) {
+                return;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                moveSymbolSuggestionFocus(1);
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                moveSymbolSuggestionFocus(-1);
+            } else if (event.key === 'Enter') {
+                if (activeSuggestionIndex >= 0 && currentSymbolSuggestions[activeSuggestionIndex]) {
+                    event.preventDefault();
+                    selectSymbolSuggestion(currentSymbolSuggestions[activeSuggestionIndex]);
+                }
+            } else if (event.key === 'Escape') {
+                hideSymbolSuggestions();
+            }
+        }
+
+        if (stockSymbolInput) {
+            stockSymbolInput.addEventListener('input', handleSymbolInput);
+            stockSymbolInput.addEventListener('focus', () => handleSymbolInput({ target: stockSymbolInput }));
+            stockSymbolInput.addEventListener('keydown', handleSymbolKeydown);
+            stockSymbolInput.addEventListener('blur', () => {
+                setTimeout(hideSymbolSuggestions, 120);
+            });
+        }
+
+        if (symbolSuggestionsEl) {
+            symbolSuggestionsEl.addEventListener('mousedown', (event) => {
+                const option = event.target.closest('.symbol-suggestion');
+                if (!option) {
+                    return;
+                }
+                event.preventDefault();
+                const index = Number(option.getAttribute('data-index'));
+                if (Number.isNaN(index)) {
+                    return;
+                }
+                const item = currentSymbolSuggestions[index];
+                if (item) {
+                    selectSymbolSuggestion(item);
+                }
+            });
+        }
 
         includePrincipalRawInput.disabled = !usePrincipalAgentInput.checked;
 
@@ -101,7 +309,7 @@
         
         document.getElementById('tradingForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const stockSymbol = document.getElementById('stockSymbol').value.trim().toUpperCase();
+            const stockSymbol = stockSymbolInput ? stockSymbolInput.value.trim().toUpperCase() : '';
             const useAiAnalysis = useAiAnalysisInput ? useAiAnalysisInput.checked : false;
             const usePrincipalAgent = usePrincipalAgentInput.checked;
             const includePrincipalRaw = includePrincipalRawInput.checked;
@@ -112,6 +320,13 @@
             const priceActionContent = document.getElementById('priceActionContent');
             const aiContent = document.getElementById('aiContent');
             const principalPlanContent = document.getElementById('principalPlanContent');
+            if (symbolSuggestionsEl) {
+                hideSymbolSuggestions();
+            }
+            if (symbolMessageEl) {
+                symbolMessageEl.classList.add('hidden');
+                symbolMessageEl.innerHTML = '';
+            }
             
             if (!stockSymbol) {
                 alert('Please enter a stock symbol');
@@ -195,6 +410,11 @@
                         resultTabs.classList.remove('hidden');
                     }
 
+                    if (symbolMessageEl && data.symbol_message) {
+                        symbolMessageEl.innerHTML = `<div class="result-content">${escapeHtml(data.symbol_message)}</div>`;
+                        symbolMessageEl.classList.remove('hidden');
+                    }
+
                     // If ai_job_id is present, start polling for async analysis
                     if (data.ai_job_id) {
                         pollAiAnalysis({
@@ -209,6 +429,11 @@
                     }
                 } else {
                     displayError(data);
+                    if (symbolMessageEl && data && data.code === 'unknown_symbol') {
+                        const suggestionText = data.error || 'Please choose a supported ticker.';
+                        symbolMessageEl.innerHTML = `<div class="result-content">${escapeHtml(suggestionText)}</div>`;
+                        symbolMessageEl.classList.remove('hidden');
+                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -1070,6 +1295,10 @@
         }
         function displayError(payload) {
             const technicalContent = document.getElementById('technicalContent');
+            if (symbolMessageEl) {
+                symbolMessageEl.classList.add('hidden');
+                symbolMessageEl.innerHTML = '';
+            }
             const detail = (typeof payload === 'string' || payload instanceof String)
                 ? { error: payload }
                 : (payload || {});

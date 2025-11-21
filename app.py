@@ -67,6 +67,12 @@ import hashlib
 from ai_agents.openai_service import openai_service
 from ai_agents.principal_agent import PrincipalAgent
 from ai_agents.price_action import PriceActionAnalyzer
+from symbol_map import (
+    TICKER_TO_COMPANY,
+    SymbolNotFound,
+    get_symbol_catalog,
+    normalize_symbol,
+)
 from azure_storage import store_ai_report
 
 load_dotenv()
@@ -709,6 +715,7 @@ async def trade_page(request: Request, user: User = Depends(get_current_user_syn
         "request": request,
         "user": user,
         "subscription": _serialize_subscription(subscription),
+        "symbol_catalog": get_symbol_catalog(),
     }
     return templates.TemplateResponse("trade.html", context)
 
@@ -721,13 +728,41 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
         print("Printing data:", data)
         
         # Extract variables from the request data
-        stock_symbol = data.get('stock_symbol')
+        raw_stock_symbol = data.get('stock_symbol')
+        stock_symbol = raw_stock_symbol
         use_ai_analysis = data.get('use_ai_analysis', False)
         use_principal_agent = data.get('use_principal_agent', use_ai_analysis)
         include_principal_raw = bool(data.get('include_principal_raw_results', False))
         price_action_timeframes_raw = data.get('price_action_timeframes')
         price_action_period_overrides_raw = data.get('price_action_period_overrides')
         # language = data.get('language', 'en')
+
+        symbol_message: Optional[str] = None
+        try:
+            stock_symbol, message = normalize_symbol(stock_symbol)
+            symbol_message = message
+        except SymbolNotFound as exc:
+            suggestion_company = None
+            suggestion_symbol = exc.suggestion
+            if suggestion_symbol:
+                suggestion_company = TICKER_TO_COMPANY.get(suggestion_symbol)
+            error_message = f"Unknown symbol '{raw_stock_symbol}'."
+            if suggestion_symbol:
+                if suggestion_company:
+                    error_message += f" Did you mean {suggestion_company} ({suggestion_symbol})?"
+                else:
+                    error_message += f" Did you mean {suggestion_symbol}?"
+            else:
+                error_message += " Please choose a supported ticker."
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": error_message,
+                    "code": "unknown_symbol",
+                    "suggested_symbol": suggestion_symbol,
+                    "suggested_company": suggestion_company,
+                },
+            )
         
         logger.info(
             "User %s requested trade analysis for %s (ai=%s principal=%s)",
@@ -938,6 +973,8 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
             'symbol': stock_symbol,
             'timestamp': str(datetime.now()),
             'ai_job_id': ai_job_id,
+            'symbol_message': symbol_message,
+            'input_symbol': raw_stock_symbol,
         }
         if runs_remaining_after is not None:
             response['runs_remaining'] = runs_remaining_after
