@@ -40,6 +40,8 @@ _FALLBACK_TICKERS: Dict[str, str] = {
     "GS": "The Goldman Sachs Group, Inc.",
     "V": "Visa Inc.",
     "MA": "Mastercard Incorporated",
+    "SPY": "SPDR S&P 500 ETF Trust",
+    "QQQ": "Invesco QQQ Trust",
 }
 
 _ALPACA_CACHE_TTL_SECONDS = int(os.getenv("ALPACA_ASSET_CACHE_TTL_SECONDS", "21600"))
@@ -83,7 +85,7 @@ def _fetch_assets_from_alpaca() -> Dict[str, str]:
     secret_key = os.getenv("ALPACA_SECRET_KEY")
     base_url = os.getenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
     if not api_key or not secret_key:
-        logger.debug("Alpaca credentials not configured; skipping asset catalog fetch")
+        logger.warning("Alpaca credentials missing; symbol catalog falling back to static list")
         return {}
 
     url = f"{base_url.rstrip('/')}/v2/assets"
@@ -137,6 +139,12 @@ def _load_ticker_map(force_refresh: bool = False) -> Dict[str, str]:
         else:
             mapping = {}
         ttl = _FALLBACK_CACHE_TTL_SECONDS
+        logger.warning(
+            "Using fallback symbol catalog with %s entries; check Alpaca connectivity",
+            len(mapping) or len(_FALLBACK_TICKERS),
+        )
+    else:
+        logger.info("Loaded %s symbols from Alpaca asset catalog", len(mapping))
 
     merged = _FALLBACK_TICKERS.copy()
     merged.update(mapping)
