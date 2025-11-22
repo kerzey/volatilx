@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VolatilX - Shared AI Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="header">
+        <a class="logo" href="/dashboard">
+            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
+            <span>VolatilX</span>
+        </a>
+        <div class="nav-links">
+            <a href="/trade">Trading</a>
+            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/subscribe">Plans</a>
+            <a href="/settings">Settings</a>
+            <span>{{ user.email }}</span>
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <div class="container dashboard-container">
+        <section class="dashboard-meta">
+            <h1>Shared AI Report Dashboard</h1>
+            <p>Viewing cached multi-agent strategies for <strong>{{ selected_date_label }}</strong>{% if selected_symbol %} focused on <strong>{{ selected_symbol }}</strong>{% endif %}. {{ report_count }} curated report{{ 's' if report_count != 1 else '' }} available.</p>
+        </section>
+
+        <form class="dashboard-filters" method="get" action="/dashboard">
+            <div class="filter-group">
+                <label for="dateInput">Date</label>
+                <input type="date" id="dateInput" name="date" value="{{ selected_date }}" max="{{ today_date }}">
+            </div>
+            <div class="filter-group">
+                <label for="symbolInput">Symbol</label>
+                <input type="text" id="symbolInput" name="symbol" value="{{ selected_symbol_input }}" placeholder="Optional ticker filter (e.g., AAPL)">
+            </div>
+            <button type="submit" class="filter-submit">Refresh</button>
+            {% if selected_symbol %}
+            <a class="filter-reset" href="/dashboard?date={{ selected_date }}">Clear symbol</a>
+            {% endif %}
+        </form>
+
+        {% if available_symbols %}
+        <div class="dashboard-available">
+            <span>Symbols found:</span>
+            {% for symbol_option in available_symbols %}
+                <a class="symbol-chip" href="/dashboard?date={{ selected_date }}&symbol={{ symbol_option }}">{{ symbol_option }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if excluded_report_count %}
+        <div class="dashboard-alert warning">
+            {{ excluded_report_count }} stored report{{ 's' if excluded_report_count != 1 else '' }} could not be summarised yet and were hidden.
+        </div>
+        {% endif %}
+
+        {% if reports %}
+        <section class="dashboard-grid">
+            {% for report in reports %}
+            <article class="dashboard-card">
+                <header class="dashboard-card-header">
+                    <div>
+                        <h2>{{ report.symbol }}</h2>
+                        {% if report.generated_display %}
+                        <p class="timestamp">Generated {{ report.generated_display }}</p>
+                        {% endif %}
+                    </div>
+                    {% if report.consensus and report.consensus.recommendation %}
+                    <span class="badge consensus-{{ report.consensus.recommendation|lower|replace(' ', '-') }}">{{ report.consensus.recommendation }}</span>
+                    {% endif %}
+                </header>
+
+                {% if report.price %}
+                <section class="dashboard-section price-overview">
+                    <h3>Market Snapshot</h3>
+                    <div class="price-grid">
+                        <div>
+                            <span class="label">Timeframe</span>
+                            <span>{{ report.price.timeframe }}</span>
+                        </div>
+                        <div>
+                            <span class="label">Close</span>
+                            <span>{{ report.price.close }}</span>
+                        </div>
+                        <div>
+                            <span class="label">Change %</span>
+                            <span>{% if report.price.change_pct is not none %}{{ '{:.2f}'.format(report.price.change_pct|float) }}%{% else %}—{% endif %}</span>
+                        </div>
+                        <div>
+                            <span class="label">Volume</span>
+                            <span>{{ report.price.volume or '—' }}</span>
+                        </div>
+                    </div>
+                </section>
+                {% endif %}
+
+                {% if report.consensus %}
+                <section class="dashboard-section consensus-overview">
+                    <h3>Consensus</h3>
+                    <div class="consensus-grid">
+                        {% if report.consensus.confidence %}
+                        <div>
+                            <span class="label">Confidence</span>
+                            <span>{{ report.consensus.confidence }}</span>
+                        </div>
+                        {% endif %}
+                        {% if report.consensus.strength is not none %}
+                        <div>
+                            <span class="label">Strength</span>
+                            <span>{{ report.consensus.strength }}</span>
+                        </div>
+                        {% endif %}
+                        {% if report.consensus.buy_signals is not none %}
+                        <div>
+                            <span class="label">Buy Signals</span>
+                            <span>{{ report.consensus.buy_signals }}</span>
+                        </div>
+                        {% endif %}
+                        {% if report.consensus.sell_signals is not none %}
+                        <div>
+                            <span class="label">Sell Signals</span>
+                            <span>{{ report.consensus.sell_signals }}</span>
+                        </div>
+                        {% endif %}
+                        {% if report.consensus.hold_signals is not none %}
+                        <div>
+                            <span class="label">Hold Signals</span>
+                            <span>{{ report.consensus.hold_signals }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if report.consensus.focus %}
+                    <div class="focus-card">
+                        <div>
+                            <span class="label">Focus Timeframe</span>
+                            <span>{{ report.consensus.focus.timeframe }}</span>
+                        </div>
+                        {% if report.consensus.focus.recommendation %}
+                        <div>
+                            <span class="label">Recommendation</span>
+                            <span>{{ report.consensus.focus.recommendation }}</span>
+                        </div>
+                        {% endif %}
+                        {% if report.consensus.focus.confidence %}
+                        <div>
+                            <span class="label">Confidence</span>
+                            <span>{{ report.consensus.focus.confidence }}</span>
+                        </div>
+                        {% endif %}
+                        {% for price_key, price_value in report.consensus.focus.items() %}
+                        {% if price_key in ['entry_price', 'stop_loss', 'take_profit', 'risk_reward_ratio'] and price_value %}
+                        <div>
+                            <span class="label">{{ price_key|replace('_', ' ')|title }}</span>
+                            <span>{{ price_value }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if report.consensus.reasoning %}
+                    <ul class="reasoning-list">
+                        {% for reason in report.consensus.reasoning %}
+                        <li>{{ reason }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </section>
+                {% endif %}
+
+                {% if report.strategies %}
+                <section class="dashboard-section strategy-overview">
+                    <h3>Strategy Highlights</h3>
+                    <div class="strategy-grid">
+                        {% for key, strategy in report.strategies.items() %}
+                        <div class="strategy-card">
+                            <h4>{{ strategy.label }}</h4>
+                            {% if strategy.summary %}
+                            <p>{{ strategy.summary }}</p>
+                            {% endif %}
+                            {% if strategy.next_actions %}
+                            <ul>
+                                {% for action in strategy.next_actions %}
+                                <li>{{ action }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                            {% if strategy.confidence %}
+                            <p class="muted">Confidence: {{ strategy.confidence }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+
+                {% if report.price_action %}
+                <section class="dashboard-section price-action-overview">
+                    <h3>Price Action Notes</h3>
+                    {% if report.price_action.trend_alignment %}
+                    <p><strong>Trend:</strong> {{ report.price_action.trend_alignment }}</p>
+                    {% endif %}
+                    {% if report.price_action.key_levels %}
+                    <div class="levels-grid">
+                        {% for level in report.price_action.key_levels %}
+                        <div>
+                            <span class="label">Level</span>
+                            <span>{{ level.price }}</span>
+                            {% if level.distance_pct is not none %}
+                            <span class="muted">{{ '%.2f'|format(level.distance_pct) }}% away</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if report.price_action.recent_patterns %}
+                    <ul class="pattern-list">
+                        {% for pattern in report.price_action.recent_patterns %}
+                        <li>{{ pattern }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </section>
+                {% endif %}
+
+                <footer class="dashboard-card-footer">
+                    <span class="muted">Blob: {{ report.source.blob or 'unknown' }}</span>
+                    {% if report.source.user_id %}
+                    <span class="muted">Author: {{ report.source.user_id }}</span>
+                    {% endif %}
+                </footer>
+            </article>
+            {% endfor %}
+        </section>
+        {% else %}
+        <div class="dashboard-empty">
+            <p>No AI reports found for {{ selected_date_label }}{% if selected_symbol %} matching {{ selected_symbol }}{% endif %}. Try another date or remove the symbol filter.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script id="dashboardReportsData" type="application/json">
+        {{ reports | tojson | safe }}
+    </script>
+</body>
+</html>

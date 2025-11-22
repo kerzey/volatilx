@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime
 from functools import lru_cache
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from azure.core.exceptions import ResourceExistsError  # type: ignore[import-untyped]
 from azure.identity import DefaultAzureCredential  # type: ignore[import-untyped]
@@ -17,8 +17,8 @@ class AzureStorageUnavailable(RuntimeError):
     """Raised when Azure storage configuration is missing."""
 
 
-@lru_cache(maxsize=64)
-def _get_container_client(container_name: str):
+@lru_cache(maxsize=1)
+def _get_blob_service_client():
     connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
     if connection_string:
         logger.debug("Initialising Azure Blob client via connection string")
@@ -41,6 +41,30 @@ def _get_container_client(container_name: str):
         logger.debug("Initialising Azure Blob client via managed identity credential (account_url=%s)", account_url)
         blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
 
+    return blob_service_client
+
+
+def _resolve_base_container() -> str:
+    base_container = os.getenv("AZURE_STORAGE_CONTAINER", "ai-reports")
+    sanitized_base = re.sub(r"[^a-z0-9-]", "-", base_container.lower())
+    if not sanitized_base:
+        sanitized_base = "ai-reports"
+    return sanitized_base
+
+
+def _build_container_name(target_date: datetime) -> str:
+    sanitized_base = _resolve_base_container()
+    container_name = f"{sanitized_base}-{target_date.strftime('%Y-%m-%d')}".strip("-")
+    container_name = container_name[:63]
+    if len(container_name) < 3:
+        container_name = f"{container_name}{'a' * (3 - len(container_name))}"
+    return container_name
+
+
+@lru_cache(maxsize=64)
+def _get_container_client(container_name: str):
+    blob_service_client = _get_blob_service_client()
+
     container_client = blob_service_client.get_container_client(container_name)
     try:
         container_client.create_container()
@@ -54,15 +78,7 @@ def store_ai_report(symbol: str, user_id: Any, payload: Dict[str, Any]) -> bool:
     """Persist AI analysis output as JSON in Azure Blob Storage."""
 
     try:
-        today = datetime.utcnow().strftime("%Y-%m-%d")
-        base_container = os.getenv("AZURE_STORAGE_CONTAINER", "ai-reports")
-        sanitized_base = re.sub(r"[^a-z0-9-]", "-", base_container.lower())
-        if not sanitized_base:
-            sanitized_base = "ai-reports"
-        container_name = f"{sanitized_base}-{today}".strip("-")
-        container_name = container_name[:63]
-        if len(container_name) < 3:
-            container_name = f"{container_name}{'a' * (3 - len(container_name))}"  # pad to minimum length
+        container_name = _build_container_name(datetime.utcnow())
         container_client = _get_container_client(container_name)
     except AzureStorageUnavailable as exc:
         logger.warning("Azure storage disabled: %s", exc)
@@ -102,3 +118,56 @@ def _json_fallback(value):
     if isinstance(value, datetime):
         return value.isoformat()
     return str(value)
+
+
+def fetch_reports_for_date(
+    target_date: datetime,
+    *,
+    symbol: Optional[str] = None,
+    max_reports: int = 120,
+) -> List[Dict[str, Any]]:
+    """Retrieve stored AI reports for a given UTC date from Azure storage."""
+
+    try:
+        container_name = _build_container_name(target_date)
+        blob_service_client = _get_blob_service_client()
+        container_client = blob_service_client.get_container_client(container_name)
+        if not container_client.exists():
+            logger.info("Azure container %s does not exist yet for date %s", container_name, target_date.date())
+            return []
+    except AzureStorageUnavailable as exc:
+        logger.warning("Azure storage unavailable: %s", exc)
+        return []
+    except Exception as exc:  # noqa: BLE001 - never propagate storage errors
+        logger.exception("Failed to connect to Azure storage for dashboard fetch")
+        return []
+
+    prefix = None
+    if symbol:
+        safe_symbol = symbol.upper().replace("/", "-").replace(" ", "_")
+        prefix = f"{safe_symbol}_"
+
+    results: List[Dict[str, Any]] = []
+    try:
+        blob_iter = container_client.list_blobs(name_starts_with=prefix)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to list blobs in container %s", container_name)
+        return []
+
+    for blob in blob_iter:
+        if max_reports and len(results) >= max_reports:
+            break
+        if not str(blob.name).lower().endswith(".json"):
+            continue
+        try:
+            downloader = container_client.download_blob(blob.name)
+            payload = downloader.readall()
+            data = json.loads(payload)
+            data.setdefault("_blob_name", blob.name)
+            data.setdefault("_blob_last_modified", blob.last_modified.isoformat() if blob.last_modified else None)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Skipping blob %s due to read error: %s", blob.name, exc)
+            continue
+        results.append(data)
+
+    return results

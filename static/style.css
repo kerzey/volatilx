@@ -1592,6 +1592,322 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   border: 1px solid #dfe6ff;
 }
 
+/* DASHBOARD --------------------------------------------------------------- */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+  width: min(1180px, 100%);
+  margin: 2.5rem auto 4rem;
+}
+
+.dashboard-meta h1 {
+  margin: 0;
+  font-size: clamp(1.85rem, 3vw, 2.35rem);
+  color: #1e1b4b;
+}
+
+.dashboard-meta p {
+  margin: 0.45rem 0 0;
+  color: rgba(30, 27, 75, 0.7);
+  line-height: 1.6;
+}
+
+.dashboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  background: #ffffff;
+  border: 1px solid rgba(102, 126, 234, 0.22);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #4338ca;
+}
+
+.filter-group input {
+  appearance: none;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.filter-group input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+  outline: none;
+}
+
+.filter-submit {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.filter-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(118, 75, 162, 0.25);
+}
+
+.filter-reset {
+  font-size: 0.92rem;
+  color: #4f46e5;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.filter-reset:hover {
+  text-decoration: underline;
+}
+
+.dashboard-available {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  font-size: 0.9rem;
+  color: rgba(30, 27, 75, 0.6);
+}
+
+.symbol-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(102, 126, 234, 0.12);
+  color: #4338ca;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.symbol-chip:hover {
+  background: rgba(102, 126, 234, 0.22);
+}
+
+.dashboard-alert {
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.dashboard-alert.warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.4rem;
+}
+
+.dashboard-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding: 1.4rem;
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.12);
+}
+
+.dashboard-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.dashboard-card-header h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  color: #1f2937;
+}
+
+.dashboard-card-header .timestamp {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: rgba(55, 65, 81, 0.7);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(102, 126, 234, 0.18);
+  color: #4338ca;
+}
+
+.badge.consensus-strong-buy,
+.badge.consensus-buy {
+  background: rgba(22, 101, 52, 0.14);
+  color: #166534;
+}
+
+.badge.consensus-strong-sell,
+.badge.consensus-sell {
+  background: rgba(190, 18, 60, 0.16);
+  color: #be123c;
+}
+
+.badge.consensus-hold {
+  background: rgba(79, 70, 229, 0.16);
+  color: #4f46e5;
+}
+
+.dashboard-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dashboard-section h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #312e81;
+}
+
+.price-grid,
+.consensus-grid,
+.levels-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.price-grid div,
+.consensus-grid div,
+.levels-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: rgba(102, 126, 234, 0.08);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+}
+
+.dashboard-section .label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(55, 65, 81, 0.66);
+}
+
+.focus-card {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  background: rgba(236, 233, 252, 0.6);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+}
+
+.reasoning-list,
+.pattern-list,
+.strategy-card ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  color: rgba(17, 24, 39, 0.86);
+}
+
+.strategy-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.strategy-card {
+  background: rgba(248, 250, 255, 0.92);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.strategy-card h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: #4338ca;
+}
+
+.muted {
+  color: rgba(55, 65, 81, 0.6);
+  font-size: 0.85rem;
+}
+
+.dashboard-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: auto;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.dashboard-empty {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.55);
+  padding: 2.2rem;
+  text-align: center;
+  color: rgba(30, 27, 75, 0.6);
+  font-size: 1.05rem;
+}
+
+.price-action-overview p {
+  margin: 0;
+}
+
+.price-action-overview strong {
+  color: #1e1b4b;
+}
+
+.dashboard-card-header .badge {
+  white-space: nowrap;
+}
+
+.dashboard-card-footer span {
+  white-space: nowrap;
+}
+
+.dashboard-card-footer span:last-child {
+  margin-left: auto;
+}
+
 /* SMALL DEVICES / MOBILE ---------------------------------------------------- */
 @media (max-width: 600px) {
   html { font-size:15px; }

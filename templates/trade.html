@@ -25,6 +25,7 @@
         </a>
         <div class="nav-links">
             <a href="/trade">Trading</a>
+            <a href="/dashboard">Dashboard</a>
             <a href="/subscribe">Plans</a>
             <a href="/settings">Settings</a>
             <span>{{ user.email }}</span>
@@ -135,6 +136,7 @@
         let currentSymbolSuggestions = [];
         let activeSuggestionIndex = -1;
         let currentMarket = marketSelect ? marketSelect.value : 'equity';
+
 
         const MARKET_UI_CONFIG = {
             equity: {

@@ -1,9 +1,9 @@
 import logging
 import os
-import asyncio
 import time
 from functools import partial
 import uuid
+import re
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, status, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
@@ -18,7 +18,6 @@ from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-import uuid
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import (
@@ -74,7 +73,7 @@ from symbol_map import (
     get_ticker_map,
     normalize_symbol,
 )
-from azure_storage import store_ai_report
+from azure_storage import store_ai_report, fetch_reports_for_date
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -100,6 +99,9 @@ stripe_webhook_config = (
 # In-memory store for AI analysis results (for demo; use Redis/db for production)
 # In-memory store for AI analysis results (for demo; use Redis/db for production)
 ai_analysis_jobs = {}
+
+DASHBOARD_ALLOWED_PLAN_SLUGS = {"sigma", "omega"}
+DEFAULT_DASHBOARD_REPORT_LIMIT = int(os.getenv("DASHBOARD_MAX_REPORTS", "120"))
 
 
 def _build_base_url(request: Request) -> str:
@@ -163,6 +165,22 @@ def _find_relevant_subscription(session: Session, user_id: int) -> Optional[User
         if sub.status in ACTIVE_SUBSCRIPTION_STATUSES:
             return sub
     return subscriptions[0] if subscriptions else None
+
+
+def _get_subscription_for_user(user_id: int) -> Optional[UserSubscription]:
+    with SessionLocal() as session:
+        return _find_relevant_subscription(session, user_id)
+
+
+def _check_dashboard_access(user: User) -> Tuple[Optional[UserSubscription], bool]:
+    subscription = _get_subscription_for_user(user.id)
+    allowed = bool(
+        subscription
+        and subscription.plan
+        and subscription.plan.slug
+        and subscription.plan.slug.lower() in DASHBOARD_ALLOWED_PLAN_SLUGS
+    )
+    return subscription, allowed
 
 
 def _ensure_trial_subscription(session: Session, user: User) -> None:
@@ -1072,7 +1090,6 @@ async def get_ai_analysis_result(job_id: str, user: User = Depends(get_current_u
         return JSONResponse(content={"success": True, "status": "done", "result": job["result"]}, status_code=200)
     if job["status"] == "error":
         return JSONResponse(content={"success": False, "status": "error", "error": job.get("error")}, status_code=200)
-
 @app.post("/api/principal/plan")
 async def generate_principal_plan(request: Request, user: User = Depends(get_current_user_sync)):
     data = await request.json()
@@ -1128,6 +1145,103 @@ async def subscribe_page(request: Request, user: User = Depends(get_current_user
         "current_subscription": _serialize_subscription(subscription) if subscription else None,
     }
     return templates.TemplateResponse("subscription.html", context)
+
+def _resolve_dashboard_date(raw_date: Optional[str]) -> Tuple[datetime, str, str]:
+    """Resolve query date into a midnight UTC timestamp and display labels."""
+
+    today_utc = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    if raw_date:
+        candidate = str(raw_date).strip()
+        if candidate:
+            for fmt in ("%Y-%m-%d", "%Y%m%d"):
+                try:
+                    parsed = datetime.strptime(candidate, fmt)
+                except ValueError:
+                    continue
+                resolved = datetime(parsed.year, parsed.month, parsed.day, tzinfo=timezone.utc)
+                return resolved, resolved.strftime("%Y-%m-%d"), resolved.strftime("%b %d, %Y")
+
+    return today_utc, today_utc.strftime("%Y-%m-%d"), today_utc.strftime("%b %d, %Y")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(
+    request: Request,
+    date: Optional[str] = None,
+    symbol: Optional[str] = None,
+    user: User = Depends(get_current_user_sync),
+):
+    subscription, allowed = _check_dashboard_access(user)
+    if not allowed:
+        query = {"reason": "dashboard_locked"}
+        if subscription and subscription.plan and subscription.plan.slug:
+            query["current_plan"] = subscription.plan.slug
+        redirect_url = "/subscribe"
+        if query:
+            redirect_url = f"/subscribe?{urllib.parse.urlencode(query)}"
+        return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+
+    target_date, selected_date_iso, selected_date_label = _resolve_dashboard_date(date)
+    today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    symbol_filter = None
+    if symbol:
+        symbol_filter_candidate = str(symbol).strip().upper()
+        if symbol_filter_candidate:
+            symbol_filter = symbol_filter_candidate
+
+    raw_reports = fetch_reports_for_date(
+        target_date,
+        symbol=symbol_filter,
+        max_reports=DEFAULT_DASHBOARD_REPORT_LIMIT,
+    )
+
+    prepared_reports: List[Dict[str, Any]] = []
+    excluded_reports: List[Dict[str, Any]] = []
+    for report in raw_reports:
+        summary = _summarize_dashboard_report(report)
+        if summary:
+            prepared_reports.append(summary)
+        else:
+            excluded_reports.append(report)
+
+    prepared_reports.sort(key=lambda item: item.get("generated_unix") or 0, reverse=True)
+
+    available_symbols = sorted(
+        {
+            str(report.get("symbol") or "").upper()
+            for report in raw_reports
+            if report.get("symbol")
+        }
+    )
+
+    logger.info(
+        "User %s loaded dashboard date=%s symbol=%s reports=%s prepared=%s",
+        user.id,
+        selected_date_iso,
+        symbol_filter,
+        len(raw_reports),
+        len(prepared_reports),
+    )
+
+    context = {
+        "request": request,
+        "user": user,
+        "subscription": _serialize_subscription(subscription) if subscription else None,
+        "selected_date": selected_date_iso,
+        "selected_date_label": selected_date_label,
+        "selected_symbol": symbol_filter,
+        "selected_symbol_input": symbol or "",
+        "today_date": today_iso,
+        "reports": prepared_reports,
+        "report_count": len(prepared_reports),
+        "raw_report_count": len(raw_reports),
+        "excluded_report_count": len(excluded_reports),
+        "available_symbols": available_symbols,
+        "max_reports": DEFAULT_DASHBOARD_REPORT_LIMIT,
+    }
+    return templates.TemplateResponse("dashboard.html", context)
+
 
 def _extract_latest_price(snapshot: Any, symbol: str) -> Tuple[Optional[float], Optional[str], Optional[str]]:
     """Best-effort extraction of latest price metadata from analysis snapshots."""
@@ -1191,6 +1305,265 @@ def _extract_latest_price(snapshot: Any, symbol: str) -> Tuple[Optional[float], 
         timestamp = str(timestamp)
 
     return (price_value, timeframe, timestamp)
+
+
+def _clean_text_fragment(value: Any, *, max_items: Optional[int] = None) -> str:
+    """Convert heterogeneous plan fragments into compact plain-text strings."""
+
+    if value is None:
+        return ""
+
+    if isinstance(value, (int, float)):
+        return str(value)
+
+    if isinstance(value, (list, tuple, set)):
+        items = list(value)
+        if max_items is not None:
+            items = items[:max_items]
+        fragments = [frag for frag in (_clean_text_fragment(item) for item in items) if frag]
+        return "; ".join(fragments)
+
+    if isinstance(value, dict):
+        fragments = []
+        for key, val in value.items():
+            cleaned_val = _clean_text_fragment(val)
+            if not cleaned_val:
+                continue
+            label = str(key).replace("_", " ").title()
+            fragments.append(f"{label}: {cleaned_val}")
+        return "; ".join(fragments)
+
+    text = str(value)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    if not value or not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    cleaned = cleaned.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(cleaned)
+    except ValueError:
+        try:
+            parsed = datetime.strptime(cleaned, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _prepare_strategy_for_dashboard(strategy: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(strategy, dict):
+        return None
+
+    summary = _clean_text_fragment(strategy.get("summary"))
+    next_actions_raw = strategy.get("next_actions")
+    actions: List[str] = []
+    if isinstance(next_actions_raw, (list, tuple, set)):
+        for item in next_actions_raw:
+            cleaned = _clean_text_fragment(item)
+            if cleaned:
+                actions.append(cleaned)
+            if len(actions) >= 4:
+                break
+
+    result: Dict[str, Any] = {}
+    if summary:
+        result["summary"] = summary
+    if actions:
+        result["next_actions"] = actions
+
+    confidence = strategy.get("confidence") or strategy.get("strength")
+    if confidence:
+        result["confidence"] = _clean_text_fragment(confidence)
+
+    return result or None
+
+
+def _extract_consensus_snapshot(report: Dict[str, Any], symbol: str) -> Optional[Dict[str, Any]]:
+    snapshot_map = report.get("technical_snapshot")
+    if not isinstance(snapshot_map, dict):
+        return None
+
+    candidates = [symbol, symbol.upper(), symbol.lower()]
+    snapshot = None
+    for candidate in candidates:
+        candidate_snapshot = snapshot_map.get(candidate)
+        if candidate_snapshot:
+            snapshot = candidate_snapshot
+            break
+
+    if not isinstance(snapshot, dict):
+        return None
+
+    consensus = snapshot.get("consensus")
+    summary: Dict[str, Any] = {
+        "status": snapshot.get("status"),
+        "timestamp": snapshot.get("timestamp"),
+    }
+
+    if isinstance(consensus, dict):
+        summary["recommendation"] = consensus.get("overall_recommendation")
+        summary["confidence"] = consensus.get("confidence")
+        strength = _safe_float(consensus.get("strength"))
+        if strength is not None:
+            summary["strength"] = strength
+        for field in ("buy_signals", "sell_signals", "hold_signals"):
+            if field in consensus:
+                summary[field] = consensus.get(field)
+        reasoning = consensus.get("reasoning")
+        if isinstance(reasoning, list):
+            cleaned_reasoning: List[str] = []
+            for item in reasoning[:3]:
+                cleaned_item = _clean_text_fragment(item)
+                if cleaned_item:
+                    cleaned_reasoning.append(cleaned_item)
+            if cleaned_reasoning:
+                summary["reasoning"] = cleaned_reasoning
+
+    decisions = snapshot.get("decisions")
+    if isinstance(decisions, dict):
+        for focus_tf in ("1d", "4h", "1h"):
+            details = decisions.get(focus_tf)
+            if isinstance(details, dict):
+                focus_summary = {
+                    "timeframe": focus_tf,
+                    "recommendation": details.get("recommendation"),
+                    "confidence": details.get("confidence"),
+                }
+                for field in ("entry_price", "stop_loss", "take_profit", "risk_reward_ratio"):
+                    if details.get(field) is not None:
+                        focus_summary[field] = details.get(field)
+                summary["focus"] = focus_summary
+                break
+
+    return summary or None
+
+
+def _extract_price_details(report: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    price_action = report.get("price_action_snapshot")
+    price_info: Dict[str, Any] = {}
+    price_action_summary: Dict[str, Any] = {}
+
+    if isinstance(price_action, dict) and price_action.get("success"):
+        per_timeframe = price_action.get("per_timeframe")
+        if isinstance(per_timeframe, dict):
+            for timeframe in ("1d", "4h", "1h", "30m"):
+                timeframe_data = per_timeframe.get(timeframe)
+                if isinstance(timeframe_data, dict):
+                    price_data = timeframe_data.get("price")
+                    if isinstance(price_data, dict):
+                        change_pct = _safe_float(price_data.get("close_change_pct"))
+                        price_info = {
+                            "timeframe": timeframe,
+                            "close": price_data.get("close"),
+                            "change_pct": change_pct,
+                            "volume": price_data.get("volume"),
+                            "timestamp": price_data.get("timestamp"),
+                        }
+                        break
+
+        overview = price_action.get("overview")
+        if isinstance(overview, dict):
+            price_action_summary["trend_alignment"] = overview.get("trend_alignment")
+            key_levels = overview.get("key_levels")
+            if isinstance(key_levels, list) and key_levels:
+                sorted_levels = sorted(
+                    (
+                        level
+                        for level in key_levels
+                        if isinstance(level, dict) and level.get("price") is not None
+                    ),
+                    key=lambda item: abs(_safe_float(item.get("distance_pct")) or 0.0),
+                )
+                price_action_summary["key_levels"] = sorted_levels[:3]
+
+            patterns = overview.get("recent_patterns")
+            if isinstance(patterns, list) and patterns:
+                price_action_summary["recent_patterns"] = patterns[:3]
+
+    return (price_info or None, price_action_summary or None)
+
+
+def _summarize_dashboard_report(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    plan_wrapper = report.get("principal_plan")
+    if not isinstance(plan_wrapper, dict) or not plan_wrapper.get("success"):
+        return None
+
+    plan_data = plan_wrapper.get("data")
+    if not isinstance(plan_data, dict):
+        return None
+
+    symbol = plan_data.get("symbol") or report.get("symbol")
+    if not symbol:
+        return None
+    symbol_clean = str(symbol).upper()
+
+    generated_dt = _parse_iso_datetime(
+        plan_data.get("generated")
+        or plan_data.get("generated_at")
+        or report.get("stored_at")
+        or report.get("_blob_last_modified")
+    )
+
+    generated_iso = None
+    generated_display = plan_data.get("generated_display")
+    generated_unix = None
+    if generated_dt:
+        generated_iso = generated_dt.isoformat().replace("+00:00", "Z")
+        generated_unix = int(generated_dt.timestamp())
+        if not generated_display:
+            generated_display = generated_dt.strftime("%b %d, %Y %H:%M UTC")
+
+    strategies = plan_data.get("strategies")
+    prepared_strategies: Dict[str, Any] = {}
+    if isinstance(strategies, dict):
+        labels = {
+            "day_trading": "Day Trading",
+            "swing_trading": "Swing Trading",
+            "longterm_trading": "Long-Term Trading",
+        }
+        for key, label in labels.items():
+            prepared = _prepare_strategy_for_dashboard(strategies.get(key))
+            if prepared:
+                prepared["label"] = label
+                prepared_strategies[key] = prepared
+
+    consensus = _extract_consensus_snapshot(report, symbol_clean)
+    price_info, price_action = _extract_price_details(report)
+
+    summary: Dict[str, Any] = {
+        "symbol": symbol_clean,
+        "generated_iso": generated_iso,
+        "generated_display": generated_display,
+        "generated_unix": generated_unix,
+        "strategies": prepared_strategies,
+        "consensus": consensus,
+        "price": price_info,
+        "price_action": price_action,
+        "stored_at": report.get("stored_at"),
+        "source": {
+            "blob": report.get("_blob_name"),
+            "user_id": report.get("user_id"),
+            "ai_job_id": report.get("ai_job_id"),
+        },
+    }
+
+    return summary
 
 def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:
     """Structure the trading agent result data for AI analysis"""
