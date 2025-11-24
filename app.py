@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import time
 from functools import partial
@@ -1545,6 +1546,23 @@ def _clean_text_fragment(value: Any, *, max_items: Optional[int] = None) -> str:
     return text
 
 
+def _round_decimal(value: Any, places: int = 2) -> Any:
+    """Best-effort rounding for numeric values while preserving non-numeric input."""
+
+    if value is None:
+        return None
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return value
+
+    if math.isfinite(numeric):
+        return round(numeric, places)
+
+    return value
+
+
 def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
     if not value or not isinstance(value, str):
         return None
@@ -1626,9 +1644,9 @@ def _extract_consensus_snapshot(report: Dict[str, Any], symbol: str) -> Optional
     if isinstance(consensus, dict):
         summary["recommendation"] = consensus.get("overall_recommendation")
         summary["confidence"] = consensus.get("confidence")
-        strength = _safe_float(consensus.get("strength"))
-        if strength is not None:
-            summary["strength"] = strength
+        strength_value = _round_decimal(consensus.get("strength"))
+        if strength_value is not None:
+            summary["strength"] = strength_value
         for field in ("buy_signals", "sell_signals", "hold_signals"):
             if field in consensus:
                 summary[field] = consensus.get(field)
@@ -1654,7 +1672,7 @@ def _extract_consensus_snapshot(report: Dict[str, Any], symbol: str) -> Optional
                 }
                 for field in ("entry_price", "stop_loss", "take_profit", "risk_reward_ratio"):
                     if details.get(field) is not None:
-                        focus_summary[field] = details.get(field)
+                        focus_summary[field] = _round_decimal(details.get(field))
                 summary["focus"] = focus_summary
                 break
 
@@ -1674,10 +1692,11 @@ def _extract_price_details(report: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
                 if isinstance(timeframe_data, dict):
                     price_data = timeframe_data.get("price")
                     if isinstance(price_data, dict):
-                        change_pct = _safe_float(price_data.get("close_change_pct"))
+                        close_price = _round_decimal(price_data.get("close"))
+                        change_pct = _round_decimal(price_data.get("close_change_pct"))
                         price_info = {
                             "timeframe": timeframe,
-                            "close": price_data.get("close"),
+                            "close": close_price,
                             "change_pct": change_pct,
                             "volume": price_data.get("volume"),
                             "timestamp": price_data.get("timestamp"),
@@ -1697,7 +1716,14 @@ def _extract_price_details(report: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
                     ),
                     key=lambda item: abs(_safe_float(item.get("distance_pct")) or 0.0),
                 )
-                price_action_summary["key_levels"] = sorted_levels[:3]
+                cleaned_levels: List[Dict[str, Any]] = []
+                for level in sorted_levels[:3]:
+                    cleaned_level = dict(level)
+                    cleaned_level["price"] = _round_decimal(level.get("price"))
+                    if "distance_pct" in level:
+                        cleaned_level["distance_pct"] = _round_decimal(level.get("distance_pct"))
+                    cleaned_levels.append(cleaned_level)
+                price_action_summary["key_levels"] = cleaned_levels
 
             patterns = overview.get("recent_patterns")
             if isinstance(patterns, list) and patterns:
