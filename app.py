@@ -1727,7 +1727,48 @@ def _extract_price_details(report: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
 
             patterns = overview.get("recent_patterns")
             if isinstance(patterns, list) and patterns:
-                price_action_summary["recent_patterns"] = patterns[:3]
+                formatted_patterns: List[str] = []
+                for pattern in patterns:
+                    if len(formatted_patterns) >= 3:
+                        break
+
+                    if isinstance(pattern, dict):
+                        timeframe = pattern.get("timeframe") or pattern.get("period")
+                        pattern_name = pattern.get("pattern") or pattern.get("name")
+                        confidence_raw = pattern.get("confidence")
+
+                        parts: List[str] = []
+                        if timeframe:
+                            parts.append(str(timeframe).upper())
+                        if pattern_name:
+                            parts.append(str(pattern_name))
+
+                        confidence_text = None
+                        if confidence_raw is not None:
+                            try:
+                                confidence_value = float(confidence_raw)
+                            except (TypeError, ValueError):
+                                confidence_value = None
+
+                            if confidence_value is not None and math.isfinite(confidence_value):
+                                if abs(confidence_value) <= 1:
+                                    confidence_value *= 100
+                                confidence_text = f"{int(round(confidence_value))}% confidence"
+
+                        description = ": ".join(parts[:2]) if parts else None
+                        if description and confidence_text:
+                            formatted_patterns.append(f"{description} ({confidence_text})")
+                        elif description:
+                            formatted_patterns.append(description)
+                        elif confidence_text:
+                            formatted_patterns.append(confidence_text)
+                        else:
+                            formatted_patterns.append(str(pattern))
+                    else:
+                        formatted_patterns.append(str(pattern))
+
+                if formatted_patterns:
+                    price_action_summary["recent_patterns"] = formatted_patterns
 
     return (price_info or None, price_action_summary or None)
 
