@@ -1152,8 +1152,12 @@ async def generate_principal_plan(request: Request, user: User = Depends(get_cur
 
 
 @app.post("/api/contact")
-async def submit_contact_request(request: Request, background_tasks: BackgroundTasks, user: User = Depends(get_current_user_sync)):
-    if not (CONTACT_EMAIL_RECIPIENT and CONTACT_EMAIL_SENDER and SMTP_HOST):
+async def submit_contact_request(request: Request, background_tasks: BackgroundTasks):
+    email_service_ready = bool(
+        CONTACT_EMAIL_RECIPIENT
+        and (ACS_CONNECTION_STRING or (CONTACT_EMAIL_SENDER and SMTP_HOST))
+    )
+    if not email_service_ready:
         logger.warning("Contact endpoint requested but email configuration is incomplete")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -1168,6 +1172,11 @@ async def submit_contact_request(request: Request, background_tasks: BackgroundT
             detail={"error": "Invalid JSON payload."},
         ) from None
 
+    try:
+        user = get_current_user_sync(request)
+    except HTTPException:
+        user = None
+
     def _trim(value: Any, *, max_length: int) -> str:
         if value is None:
             return ""
@@ -1176,8 +1185,9 @@ async def submit_contact_request(request: Request, background_tasks: BackgroundT
             return text_value[:max_length].strip()
         return text_value
 
-    name = _trim(payload.get("name") or user.email or "Customer", max_length=120)
-    email_address = _trim(payload.get("email") or user.email or "", max_length=255)
+    user_email_default = user.email if user and user.email else ""
+    name = _trim(payload.get("name") or user_email_default or "Customer", max_length=120)
+    email_address = _trim(payload.get("email") or user_email_default or "", max_length=255)
     message = payload.get("message")
     if message is None:
         message = ""
@@ -1209,14 +1219,19 @@ async def submit_contact_request(request: Request, background_tasks: BackgroundT
         "name": name,
         "email": email_address,
         "message": message,
-        "user_id": user.id,
-        "user_email": user.email,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
     }
 
+    if user is not None:
+        submission_payload["user_id"] = user.id
+        submission_payload["user_email"] = user.email
+        log_identity = f"user {user.id}"
+    else:
+        log_identity = "guest visitor"
+
     background_tasks.add_task(_send_contact_email, submission_payload)
 
-    logger.info("Queued contact request from user %s", user.id)
+    logger.info("Queued contact request from %s", log_identity)
 
     return JSONResponse(
         content={"success": True},
