@@ -1,0 +1,146 @@
+<div class="contact-widget" id="contactWidget">
+    <button type="button" class="contact-fab" id="contactFab" aria-label="Contact VolatilX support">
+        Contact
+    </button>
+    <div class="contact-modal" id="contactModal" aria-hidden="true">
+        <div class="contact-modal__backdrop" id="contactBackdrop"></div>
+        <div class="contact-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+            <button type="button" class="contact-modal__close" id="contactClose" aria-label="Close contact form">&times;</button>
+            <h2 class="contact-modal__title" id="contactModalTitle">Contact Us</h2>
+            <p class="contact-modal__intro">Have a question or feedback? Send us a quick note and we will respond shortly.</p>
+            <form class="contact-form" id="contactForm">
+                <div class="contact-form__field">
+                    <label for="contactName">Name</label>
+                    <input type="text" id="contactName" name="name" maxlength="120" required>
+                </div>
+                <div class="contact-form__field">
+                    <label for="contactEmail">Email</label>
+                    <input type="email" id="contactEmail" name="email" maxlength="255" value="{{ user.email if user is defined and user.email is not none else '' }}" required>
+                </div>
+                <div class="contact-form__field">
+                    <label for="contactMessage">Message</label>
+                    <textarea id="contactMessage" name="message" rows="5" maxlength="4000" placeholder="How can we help?" required></textarea>
+                </div>
+                <div class="contact-form__actions">
+                    <span class="contact-form__status" id="contactStatus" role="status" aria-live="polite"></span>
+                    <button type="submit" class="contact-form__submit" id="contactSubmit">Send Message</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    const widget = document.getElementById('contactWidget');
+    if (!widget) {
+        return;
+    }
+    const fab = document.getElementById('contactFab');
+    const modal = document.getElementById('contactModal');
+    const backdrop = document.getElementById('contactBackdrop');
+    const closeBtn = document.getElementById('contactClose');
+    const form = document.getElementById('contactForm');
+    const submitBtn = document.getElementById('contactSubmit');
+    const statusEl = document.getElementById('contactStatus');
+    const nameInput = document.getElementById('contactName');
+    const emailInput = document.getElementById('contactEmail');
+    const messageInput = document.getElementById('contactMessage');
+
+    const openModal = () => {
+        modal.classList.add('is-visible');
+        modal.setAttribute('aria-hidden', 'false');
+        statusEl.textContent = '';
+        setTimeout(() => {
+            if (nameInput && !nameInput.value) {
+                nameInput.focus();
+            } else if (messageInput) {
+                messageInput.focus();
+            }
+        }, 50);
+        document.body.classList.add('contact-modal--open');
+    };
+
+    const closeModal = () => {
+        modal.classList.remove('is-visible');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('contact-modal--open');
+        fab.focus();
+    };
+
+    const handleKeyDown = (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-visible')) {
+            closeModal();
+        }
+    };
+
+    const showStatus = (message, variant) => {
+        if (!statusEl) {
+            return;
+        }
+        statusEl.textContent = message || '';
+        statusEl.className = 'contact-form__status';
+        if (variant) {
+            statusEl.classList.add(`contact-form__status--${variant}`);
+        }
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        if (!form || !submitBtn) {
+            return;
+        }
+        const name = nameInput.value.trim();
+        const email = emailInput.value.trim();
+        const message = messageInput.value.trim();
+
+        if (!name || !email || !message) {
+            showStatus('Please complete all fields.', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        showStatus('Sending message…', 'info');
+
+        try {
+            const response = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, message })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || !data.success) {
+                const errorMessage = (data && data.error) || 'We could not send your message. Please try again.';
+                showStatus(errorMessage, 'error');
+                return;
+            }
+
+            showStatus('Message sent! We will reach out soon.', 'success');
+            form.reset();
+            setTimeout(() => {
+                closeModal();
+            }, 1200);
+        } catch (error) {
+            console.error('Contact form error', error);
+            showStatus('Unexpected error. Please try again later.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    };
+
+    if (fab) {
+        fab.addEventListener('click', openModal);
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeModal);
+    }
+    if (backdrop) {
+        backdrop.addEventListener('click', closeModal);
+    }
+    if (form) {
+        form.addEventListener('submit', handleSubmit);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+})();
+</script>

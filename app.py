@@ -4,6 +4,14 @@ import time
 from functools import partial
 import uuid
 import re
+import smtplib
+from email.message import EmailMessage
+import html
+
+try:
+    from azure.communication.email import EmailClient
+except ImportError:  # pragma: no cover - optional dependency
+    EmailClient = None  # type: ignore[assignment]
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, status, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
@@ -102,6 +110,16 @@ ai_analysis_jobs = {}
 
 DASHBOARD_ALLOWED_PLAN_SLUGS = {"sigma", "omega"}
 DEFAULT_DASHBOARD_REPORT_LIMIT = int(os.getenv("DASHBOARD_MAX_REPORTS", "120"))
+CONTACT_EMAIL_RECIPIENT = os.getenv("CONTACT_EMAIL_RECIPIENT")
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").strip().lower() not in {"0", "false", "no"}
+CONTACT_EMAIL_PREFIX = os.getenv("CONTACT_EMAIL_SUBJECT_PREFIX", "VolatilX Contact")
+CONTACT_EMAIL_SENDER = os.getenv("CONTACT_EMAIL_SENDER") or SMTP_USERNAME or CONTACT_EMAIL_RECIPIENT
+ACS_CONNECTION_STRING = os.getenv("ACS_CONNECTION_STRING")
+ACS_EMAIL_SENDER = os.getenv("ACS_EMAIL_SENDER") or CONTACT_EMAIL_SENDER
 
 
 def _build_base_url(request: Request) -> str:
@@ -1133,6 +1151,79 @@ async def generate_principal_plan(request: Request, user: User = Depends(get_cur
     )
 
 
+@app.post("/api/contact")
+async def submit_contact_request(request: Request, background_tasks: BackgroundTasks, user: User = Depends(get_current_user_sync)):
+    if not (CONTACT_EMAIL_RECIPIENT and CONTACT_EMAIL_SENDER and SMTP_HOST):
+        logger.warning("Contact endpoint requested but email configuration is incomplete")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error": "Contact service is not configured. Please try again later."},
+        )
+
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 - invalid JSON
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Invalid JSON payload."},
+        ) from None
+
+    def _trim(value: Any, *, max_length: int) -> str:
+        if value is None:
+            return ""
+        text_value = str(value).strip()
+        if len(text_value) > max_length:
+            return text_value[:max_length].strip()
+        return text_value
+
+    name = _trim(payload.get("name") or user.email or "Customer", max_length=120)
+    email_address = _trim(payload.get("email") or user.email or "", max_length=255)
+    message = payload.get("message")
+    if message is None:
+        message = ""
+    else:
+        message = str(message).strip()
+
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Please provide your name."},
+        )
+
+    if not email_address or "@" not in email_address:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Please provide a valid email address."},
+        )
+
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Please include a brief message."},
+        )
+
+    if len(message) > 4000:
+        message = message[:4000].rstrip()
+
+    submission_payload: Dict[str, Any] = {
+        "name": name,
+        "email": email_address,
+        "message": message,
+        "user_id": user.id,
+        "user_email": user.email,
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    background_tasks.add_task(_send_contact_email, submission_payload)
+
+    logger.info("Queued contact request from user %s", user.id)
+
+    return JSONResponse(
+        content={"success": True},
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+
+
 @app.get("/subscribe", response_class=HTMLResponse)
 async def subscribe_page(request: Request, user: User = Depends(get_current_user_sync)):
     logger.info("User %s (%s) opened subscription page", user.id, user.email)
@@ -1305,6 +1396,107 @@ def _extract_latest_price(snapshot: Any, symbol: str) -> Tuple[Optional[float], 
         timestamp = str(timestamp)
 
     return (price_value, timeframe, timestamp)
+
+
+def _send_contact_email(payload: Dict[str, Any]) -> bool:
+    if not CONTACT_EMAIL_RECIPIENT:
+        logger.warning("Contact email recipient not configured; skipping send")
+        return False
+
+    name = payload.get("name") or "Unknown"
+    email_address = payload.get("email") or "unknown@example.com"
+    message = payload.get("message") or "(no message provided)"
+    submitted_at = payload.get("submitted_at") or datetime.now(timezone.utc).isoformat()
+
+    subject = f"{CONTACT_EMAIL_PREFIX} - {name}" if CONTACT_EMAIL_PREFIX else f"Contact Request - {name}"
+
+    text_body = (
+        "New contact request from VolatilX dashboard.\n\n"
+        f"Name: {name}\n"
+        f"Email: {email_address}\n"
+        f"Submitted At: {submitted_at}\n"
+        "\nMessage:\n"
+        f"{message}\n"
+    )
+
+    safe_name = html.escape(str(name))
+    safe_email = html.escape(str(email_address))
+    safe_message = "<br />".join(html.escape(str(message)).splitlines())
+    safe_submitted = html.escape(str(submitted_at))
+
+    html_body = f"""
+        <html>
+            <body>
+                <h2>New VolatilX Contact Request</h2>
+                <p><strong>Name:</strong> {safe_name}</p>
+                <p><strong>Email:</strong> {safe_email}</p>
+                <p><strong>Submitted:</strong> {safe_submitted}</p>
+                <hr />
+                <p>{safe_message or '<em>(no message provided)</em>'}</p>
+            </body>
+        </html>
+    """
+
+    if ACS_CONNECTION_STRING:
+        if EmailClient is None:
+            logger.warning(
+                "Azure Communication Services email library missing. Install 'azure-communication-email' or disable ACS to use SMTP."
+            )
+        else:
+            sender_address = ACS_EMAIL_SENDER or CONTACT_EMAIL_SENDER
+            if not sender_address:
+                logger.warning("ACS sender address not configured; skipping ACS send")
+            else:
+                try:
+                    client = EmailClient.from_connection_string(ACS_CONNECTION_STRING)
+                    email_message: Dict[str, Any] = {
+                        "senderAddress": sender_address,
+                        "recipients": {"to": [{"address": CONTACT_EMAIL_RECIPIENT}]},
+                        "content": {
+                            "subject": subject,
+                            "plainText": text_body,
+                            "html": html_body,
+                        },
+                    }
+                    if email_address:
+                        email_message["replyTo"] = [{"address": email_address}]
+
+                    poller = client.begin_send(email_message)
+                    result = poller.result()
+                    status = getattr(result, "status", None)
+                    if status and str(status).lower() not in {"queued", "accepted", "succeeded"}:
+                        logger.warning("ACS email send completed with status %s", status)
+                    else:
+                        logger.info("Contact email queued via ACS for %s", email_address)
+                        return True
+                except Exception:  # noqa: BLE001 - logging for operational visibility
+                    logger.exception("Failed to send contact email via ACS")
+
+    if not CONTACT_EMAIL_SENDER or not SMTP_HOST:
+        logger.warning("No working email transport configured (ACS failed and SMTP incomplete)")
+        return False
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["To"] = CONTACT_EMAIL_RECIPIENT
+    msg["From"] = CONTACT_EMAIL_SENDER
+    if email_address:
+        msg["Reply-To"] = email_address
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            if SMTP_USE_TLS:
+                smtp.starttls()
+            if SMTP_USERNAME and SMTP_PASSWORD:
+                smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            smtp.send_message(msg)
+        logger.info("Contact email sent via SMTP for %s", email_address)
+        return True
+    except Exception:  # noqa: BLE001 - log and surface failure gracefully
+        logger.exception("Failed to send contact email via SMTP")
+        return False
 
 
 def _clean_text_fragment(value: Any, *, max_items: Optional[int] = None) -> str:
