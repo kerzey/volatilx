@@ -155,6 +155,16 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.settings-page .plan-grid {
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .settings-page .plan-grid {
+    grid-template-columns: repeat(3, minmax(260px, 1fr));
+  }
+}
+
 .plan-grid-empty {
   grid-column: 1 / -1;
   text-align: center;
