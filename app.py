@@ -505,7 +505,7 @@ async def azure_callback(request: Request):
             # Issue JWT
             jwt_strategy = get_jwt_strategy()
             access_token = await jwt_strategy.write_token(user)
-            response = RedirectResponse("/trade")
+            response = RedirectResponse("/analyze")
             response.set_cookie(
                 key="volatilx_cookie", 
                 value=access_token,
@@ -604,7 +604,7 @@ async def google_callback(request: Request):
             jwt_strategy = get_jwt_strategy()
             access_token = await jwt_strategy.write_token(user)
             
-            response = RedirectResponse(url="/trade")
+            response = RedirectResponse(url="/analyze")
             response.set_cookie(
                 key="volatilx_cookie", 
                 value=access_token, 
@@ -614,7 +614,7 @@ async def google_callback(request: Request):
                 max_age=3600,  # Add explicit max_age
                 path="/"       # Add explicit path
             )
-            print("OAuth successful, redirecting to /trade")
+            print("OAuth successful, redirecting to /analyze")
             return response
             
         except Exception as e:
@@ -739,15 +739,15 @@ def get_principal_agent_instance() -> PrincipalAgent:
 async def index(request: Request):
     return RedirectResponse(url="/signin")
 
-@app.get("/trade", response_class=HTMLResponse)
-async def trade_page(request: Request, user: User = Depends(get_current_user_sync)):
-    logger.info("User %s (%s) opened trade page", user.id, user.email)
+@app.get("/analyze", response_class=HTMLResponse)
+async def analyze_page(request: Request, user: User = Depends(get_current_user_sync)):
+    logger.info("User %s (%s) opened AI insights page", user.id, user.email)
     with SessionLocal() as session:
         subscription = _find_relevant_subscription(session, user.id)
 
     if subscription is None or subscription.plan is None:
         logger.info("Redirecting user %s to subscription page (no active plan)", user.id)
-        return RedirectResponse(url="/subscribe?from=trade", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/subscribe?from=analyze", status_code=status.HTTP_303_SEE_OTHER)
 
     context = {
         "request": request,
@@ -755,10 +755,10 @@ async def trade_page(request: Request, user: User = Depends(get_current_user_syn
         "subscription": _serialize_subscription(subscription),
         "symbol_catalogs": get_all_symbol_catalogs(),
     }
-    return templates.TemplateResponse("trade.html", context)
+    return templates.TemplateResponse("ai_insights.html", context)
 
-@app.post("/trade")
-async def trade(request: Request, background_tasks: BackgroundTasks, user: User = Depends(get_current_user_sync)):
+@app.post("/analyze")
+async def analyze(request: Request, background_tasks: BackgroundTasks, user: User = Depends(get_current_user_sync)):
     try:
         # Get JSON data from request
         data = await request.json()
@@ -808,7 +808,7 @@ async def trade(request: Request, background_tasks: BackgroundTasks, user: User 
             )
         
         logger.info(
-            "User %s requested trade analysis for %s in %s market (ai=%s principal=%s)",
+            "User %s requested AI insights for %s in %s market (ai=%s principal=%s)",
             user.id,
             stock_symbol,
             market,

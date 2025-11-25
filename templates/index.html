@@ -117,7 +117,7 @@
 }
         async function tradeStock() {
             const stockSymbol = document.getElementById('stockSymbol').value;
-            const response = await fetch('/trade', {
+            const response = await fetch('/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ stock_symbol: stockSymbol })
@@ -143,7 +143,7 @@
         return;
     }
     try {
-        const response = await fetch('/trade', {
+        const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ stock_symbol: stockSymbol })
@@ -285,7 +285,7 @@
                 return;
             }
             try {
-                const response = await fetch('/trade', {
+                const response = await fetch('/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ stock_symbol: stockSymbol })

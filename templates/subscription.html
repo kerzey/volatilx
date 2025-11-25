@@ -8,12 +8,12 @@
 </head>
 <body class="subscription-body">
     <div class="header">
-        <a class="logo" href="/trade">
+        <a class="logo" href="/analyze">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
             <span>VolatilX</span>
         </a>
         <div class="nav-links">
-            <a href="/trade">Trading</a>
+            <a href="/analyze">AI Insights</a>
             <a href="/dashboard">Dashboard</a>
             <a href="/subscribe" class="active">Plans</a>
             <a href="/settings">Settings</a>
@@ -54,7 +54,7 @@
 
     const params = new URLSearchParams(window.location.search);
     const reason = params.get('reason');
-    const fromTrade = params.get('from') === 'trade' || reason === 'subscription_required';
+    const fromAnalyze = params.get('from') === 'analyze' || reason === 'subscription_required';
     const outOfRuns = params.get('status') === 'out_of_runs' || reason === 'quota_exhausted';
 
         const PLAN_META = {
@@ -273,7 +273,7 @@
                 if (!data.current_subscription || !data.current_subscription.plan) {
                     if (outOfRuns) {
                         setMessage('You have exhausted this cycle’s AI runs. Upgrade to continue immediately.', 'info');
-                    } else if (fromTrade) {
+                    } else if (fromAnalyze) {
                         setMessage('Activate a plan to launch your first VolatilX AI strategy run.', 'info');
                     } else {
                         setMessage('Select a plan to unlock your next AI strategy run.', 'info');

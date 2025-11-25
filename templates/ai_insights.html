@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VolatilX - Trading Dashboard</title>
+    <title>VolatilX - AI Insights</title>
     <!-- Link to your main CSS -->
     <link rel="stylesheet" href="/static/style.css">
 
@@ -19,12 +19,12 @@
 <body>
 
     <div class="header">
-        <a class="logo" href="/trade">
+        <a class="logo" href="/analyze">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
             <span>VolatilX</span>
         </a>
         <div class="nav-links">
-            <a href="/trade">Trading</a>
+            <a href="/analyze">AI Insights</a>
             <a href="/dashboard">Dashboard</a>
             <a href="/subscribe">Plans</a>
             <a href="/settings">Settings</a>
@@ -35,7 +35,7 @@
     
     <div class="container">
         <div class="trading-panel">
-            <h2 class="panel-title">AI Trading Analysis</h2>
+            <h2 class="panel-title">AI Insights</h2>
             <form id="tradingForm">
                 <div class="input-group">
                     <label for="marketSelect">Market</label>
@@ -423,7 +423,7 @@
             priceActionContent.innerHTML = '';
             
             try {
-                const response = await fetch('/trade', {
+                const response = await fetch('/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

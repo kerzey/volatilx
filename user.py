@@ -108,7 +108,7 @@ def get_current_user_sync(request: Request) -> User:
     except Exception as e:
         raise HTTPException(status_code=401, detail="Authentication failed")
 
-# Keep these for FastAPI Users routers (they won't be used for /trade)
+# Keep these for FastAPI Users routers (they won't be used for /analyze)
 async def get_user_db():
     db = SessionLocal()
     try:
