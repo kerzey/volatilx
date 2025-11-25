@@ -241,13 +241,6 @@
                     ></canvas>
                     <div class="level-gauge__needle-value" data-gauge-price>{{ action_data.radar.price.value or action_data.latest_price or 'N/A' }}</div>
                 </div>
-                <div class="level-gauge__markers" aria-hidden="true">
-                    <span data-gauge-marker="s2">{{ action_data.radar.s2.value or 'N/A' }}</span>
-                    <span data-gauge-marker="s1">{{ action_data.radar.s1.value or 'N/A' }}</span>
-                    <span data-gauge-marker="price">{{ action_data.radar.price.value or action_data.latest_price or 'N/A' }}</span>
-                    <span data-gauge-marker="r1">{{ action_data.radar.r1.value or 'N/A' }}</span>
-                    <span data-gauge-marker="r2">{{ action_data.radar.r2.value or 'N/A' }}</span>
-                </div>
             </div>
         </section>
 
@@ -283,28 +276,21 @@
         let favoriteState = favoriteButton ? favoriteButton.getAttribute('aria-pressed') === 'true' : false;
         const gaugeCanvas = document.querySelector('[data-gauge-canvas]');
         const gaugeRange = document.querySelector('[data-gauge-range]');
-        const gaugeMarkers = {
-            s2: document.querySelector('[data-gauge-marker="s2"]'),
-            s1: document.querySelector('[data-gauge-marker="s1"]'),
-            price: document.querySelector('[data-gauge-marker="price"]'),
-            r1: document.querySelector('[data-gauge-marker="r1"]'),
-            r2: document.querySelector('[data-gauge-marker="r2"]'),
-        };
         const gaugePriceValue = document.querySelector('[data-gauge-price]');
         const gaugeColors = {
-            belowS2: '#111827',
-            betweenSupports: '#0f766e',
-            midZone: '#2563eb',
-            betweenResistances: '#f59e0b',
-            aboveR2: '#dc2626',
+            belowS2: '#3b0f14',
+            betweenSupports: '#7f1d1d',
+            midZone: '#b45309',
+            betweenResistances: '#0f766e',
+            aboveR2: '#064e3b',
         };
         let gaugeResizeTimer = null;
         const gaugeZoneFill = {
-            belowS2: 'rgba(30, 41, 59, 0.5)',
-            betweenSupports: 'rgba(13, 148, 136, 0.38)',
-            midZone: 'rgba(59, 130, 246, 0.38)',
-            betweenResistances: 'rgba(245, 158, 11, 0.38)',
-            aboveR2: 'rgba(220, 38, 38, 0.38)',
+            belowS2: 'rgba(59, 15, 20, 0.5)',
+            betweenSupports: 'rgba(127, 29, 29, 0.42)',
+            midZone: 'rgba(180, 83, 9, 0.38)',
+            betweenResistances: 'rgba(15, 118, 110, 0.38)',
+            aboveR2: 'rgba(6, 78, 59, 0.4)',
         };
         const gaugeZoneLabels = {
             belowS2: 'below Support-2',
@@ -550,9 +536,47 @@
 
             const centerX = width / 2;
             const centerY = height - 10;
-            const baseRadius = Math.min(width / 2 - 20, height - 20);
+            const baseRadius = Math.min(width / 2 - 20, height - 28);
             const radius = Math.max(48, baseRadius);
             const lineWidth = Math.max(12, radius * 0.22);
+            let stripeOuterRadius = Math.min(centerY - 4, radius + lineWidth * 0.48);
+            let stripeInnerRadius = Math.max(radius + lineWidth * 0.1, stripeOuterRadius - lineWidth * 0.34);
+            if (stripeInnerRadius >= stripeOuterRadius) {
+                stripeInnerRadius = Math.max(radius + lineWidth * 0.08, stripeOuterRadius - 6);
+            }
+            stripeOuterRadius = Math.max(stripeOuterRadius, stripeInnerRadius + 4);
+            const effectiveStripeThickness = Math.max(4, stripeOuterRadius - stripeInnerRadius);
+
+            ctx.lineCap = 'round';
+            ctx.lineWidth = lineWidth;
+
+            ctx.save();
+            if (typeof ctx.createConicGradient === 'function') {
+                const stripeGradient = ctx.createConicGradient(Math.PI, centerX, centerY);
+                stripeGradient.addColorStop(0, '#581c1c');
+                stripeGradient.addColorStop(0.18, '#7f1d1d');
+                stripeGradient.addColorStop(0.36, '#b45309');
+                stripeGradient.addColorStop(0.5, '#0f766e');
+                stripeGradient.addColorStop(0.82, '#0f766e');
+                stripeGradient.addColorStop(1, '#064e3b');
+                ctx.fillStyle = stripeGradient;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, stripeOuterRadius, Math.PI, 0, true);
+                ctx.arc(centerX, centerY, stripeInnerRadius, 0, Math.PI, false);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                const fallbackGradient = ctx.createLinearGradient(centerX - radius, centerY, centerX + radius, centerY);
+                fallbackGradient.addColorStop(0, '#581c1c');
+                fallbackGradient.addColorStop(0.5, '#b45309');
+                fallbackGradient.addColorStop(1, '#064e3b');
+                ctx.strokeStyle = fallbackGradient;
+                ctx.lineWidth = effectiveStripeThickness;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, stripeInnerRadius + effectiveStripeThickness / 2, Math.PI, 0, true);
+                ctx.stroke();
+            }
+            ctx.restore();
 
             ctx.lineCap = 'round';
             ctx.lineWidth = lineWidth;
@@ -571,7 +595,6 @@
             ctx.closePath();
             ctx.fill();
 
-            ctx.lineWidth = lineWidth;
             config.segments.forEach((segment) => {
                 ctx.strokeStyle = segment.color;
                 ctx.beginPath();
@@ -627,12 +650,12 @@
             renderLevelLabel(config.anchors.r2, config.formatted.r2);
 
             const needleAngle = typeof config.needleAngle === 'number' ? config.needleAngle : config.anchors.s1;
-            const needleLength = radius - lineWidth * 0.7;
+            const needleLength = radius - lineWidth * 0.68;
             const needleCos = Math.cos(needleAngle);
             const needleSin = Math.sin(needleAngle);
-            const needleStartOffset = Math.min(radius * 0.18, lineWidth * 0.8);
-            const startX = centerX + needleCos * needleStartOffset;
-            const startY = centerY - needleSin * needleStartOffset;
+            const needleStartOffset = Math.min(radius * 0.22, lineWidth * 0.85);
+            const startXRaw = centerX + needleCos * needleStartOffset;
+            const startYRaw = centerY - needleSin * needleStartOffset;
             const endX = centerX + needleCos * needleLength;
             const endY = centerY - needleSin * needleLength;
 
@@ -642,7 +665,7 @@
             ctx.strokeStyle = '#fde68a';
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(startX, startY);
+            ctx.moveTo(startXRaw, startYRaw);
             ctx.lineTo(endX, endY);
             ctx.stroke();
             ctx.restore();
@@ -663,6 +686,20 @@
             ctx.beginPath();
             ctx.arc(tipX, tipY, 4, 0, Math.PI * 2);
             ctx.fill();
+
+            const clampLabelCoordinate = (value, min, max) => Math.max(min, Math.min(max, value));
+            const labelX = clampLabelCoordinate(startXRaw, width * 0.22, width * 0.78);
+            const labelY = clampLabelCoordinate(startYRaw, height * 0.38, height * 0.78);
+            const parent = canvas.parentElement;
+            if (parent) {
+                const labelNode = parent.querySelector('[data-gauge-price]');
+                if (labelNode) {
+                    const percentX = (labelX / width) * 100;
+                    const percentY = (labelY / height) * 100;
+                    labelNode.style.setProperty('--needle-label-x', `${percentX.toFixed(2)}%`);
+                    labelNode.style.setProperty('--needle-label-y', `${percentY.toFixed(2)}%`);
+                }
+            }
         }
 
         function updateGaugeDisplay(payload) {
@@ -687,12 +724,8 @@
                 }
                 if (gaugePriceValue) {
                     gaugePriceValue.textContent = 'N/A';
+                    gaugePriceValue.style.opacity = '0';
                 }
-                Object.values(gaugeMarkers).forEach((node) => {
-                    if (node) {
-                        node.textContent = 'N/A';
-                    }
-                });
                 if (gaugeContainer) {
                     gaugeContainer.removeAttribute('data-zone');
                 }
@@ -726,25 +759,8 @@
                     || payload.latest_price
                     || 'N/A';
                 gaugePriceValue.textContent = priceLabel || 'N/A';
+                gaugePriceValue.style.opacity = config ? '1' : '0';
             }
-
-            Object.entries(gaugeMarkers).forEach(([key, node]) => {
-                if (!node) {
-                    return;
-                }
-                if (key === 'price') {
-                    node.textContent =
-                        (config && config.formatted.price)
-                        || (payload.radar && payload.radar.price && payload.radar.price.value)
-                        || payload.latest_price
-                        || 'N/A';
-                    return;
-                }
-                const levelValue =
-                    (config && config.formatted[key])
-                    || (payload.radar && payload.radar[key] && payload.radar[key].value);
-                node.textContent = levelValue || 'N/A';
-            });
 
             if (!config) {
                 if (gaugeRange) {
@@ -757,6 +773,9 @@
                     }
                     gaugeCanvas.setAttribute('aria-label', 'Price gauge unavailable');
                     gaugeCanvas.removeAttribute('data-zone');
+                }
+                if (gaugePriceValue) {
+                    gaugePriceValue.style.opacity = '0';
                 }
                 return;
             }
