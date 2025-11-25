@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VolatilX - Action Center</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="action-center-page">
+    <div class="header">
+        <a class="logo" href="/analyze">
+            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
+            <span>VolatilX</span>
+        </a>
+        <div class="nav-links">
+            <a href="/analyze">AI Insights</a>
+            <a href="/action-center" class="active">Action Center</a>
+            <a href="/report-center">Report Center</a>
+            <a href="/subscribe">Plans</a>
+            <a href="/settings">Settings</a>
+            <span>{{ user.email }}</span>
+            <a href="/logout">Logout</a>
+        </div>
+    </div>
+
+    <main class="action-center">
+        <header class="action-center__header">
+            <div>
+                <h1>Action Center</h1>
+                <p>Your AI-powered trading cockpit &mdash; real-time signals, levels, and actions.</p>
+                {% if action_data %}
+                <p class="action-center__meta">Symbol <strong>{{ action_data.symbol }}</strong>{% if action_data.generated_display %} &middot; Updated {{ action_data.generated_display }}{% endif %}</p>
+                {% endif %}
+            </div>
+            <form class="action-controls" method="get" action="/action-center">
+                <input type="hidden" name="symbol" value="{{ symbol }}">
+                <label class="control-group">
+                    <span>Timeframe</span>
+                    <select name="timeframe" aria-label="Select timeframe">
+                        <option value="day"{% if timeframe == 'day' %} selected{% endif %}>Day</option>
+                        <option value="swing"{% if timeframe == 'swing' %} selected{% endif %}>Swing</option>
+                        <option value="long"{% if timeframe == 'long' %} selected{% endif %}>Long</option>
+                    </select>
+                </label>
+                <label class="control-group">
+                    <span>Intent</span>
+                    <select name="intent" aria-label="Select intent">
+                        <option value="buy"{% if intent == 'buy' %} selected{% endif %}>Buy</option>
+                        <option value="sell"{% if intent == 'sell' %} selected{% endif %}>Sell</option>
+                    </select>
+                </label>
+                <button type="submit" class="pill-button">Update View</button>
+                <button type="button" class="pill-button pill-button--ghost" id="favoriteSymbol" data-symbol="{{ symbol }}" aria-pressed="false">Follow Symbol</button>
+                <label class="toggle" for="autoRefreshToggle">
+                    <input type="checkbox" id="autoRefreshToggle" name="autoupdate" value="1">
+                    <span>Auto-update</span>
+                </label>
+            </form>
+        </header>
+
+        {% if error_message %}
+        <div class="action-center__empty">
+            <p>{{ error_message }}</p>
+        </div>
+        {% endif %}
+
+        {% if action_data %}
+        <section class="action-card" data-section="primary">
+            <div class="action-card__label">What should I do?</div>
+            <div class="action-card__body">
+                <div class="action-card__status action-card__status--{{ action_data.primary_action.icon }}">
+                    <span class="action-card__status-title">{{ action_data.primary_action.title }}</span>
+                    <span class="action-card__status-subtitle">{{ action_data.primary_action.subtitle }}</span>
+                </div>
+                <div class="action-card__details">
+                    {% for line in action_data.primary_action.explanation %}
+                    <p>{{ line }}</p>
+                    {% endfor %}
+                </div>
+                <div class="confidence-meter" data-confidence="{{ action_data.primary_action.confidence_score }}">
+                    <div class="confidence-meter__label">Confidence {{ action_data.primary_action.confidence }}</div>
+                    <div class="confidence-meter__bar"><span data-confidence-bar data-width="{{ action_data.primary_action.confidence_score }}"></span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="gauge-cluster">
+            <div class="gauge" data-gauge="bias" style="--gauge-value: {{ action_data.gauges.bias.score }}">
+                <div class="gauge__dial"></div>
+                <div class="gauge__content">
+                    <span class="gauge__label">Bias</span>
+                    <strong>{{ action_data.gauges.bias.label }}</strong>
+                </div>
+            </div>
+            <div class="gauge" data-gauge="volatility" style="--gauge-value: {{ action_data.gauges.volatility.score }}">
+                <div class="gauge__dial"></div>
+                <div class="gauge__content">
+                    <span class="gauge__label">Volatility</span>
+                    <strong>{{ action_data.gauges.volatility.label }}</strong>
+                </div>
+            </div>
+            <div class="gauge" data-gauge="signal" style="--gauge-value: {{ action_data.gauges.signal.score }}">
+                <div class="gauge__dial"></div>
+                <div class="gauge__content">
+                    <span class="gauge__label">Signal Strength</span>
+                    <strong>{{ action_data.gauges.signal.label }}</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="level-radar" aria-label="Support and resistance radar">
+            <div class="level-radar__track" style="--price-position: {{ action_data.radar.price.position or 0.5 }}">
+                <div class="level-marker level-marker--s2">
+                    <span class="level-marker__title">S2</span>
+                    <span class="level-marker__value">{{ action_data.radar.s2.value or 'N/A' }}</span>
+                    <span class="level-marker__delta">{{ action_data.radar.s2.distance or '' }}</span>
+                </div>
+                <div class="level-marker level-marker--s1">
+                    <span class="level-marker__title">S1</span>
+                    <span class="level-marker__value">{{ action_data.radar.s1.value or 'N/A' }}</span>
+                    <span class="level-marker__delta">{{ action_data.radar.s1.distance or '' }}</span>
+                </div>
+                <div class="level-marker level-marker--price">
+                    <span class="level-marker__title">Price</span>
+                    <span class="level-marker__value">{{ action_data.radar.price.value or 'N/A' }}</span>
+                </div>
+                <div class="level-marker level-marker--r1">
+                    <span class="level-marker__title">R1</span>
+                    <span class="level-marker__value">{{ action_data.radar.r1.value or 'N/A' }}</span>
+                    <span class="level-marker__delta">{{ action_data.radar.r1.distance or '' }}</span>
+                </div>
+                <div class="level-marker level-marker--r2">
+                    <span class="level-marker__title">R2</span>
+                    <span class="level-marker__value">{{ action_data.radar.r2.value or 'N/A' }}</span>
+                    <span class="level-marker__delta">{{ action_data.radar.r2.distance or '' }}</span>
+                </div>
+            </div>
+            <div class="traffic-light traffic-light--{{ action_data.traffic_light }}" aria-label="Market zone indicator"></div>
+        </section>
+
+        <section class="scenario-cards">
+            {% for scenario in action_data.scenarios %}
+            <article class="scenario-card scenario-card--{{ scenario.icon }}">
+                <h3>{{ scenario.title }}</h3>
+                <p>{{ scenario.body }}</p>
+            </article>
+            {% endfor %}
+        </section>
+
+        <section class="trade-plan">
+            <header>
+                <h2>Auto-generated trade plan</h2>
+                {% if strategy_summary %}
+                <p>{{ strategy_summary }}</p>
+                {% endif %}
+            </header>
+            <div class="trade-plan__grid">
+                <div>
+                    <h3>Entries</h3>
+                    <ul>
+                        <li><span>Initial</span><strong data-entry-field="primary">{{ action_data.trade_plan.entry.primary or 'N/A' }}</strong></li>
+                        <li><span>Scale</span><strong data-entry-field="scale">{{ action_data.trade_plan.entry.scale or 'N/A' }}</strong></li>
+                        <li><span>Breakout</span><strong data-entry-field="breakout">{{ action_data.trade_plan.entry.breakout or 'N/A' }}</strong></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3>Targets</h3>
+                    <ul data-plan-targets>
+                        {% for target in action_data.trade_plan.targets %}
+                        <li><strong>{{ target }}</strong></li>
+                        {% endfor %}
+                        {% if not action_data.trade_plan.targets %}
+                        <li><strong>N/A</strong></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div>
+                    <h3>Stops</h3>
+                    <ul data-plan-stops>
+                        {% for stop in action_data.trade_plan.stops %}
+                        <li><strong>{{ stop }}</strong></li>
+                        {% endfor %}
+                        {% if not action_data.trade_plan.stops %}
+                        <li><strong>N/A</strong></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div>
+                    <h3>Position Size</h3>
+                    <p class="trade-plan__size" data-plan-size>{{ action_data.trade_plan.position_size }}</p>
+                    <h3>Risk Notes</h3>
+                    <ul data-plan-risk>
+                        {% for note in action_data.trade_plan.risk_notes %}
+                        <li>{{ note }}</li>
+                        {% endfor %}
+                        {% if not action_data.trade_plan.risk_notes %}
+                        <li>No additional risk notes.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="action-lower">
+            <div class="alerts">
+                <h2>Suggested alerts</h2>
+                <ul>
+                    {% for alert in action_data.alerts %}
+                    <li><button type="button" class="alert-button" data-alert="{{ alert }}">{{ alert }}</button></li>
+                    {% endfor %}
+                    {% if not action_data.alerts %}
+                    <li>No alerts suggested.</li>
+                    {% endif %}
+                </ul>
+            </div>
+            <div class="chart-preview" aria-label="Price context chart">
+                <div class="chart-preview__header">
+                    <h2>Chart preview</h2>
+                    <span class="chart-preview__range">{{ action_data.chart.min or 'N/A' }} &ndash; {{ action_data.chart.max or 'N/A' }}</span>
+                </div>
+                <div class="chart-preview__canvas" style="--price-position: {{ action_data.chart.position or 0.5 }}">
+                    <div class="chart-preview__level chart-preview__level--support">S1</div>
+                    <div class="chart-preview__level chart-preview__level--resistance">R1</div>
+                    <div class="chart-preview__needle" role="presentation"></div>
+                </div>
+                <p class="chart-preview__note">Contextual view of price within current range. Live updates refresh automatically when enabled.</p>
+            </div>
+        </section>
+
+        <footer class="action-tags">
+            {% for tag in action_data.tags %}
+            <span>{{ tag }}</span>
+            {% endfor %}
+        </footer>
+        {% endif %}
+    </main>
+
+    {% if action_data_json %}
+    <script id="actionCenterData" type="application/json">{{ action_data_json | safe }}</script>
+    {% endif %}
+    <script>
+    (function() {
+        const dataElement = document.getElementById('actionCenterData');
+        let state = null;
+        if (dataElement) {
+            try {
+                state = JSON.parse(dataElement.textContent || '{}');
+            } catch (error) {
+                console.warn('Failed to parse Action Center data payload', error);
+            }
+        }
+
+        const autoToggle = document.getElementById('autoRefreshToggle');
+        const favoriteButton = document.getElementById('favoriteSymbol');
+        let refreshTimer = null;
+
+        function applyGaugeStyles() {
+            document.querySelectorAll('.gauge').forEach((gauge) => {
+                const value = gauge.getAttribute('data-live-value') || gauge.style.getPropertyValue('--gauge-value');
+                if (value) {
+                    gauge.style.setProperty('--gauge-value', value);
+                }
+            });
+        }
+
+        function applyConfidenceBar() {
+            document.querySelectorAll('[data-confidence-bar]').forEach((node) => {
+                const width = Number(node.dataset.width || 0);
+                const clamped = Math.max(0, Math.min(width, 100));
+                node.style.width = `${clamped}%`;
+            });
+        }
+
+        function updateFromPayload(payload) {
+            if (!payload) {
+                return;
+            }
+            const meta = document.querySelector('.action-center__meta');
+            if (meta) {
+                const symbolText = payload.symbol || '{{ symbol }}';
+                const updated = payload.generated_display ? ` &middot; Updated ${payload.generated_display}` : '';
+                meta.innerHTML = `Symbol <strong>${symbolText}</strong>${updated}`;
+            }
+            const primary = payload.primary_action || {};
+            const actionCard = document.querySelector('[data-section="primary"]');
+            if (actionCard) {
+                const statusTitle = actionCard.querySelector('.action-card__status-title');
+                const statusSubtitle = actionCard.querySelector('.action-card__status-subtitle');
+                if (statusTitle) statusTitle.textContent = primary.title || 'WAIT';
+                if (statusSubtitle) statusSubtitle.textContent = primary.subtitle || '';
+                actionCard.querySelectorAll('.action-card__details p').forEach((p, index) => {
+                    if (primary.explanation && primary.explanation[index]) {
+                        p.textContent = primary.explanation[index];
+                    }
+                });
+                const confidenceBar = actionCard.querySelector('.confidence-meter__bar span');
+                if (confidenceBar) {
+                    const score = primary.confidence_score || 0;
+                    confidenceBar.style.width = `${Math.max(0, Math.min(score, 100))}%`;
+                    confidenceBar.dataset.width = score;
+                }
+            }
+
+            ['bias', 'volatility', 'signal'].forEach((key) => {
+                const gauge = document.querySelector(`.gauge[data-gauge="${key}"]`);
+                if (!gauge || !payload.gauges || !payload.gauges[key]) {
+                    return;
+                }
+                const info = payload.gauges[key];
+                gauge.setAttribute('data-live-value', info.score || 0);
+                const label = gauge.querySelector('strong');
+                if (label) label.textContent = info.label || '';
+            });
+            applyGaugeStyles();
+            applyConfidenceBar();
+
+            const radar = payload.radar || {};
+            const radarRoot = document.querySelector('.level-radar__track');
+            if (radarRoot && radar.price && typeof radar.price.position === 'number') {
+                radarRoot.style.setProperty('--price-position', radar.price.position);
+                const priceValue = radarRoot.querySelector('.level-marker--price .level-marker__value');
+                if (priceValue) priceValue.textContent = radar.price.value || 'N/A';
+            }
+            [['s2', 'level-marker--s2'], ['s1', 'level-marker--s1'], ['r1', 'level-marker--r1'], ['r2', 'level-marker--r2']].forEach(([key, cls]) => {
+                const node = document.querySelector(`.${cls}`);
+                if (!node || !radar[key]) return;
+                const info = radar[key];
+                const valueNode = node.querySelector('.level-marker__value');
+                const deltaNode = node.querySelector('.level-marker__delta');
+                if (valueNode) valueNode.textContent = info.value || 'N/A';
+                if (deltaNode) deltaNode.textContent = info.distance || '';
+            });
+
+            const traffic = document.querySelector('.traffic-light');
+            if (traffic) {
+                traffic.classList.remove('traffic-light--buy', 'traffic-light--sell', 'traffic-light--wait');
+                traffic.classList.add(`traffic-light--${payload.traffic_light || 'wait'}`);
+            }
+
+            const alertsList = document.querySelector('.alerts ul');
+            if (alertsList) {
+                alertsList.innerHTML = '';
+                if (payload.alerts && payload.alerts.length) {
+                    payload.alerts.forEach((alertText) => {
+                        const li = document.createElement('li');
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'alert-button';
+                        button.textContent = alertText;
+                        button.dataset.alert = alertText;
+                        li.appendChild(button);
+                        alertsList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = 'No alerts suggested.';
+                    alertsList.appendChild(li);
+                }
+            }
+
+            const tagsFooter = document.querySelector('.action-tags');
+            if (tagsFooter) {
+                tagsFooter.innerHTML = '';
+                (payload.tags || []).forEach((tag) => {
+                    const span = document.createElement('span');
+                    span.textContent = tag;
+                    tagsFooter.appendChild(span);
+                });
+            }
+
+            const chartCanvas = document.querySelector('.chart-preview__canvas');
+            const chartRange = document.querySelector('.chart-preview__range');
+            const chartData = payload.chart || {};
+            if (chartCanvas && typeof chartData.position === 'number') {
+                chartCanvas.style.setProperty('--price-position', chartData.position);
+            }
+            if (chartRange) {
+                const min = chartData.min || 'N/A';
+                const max = chartData.max || 'N/A';
+                chartRange.textContent = `${min} - ${max}`;
+            }
+
+            const scenarioCards = document.querySelectorAll('.scenario-card');
+            const scenarios = payload.scenarios || [];
+            scenarioCards.forEach((card, index) => {
+                const scenario = scenarios[index];
+                if (!scenario) return;
+                const titleNode = card.querySelector('h3');
+                const bodyNode = card.querySelector('p');
+                if (titleNode) titleNode.textContent = scenario.title || titleNode.textContent;
+                if (bodyNode) bodyNode.textContent = scenario.body || bodyNode.textContent;
+                card.classList.remove('scenario-card--bull', 'scenario-card--bear', 'scenario-card--range');
+                card.classList.add(`scenario-card--${scenario.icon || 'range'}`);
+            });
+
+            const tradePlan = payload.trade_plan || {};
+            const entryFields = tradePlan.entry || {};
+            document.querySelectorAll('[data-entry-field]').forEach((node) => {
+                const field = node.getAttribute('data-entry-field');
+                const value = entryFields[field] || 'N/A';
+                node.textContent = value;
+            });
+
+            const targetsList = document.querySelector('[data-plan-targets]');
+            if (targetsList) {
+                targetsList.innerHTML = '';
+                const targets = tradePlan.targets || [];
+                if (targets.length) {
+                    targets.slice(0, 3).forEach((target) => {
+                        const li = document.createElement('li');
+                        const strong = document.createElement('strong');
+                        strong.textContent = target;
+                        li.appendChild(strong);
+                        targetsList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    const strong = document.createElement('strong');
+                    strong.textContent = 'N/A';
+                    li.appendChild(strong);
+                    targetsList.appendChild(li);
+                }
+            }
+
+            const stopsList = document.querySelector('[data-plan-stops]');
+            if (stopsList) {
+                stopsList.innerHTML = '';
+                const stops = tradePlan.stops || [];
+                if (stops.length) {
+                    stops.slice(0, 3).forEach((stop) => {
+                        const li = document.createElement('li');
+                        const strong = document.createElement('strong');
+                        strong.textContent = stop;
+                        li.appendChild(strong);
+                        stopsList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    const strong = document.createElement('strong');
+                    strong.textContent = 'N/A';
+                    li.appendChild(strong);
+                    stopsList.appendChild(li);
+                }
+            }
+
+            const positionNode = document.querySelector('[data-plan-size]');
+            if (positionNode) {
+                positionNode.textContent = tradePlan.position_size || 'N/A';
+            }
+
+            const riskList = document.querySelector('[data-plan-risk]');
+            if (riskList) {
+                riskList.innerHTML = '';
+                const notes = tradePlan.risk_notes || [];
+                if (notes.length) {
+                    notes.slice(0, 4).forEach((note) => {
+                        const li = document.createElement('li');
+                        li.textContent = note;
+                        riskList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = 'No additional risk notes.';
+                    riskList.appendChild(li);
+                }
+            }
+        }
+
+        async function refreshData() {
+            if (!state) return;
+            const params = new URLSearchParams({
+                symbol: state.symbol || '{{ symbol }}',
+                timeframe: '{{ timeframe }}',
+                intent: '{{ intent }}'
+            });
+            try {
+                const response = await fetch(`/api/action-center?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
+                if (!response.ok) {
+                    console.warn('Action Center refresh skipped', response.status);
+                    return;
+                }
+                const payload = await response.json();
+                if (payload && payload.action) {
+                    state = payload.action;
+                    updateFromPayload(state);
+                }
+            } catch (error) {
+                console.warn('Failed to refresh Action Center data', error);
+            }
+        }
+
+        function startAutoRefresh() {
+            if (refreshTimer) return;
+            refreshTimer = window.setInterval(refreshData, 30000);
+        }
+
+        function stopAutoRefresh() {
+            if (!refreshTimer) return;
+            window.clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+
+        if (autoToggle) {
+            autoToggle.addEventListener('change', (event) => {
+                if (event.target.checked) {
+                    startAutoRefresh();
+                    refreshData();
+                } else {
+                    stopAutoRefresh();
+                }
+            });
+        }
+
+        if (favoriteButton) {
+            favoriteButton.addEventListener('click', () => {
+                const isActive = favoriteButton.getAttribute('aria-pressed') === 'true';
+                favoriteButton.setAttribute('aria-pressed', String(!isActive));
+                favoriteButton.classList.toggle('pill-button--active', !isActive);
+                favoriteButton.textContent = !isActive ? 'Following' : 'Follow Symbol';
+            });
+        }
+
+        applyGaugeStyles();
+        applyConfidenceBar();
+
+        if (state) {
+            updateFromPayload(state);
+        }
+    }());
+    </script>
+</body>
+</html>

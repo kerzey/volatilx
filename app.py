@@ -113,6 +113,8 @@ REPORT_CENTER_ALLOWED_PLAN_SLUGS = {"sigma", "omega"}
 DEFAULT_REPORT_CENTER_REPORT_LIMIT = int(
     os.getenv("REPORT_CENTER_MAX_REPORTS", os.getenv("DASHBOARD_MAX_REPORTS", "120"))
 )
+DEFAULT_ACTION_CENTER_SYMBOL = os.getenv("ACTION_CENTER_DEFAULT_SYMBOL", "SPY").upper()
+ACTION_CENTER_LOOKBACK_DAYS = int(os.getenv("ACTION_CENTER_LOOKBACK_DAYS", "3"))
 CONTACT_EMAIL_RECIPIENT = os.getenv("CONTACT_EMAIL_RECIPIENT")
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -1273,6 +1275,421 @@ def _resolve_report_center_date(raw_date: Optional[str]) -> Tuple[datetime, str,
     return today_utc, today_utc.strftime("%Y-%m-%d"), today_utc.strftime("%b %d, %Y")
 
 
+def _fetch_latest_action_report(symbol: str, *, lookback_days: int = ACTION_CENTER_LOOKBACK_DAYS) -> Optional[Dict[str, Any]]:
+    """Fetch the most recent stored AI report for *symbol* within the lookback window."""
+
+    safe_symbol = (symbol or DEFAULT_ACTION_CENTER_SYMBOL).strip().upper()
+    now = datetime.now(timezone.utc)
+    max_days = max(1, lookback_days)
+
+    for offset in range(max_days):
+        target_day = now - timedelta(days=offset)
+        day_anchor = target_day.replace(hour=0, minute=0, second=0, microsecond=0)
+        reports = fetch_reports_for_date(day_anchor, symbol=safe_symbol, max_reports=20)
+        if not reports:
+            continue
+
+        def sort_key(item: Dict[str, Any]) -> datetime:
+            timestamp = item.get("stored_at") or item.get("_blob_last_modified")
+            parsed = _parse_iso_datetime(timestamp) if isinstance(timestamp, str) else None
+            if parsed is None:
+                return datetime.min.replace(tzinfo=timezone.utc)
+            return parsed
+
+        reports.sort(key=sort_key, reverse=True)
+        return reports[0]
+
+    return None
+
+
+def _derive_action_center_view(
+    report: Dict[str, Any],
+    *,
+    strategy_key: str,
+    intent: str,
+) -> Dict[str, Any]:
+    """Build a presentation-friendly payload for the Action Center UI."""
+
+    intent_slug = intent.lower()
+    symbol = str(
+        report.get("symbol")
+        or report.get("principal_plan", {}).get("data", {}).get("symbol")
+        or DEFAULT_ACTION_CENTER_SYMBOL
+    ).upper()
+
+    principal = (report.get("principal_plan") or {}).get("data") or {}
+    strategies = principal.get("strategies") or {}
+    strategy = strategies.get(strategy_key) or {}
+
+    expert_outputs = report.get("expert_outputs") or {}
+    technical_output = (expert_outputs.get("technical") or {}).get("agent_output") or {}
+    price_action_output = (expert_outputs.get("price_action") or {}).get("agent_output") or {}
+
+    indicator_signals = (technical_output.get("indicator_signals") or {})
+    consensus = indicator_signals.get("consensus") or {}
+    timeframes = indicator_signals.get("timeframes") or []
+
+    latest_price = None
+    latest_price_ts = None
+    technical_snapshot = (report.get("technical_snapshot") or {})
+    symbol_snapshot = None
+    if isinstance(technical_snapshot, dict):
+        symbol_snapshot = technical_snapshot.get(symbol)
+        if not symbol_snapshot:
+            for candidate in technical_snapshot.values():
+                if isinstance(candidate, dict) and str(candidate.get("symbol")).upper() == symbol:
+                    symbol_snapshot = candidate
+                    break
+    if isinstance(symbol_snapshot, dict):
+        latest_price = symbol_snapshot.get("latest_price")
+        latest_price_ts = symbol_snapshot.get("latest_price_timestamp")
+        if not latest_price and isinstance(symbol_snapshot.get("price_by_timeframe"), dict):
+            latest_price = symbol_snapshot["price_by_timeframe"].get("5m") or symbol_snapshot["price_by_timeframe"].get("15m")
+    if latest_price is None:
+        latest_price = report.get("latest_price") or report.get("principal_plan", {}).get("data", {}).get("latest_price")
+
+    price_action_snapshot = report.get("price_action_snapshot") or {}
+    overview = price_action_snapshot.get("overview") or {}
+    key_levels = overview.get("key_levels") or []
+    supports: List[Dict[str, Any]] = []
+    resistances: List[Dict[str, Any]] = []
+    for entry in key_levels:
+        if not isinstance(entry, dict):
+            continue
+        price = _safe_float(entry.get("price"))
+        if price is None:
+            continue
+        cleaned = {
+            "price": price,
+            "distance_pct": _safe_float(entry.get("distance_pct")),
+            "timeframe": entry.get("timeframe"),
+        }
+        if str(entry.get("type")).lower() == "support":
+            supports.append(cleaned)
+        elif str(entry.get("type")).lower() == "resistance":
+            resistances.append(cleaned)
+
+    def _distance_to(level: Dict[str, Any]) -> Optional[float]:
+        if latest_price is None:
+            return level.get("distance_pct")
+        level_price = _safe_float(level.get("price"))
+        if level_price in (None, 0):
+            return level.get("distance_pct")
+        return ((latest_price - level_price) / level_price) * 100
+
+    supports.sort(key=lambda lvl: abs(_distance_to(lvl) or 9999))
+    resistances.sort(key=lambda lvl: abs(_distance_to(lvl) or 9999))
+
+    radar_levels = {
+        "s1": supports[0] if supports else None,
+        "s2": supports[1] if len(supports) > 1 else (supports[0] if supports else None),
+        "r1": resistances[0] if resistances else None,
+        "r2": resistances[1] if len(resistances) > 1 else (resistances[0] if resistances else None),
+    }
+
+    def _format_level(level: Optional[Dict[str, Any]]) -> Optional[str]:
+        if not isinstance(level, dict):
+            return None
+        price_val = _safe_float(level.get("price"))
+        if price_val is None:
+            return None
+        return f"{price_val:,.2f}"
+
+    def _formatted_distance(level: Optional[Dict[str, Any]]) -> Optional[str]:
+        distance_val = _distance_to(level or {}) if isinstance(level, dict) else None
+        if distance_val is None:
+            return None
+        return f"{distance_val:+.2f}%"
+
+    s1_price = _safe_float((radar_levels.get("s1") or {}).get("price"))
+    r1_price = _safe_float((radar_levels.get("r1") or {}).get("price"))
+
+    zone = "wait"
+    if latest_price is not None:
+        if s1_price:
+            proximity = abs((latest_price - s1_price) / s1_price) * 100
+            if proximity <= 0.2:
+                zone = "buy"
+        if r1_price and zone == "wait":
+            proximity = abs((r1_price - latest_price) / r1_price) * 100
+            if proximity <= 0.2:
+                zone = "sell"
+
+    consensus_label = str(consensus.get("overall_recommendation") or "Neutral").upper()
+    consensus_confidence = str(consensus.get("confidence") or "medium").upper()
+    strength = _safe_float(consensus.get("strength"))
+
+    def _confidence_to_score(label: str, fallback: float = 50.0) -> float:
+        mapping = {
+            "VERY HIGH": 95.0,
+            "HIGH": 85.0,
+            "MEDIUM": 65.0,
+            "LOW": 45.0,
+            "VERY LOW": 30.0,
+        }
+        return mapping.get(label.upper(), fallback)
+
+    confidence_score = strength if strength is not None else _confidence_to_score(consensus_confidence)
+    confidence_score = max(5.0, min(float(confidence_score), 100.0))
+
+    def _title_case(text: str) -> str:
+        return text[:1].upper() + text[1:].lower() if text else ""
+
+    consensus_title = _title_case(consensus.get("overall_recommendation", "Neutral"))
+    confidence_title = _title_case(consensus.get("confidence", "Medium"))
+
+    def _classify_bias(text: str) -> Tuple[str, float]:
+        normalized = text.lower()
+        if "strong" in normalized and "bull" in normalized:
+            return "Strongly Bullish", 90.0
+        if "strong" in normalized and "bear" in normalized:
+            return "Strongly Bearish", 10.0
+        if "bear" in normalized:
+            return "Bearish", 25.0
+        if "bull" in normalized:
+            return "Slightly Bullish", 75.0
+        if "neutral" in normalized:
+            return "Neutral", 50.0
+        return text.title() if text else "Mixed", 55.0
+
+    immediate_bias = price_action_output.get("immediate_bias") or overview.get("trend_alignment") or "Mixed"
+    bias_label, bias_score = _classify_bias(str(immediate_bias))
+
+    range_state = overview.get("range_state") or price_action_snapshot.get("per_timeframe", {}).get("30m", {}).get("structure", {}).get("range_state")
+    if isinstance(range_state, str):
+        range_state = range_state.lower()
+    volatility_mapping = {
+        "contracting": ("Low", 35.0),
+        "sideways": ("Normal", 55.0),
+        "expanding": ("Elevated", 75.0),
+        "trending": ("Normal", 55.0),
+        "volatile": ("High Risk", 85.0),
+    }
+    volatility_label, volatility_score = volatility_mapping.get(range_state, ("Normal", 55.0))
+
+    signal_mapping = {
+        "STRONG BUY": ("Strong Buy", 90.0),
+        "BUY": ("Buy", 75.0),
+        "HOLD": ("Neutral", 55.0),
+        "SELL": ("Sell", 35.0),
+        "STRONG SELL": ("Strong Sell", 15.0),
+    }
+    signal_label, signal_score = signal_mapping.get(consensus_label, (consensus_title or "Neutral", confidence_score))
+
+    summary_text = str(strategy.get("summary") or principal.get("summary") or "")
+    risk_note = str(price_action_output.get("structure", {}).get("risk_note") or "")
+
+    def _first_sentence(text: str) -> str:
+        if not text:
+            return ""
+        for delimiter in (". ", "\n", ".\n"):
+            if delimiter in text:
+                return text.split(delimiter)[0].strip().rstrip(".")
+        return text.strip().rstrip(".")
+
+    headline_sentence = _first_sentence(summary_text)
+    risk_sentence = _first_sentence(risk_note)
+
+    zone_copy = {
+        "buy": {
+            "title": "BUY",
+            "subtitle": "Scale In",
+            "icon": "buy",
+        },
+        "sell": {
+            "title": "SELL",
+            "subtitle": "Reduce",
+            "icon": "sell",
+        },
+        "wait": {
+            "title": "WAIT",
+            "subtitle": "No-Trade Zone",
+            "icon": "wait",
+        },
+    }
+
+    primary_zone = zone_copy.get(zone, zone_copy["wait"]).copy()
+    if intent_slug == "sell" and zone == "buy":
+        primary_zone.update({"title": "HOLD", "subtitle": "Let Price Stabilise", "icon": "wait"})
+    elif intent_slug == "buy" and zone == "sell":
+        primary_zone.update({"title": "AVOID", "subtitle": "Risk Elevated", "icon": "sell"})
+
+    explanation_lines: List[str] = []
+    if headline_sentence:
+        explanation_lines.append(headline_sentence)
+    if risk_sentence and risk_sentence not in explanation_lines:
+        explanation_lines.append(risk_sentence)
+    if not explanation_lines:
+        explanation_lines.append("Monitoring key levels before committing capital.")
+
+    scenario_templates = {
+        "bullish": {
+            "title": "Bullish Scenario",
+            "icon": "bull",
+        },
+        "bearish": {
+            "title": "Bearish Scenario",
+            "icon": "bear",
+        },
+        "range": {
+            "title": "No-Trade Scenario",
+            "icon": "range",
+        },
+    }
+
+    scenarios: Dict[str, Dict[str, Any]] = {}
+    for step in (strategy.get("next_actions") or []):
+        if len(scenarios) == 3:
+            break
+        text = str(step).strip()
+        lower = text.lower()
+        if not text:
+            continue
+        if "above" in lower or "break" in lower and "above" in lower:
+            key = "bullish"
+        elif "below" in lower or "break" in lower and "below" in lower or "falls" in lower:
+            key = "bearish"
+        else:
+            key = "range"
+        if key in scenarios:
+            continue
+        scenarios[key] = {
+            **scenario_templates[key],
+            "body": text,
+        }
+
+    for missing_key in ("bullish", "bearish", "range"):
+        scenarios.setdefault(
+            missing_key,
+            {
+                **scenario_templates[missing_key],
+                "body": "Awaiting additional AI guidance.",
+            },
+        )
+
+    primary_entry = s1_price or latest_price
+    add_entry = _safe_float((radar_levels.get("s2") or {}).get("price")) or primary_entry
+    breakout_entry = r1_price
+
+    target_prices = [lvl for lvl in (radar_levels.get("r1"), radar_levels.get("r2")) if isinstance(lvl, dict)]
+    target_values = [f"{_safe_float(lvl.get('price')):,.2f}" for lvl in target_prices if _safe_float(lvl.get("price"))]
+    stop_price = _safe_float((radar_levels.get("s2") or {}).get("price")) or primary_entry
+
+    sizing_ranges = {
+        "HIGH": "40–60%",
+        "MEDIUM": "30–40%",
+        "LOW": "20–30%",
+    }
+    position_size = sizing_ranges.get(consensus_confidence, "15–25%")
+
+    risk_tips = (technical_output.get("risk_management") or {}).get("risk_tips") or []
+    risk_notes: List[str] = []
+    if risk_sentence:
+        risk_notes.append(risk_sentence)
+    for tip in risk_tips[:2]:
+        if tip and tip not in risk_notes:
+            risk_notes.append(str(tip))
+
+    def _fmt(value: Optional[float]) -> Optional[str]:
+        if value is None:
+            return None
+        return f"{value:,.2f}"
+
+    alerts: List[str] = []
+    if r1_price:
+        alerts.append(f"Alert me if price breaks ABOVE {_fmt(r1_price)}")
+    if s1_price:
+        alerts.append(f"Alert me if price falls BELOW {_fmt(s1_price)}")
+    if zone == "buy":
+        alerts.append("Alert me if price enters BUY zone")
+    if target_values:
+        alerts.append(f"Alert me if price hits target {target_values[0]}")
+
+    chart_range_min = _safe_float((radar_levels.get("s2") or {}).get("price")) or s1_price or latest_price or 0
+    chart_range_max = _safe_float((radar_levels.get("r2") or {}).get("price")) or r1_price or latest_price or chart_range_min
+    chart_position = None
+    if latest_price is not None and chart_range_max not in (None, chart_range_min):
+        span = chart_range_max - chart_range_min
+        if span:
+            chart_position = max(0.0, min(1.0, (latest_price - chart_range_min) / span))
+
+    tags = []
+    if bias_label:
+        tags.append(f"Bias: {bias_label}")
+    if overview.get("trend_alignment"):
+        tags.append(f"Trend: {overview['trend_alignment'].title()}")
+    if s1_price and r1_price:
+        tags.append(f"Range: {s1_price:,.2f}–{r1_price:,.2f}")
+    tags.append(f"Volatility: {volatility_label}")
+    candlestick_note = price_action_output.get("candlestick_notes")
+    if candlestick_note:
+        first_note = _first_sentence(str(candlestick_note))
+        if first_note:
+            tags.append(first_note)
+
+    plan_generated = principal.get("generated_display") or principal.get("generated")
+
+    return {
+        "symbol": symbol,
+        "latest_price": f"{latest_price:,.2f}" if isinstance(latest_price, (int, float)) else latest_price,
+        "latest_price_timestamp": latest_price_ts,
+        "generated_display": plan_generated,
+        "primary_action": {
+            **primary_zone,
+            "confidence": confidence_title,
+            "confidence_score": confidence_score,
+            "explanation": explanation_lines[:2],
+        },
+        "gauges": {
+            "bias": {"label": bias_label, "score": bias_score},
+            "volatility": {"label": volatility_label, "score": volatility_score},
+            "signal": {"label": signal_label, "score": signal_score},
+        },
+        "radar": {
+            "s2": {
+                "value": _format_level(radar_levels.get("s2")),
+                "distance": _formatted_distance(radar_levels.get("s2")),
+            },
+            "s1": {
+                "value": _format_level(radar_levels.get("s1")),
+                "distance": _formatted_distance(radar_levels.get("s1")),
+            },
+            "price": {
+                "value": f"{latest_price:,.2f}" if isinstance(latest_price, (int, float)) else None,
+                "position": chart_position,
+            },
+            "r1": {
+                "value": _format_level(radar_levels.get("r1")),
+                "distance": _formatted_distance(radar_levels.get("r1")),
+            },
+            "r2": {
+                "value": _format_level(radar_levels.get("r2")),
+                "distance": _formatted_distance(radar_levels.get("r2")),
+            },
+        },
+        "traffic_light": zone,
+        "scenarios": [scenarios["bullish"], scenarios["bearish"], scenarios["range"]],
+        "trade_plan": {
+            "entry": {
+                "primary": _fmt(primary_entry),
+                "scale": _fmt(add_entry),
+                "breakout": _fmt(breakout_entry),
+            },
+            "targets": target_values[:2],
+            "stops": [_fmt(stop_price)],
+            "position_size": position_size,
+            "risk_notes": risk_notes,
+        },
+        "alerts": alerts,
+        "chart": {
+            "min": _fmt(chart_range_min),
+            "max": _fmt(chart_range_max),
+            "position": chart_position,
+        },
+        "tags": tags[:6],
+        "timeframes": timeframes,
+    }
+
 @app.get("/report-center", response_class=HTMLResponse)
 async def report_center_page(
     request: Request,
@@ -1350,6 +1767,115 @@ async def report_center_page(
         "max_reports": DEFAULT_REPORT_CENTER_REPORT_LIMIT,
     }
     return templates.TemplateResponse("report_center.html", context)
+
+
+_STRATEGY_KEY_BY_TIMEFRAME = {
+    "day": "day_trading",
+    "swing": "swing_trading",
+    "long": "longterm_trading",
+}
+
+
+def _normalise_timeframe(value: str) -> str:
+    slug = (value or "day").strip().lower()
+    return slug if slug in _STRATEGY_KEY_BY_TIMEFRAME else "day"
+
+
+def _normalise_intent(value: str) -> str:
+    slug = (value or "buy").strip().lower()
+    return slug if slug in {"buy", "sell"} else "buy"
+
+
+@app.get("/action-center", response_class=HTMLResponse)
+async def action_center_page(
+    request: Request,
+    symbol: Optional[str] = None,
+    timeframe: str = "day",
+    intent: str = "buy",
+    user: User = Depends(get_current_user_sync),
+):
+    subscription, allowed = _check_report_center_access(user)
+    if not allowed:
+        query = {"reason": "action_center_locked"}
+        if subscription and subscription.plan and subscription.plan.slug:
+            query["current_plan"] = subscription.plan.slug
+        redirect_url = "/subscribe"
+        if query:
+            redirect_url = f"/subscribe?{urllib.parse.urlencode(query)}"
+        return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+
+    timeframe_slug = _normalise_timeframe(timeframe)
+    intent_slug = _normalise_intent(intent)
+    symbol_upper = (symbol or DEFAULT_ACTION_CENTER_SYMBOL).strip().upper() or DEFAULT_ACTION_CENTER_SYMBOL
+
+    raw_report = _fetch_latest_action_report(symbol_upper)
+    if not raw_report:
+        context = {
+            "request": request,
+            "user": user,
+            "symbol": symbol_upper,
+            "subscription": _serialize_subscription(subscription) if subscription else None,
+            "timeframe": timeframe_slug,
+            "intent": intent_slug,
+            "action_data": None,
+            "error_message": "No recent AI analysis found for this symbol. Try running a new multi-agent analysis first.",
+        }
+        return templates.TemplateResponse("action_center.html", context)
+
+    strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
+    action_payload = _derive_action_center_view(raw_report, strategy_key=strategy_key, intent=intent_slug)
+
+    principal_data = (raw_report.get("principal_plan") or {}).get("data") or {}
+    strategies = principal_data.get("strategies") or {}
+    active_strategy = strategies.get(strategy_key) or {}
+
+    context = {
+        "request": request,
+        "user": user,
+        "symbol": action_payload.get("symbol", symbol_upper),
+        "subscription": _serialize_subscription(subscription) if subscription else None,
+        "timeframe": timeframe_slug,
+        "intent": intent_slug,
+        "strategy_summary": active_strategy.get("summary"),
+        "action_data": action_payload,
+        "action_data_json": json.dumps(action_payload, separators=(",", ":")),
+        "latest_report_blob": raw_report.get("_blob_name"),
+    }
+
+    return templates.TemplateResponse("action_center.html", context)
+
+
+@app.get("/api/action-center")
+async def action_center_api(
+    symbol: str,
+    timeframe: str = "day",
+    intent: str = "buy",
+    user: User = Depends(get_current_user_sync),
+):
+    subscription, allowed = _check_report_center_access(user)
+    if not allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Subscription upgrade required for Action Center")
+    symbol_upper = (symbol or DEFAULT_ACTION_CENTER_SYMBOL).strip().upper() or DEFAULT_ACTION_CENTER_SYMBOL
+    timeframe_slug = _normalise_timeframe(timeframe)
+    intent_slug = _normalise_intent(intent)
+    report = _fetch_latest_action_report(symbol_upper)
+    if not report:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": "No recent analysis available for the requested symbol."},
+        )
+
+    strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
+    payload = _derive_action_center_view(report, strategy_key=strategy_key, intent=intent_slug)
+    return JSONResponse(
+        content={
+            "symbol": symbol_upper,
+            "timeframe": timeframe_slug,
+            "intent": intent_slug,
+            "action": payload,
+            "source_blob": report.get("_blob_name"),
+        }
+    )
 
 
 def _extract_latest_price(snapshot: Any, symbol: str) -> Tuple[Optional[float], Optional[str], Optional[str]]:
