@@ -109,8 +109,10 @@ stripe_webhook_config = (
 # In-memory store for AI analysis results (for demo; use Redis/db for production)
 ai_analysis_jobs = {}
 
-DASHBOARD_ALLOWED_PLAN_SLUGS = {"sigma", "omega"}
-DEFAULT_DASHBOARD_REPORT_LIMIT = int(os.getenv("DASHBOARD_MAX_REPORTS", "120"))
+REPORT_CENTER_ALLOWED_PLAN_SLUGS = {"sigma", "omega"}
+DEFAULT_REPORT_CENTER_REPORT_LIMIT = int(
+    os.getenv("REPORT_CENTER_MAX_REPORTS", os.getenv("DASHBOARD_MAX_REPORTS", "120"))
+)
 CONTACT_EMAIL_RECIPIENT = os.getenv("CONTACT_EMAIL_RECIPIENT")
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -191,13 +193,13 @@ def _get_subscription_for_user(user_id: int) -> Optional[UserSubscription]:
         return _find_relevant_subscription(session, user_id)
 
 
-def _check_dashboard_access(user: User) -> Tuple[Optional[UserSubscription], bool]:
+def _check_report_center_access(user: User) -> Tuple[Optional[UserSubscription], bool]:
     subscription = _get_subscription_for_user(user.id)
     allowed = bool(
         subscription
         and subscription.plan
         and subscription.plan.slug
-        and subscription.plan.slug.lower() in DASHBOARD_ALLOWED_PLAN_SLUGS
+        and subscription.plan.slug.lower() in REPORT_CENTER_ALLOWED_PLAN_SLUGS
     )
     return subscription, allowed
 
@@ -1253,7 +1255,7 @@ async def subscribe_page(request: Request, user: User = Depends(get_current_user
     }
     return templates.TemplateResponse("subscription.html", context)
 
-def _resolve_dashboard_date(raw_date: Optional[str]) -> Tuple[datetime, str, str]:
+def _resolve_report_center_date(raw_date: Optional[str]) -> Tuple[datetime, str, str]:
     """Resolve query date into a midnight UTC timestamp and display labels."""
 
     today_utc = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1271,16 +1273,16 @@ def _resolve_dashboard_date(raw_date: Optional[str]) -> Tuple[datetime, str, str
     return today_utc, today_utc.strftime("%Y-%m-%d"), today_utc.strftime("%b %d, %Y")
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(
+@app.get("/report-center", response_class=HTMLResponse)
+async def report_center_page(
     request: Request,
     date: Optional[str] = None,
     symbol: Optional[str] = None,
     user: User = Depends(get_current_user_sync),
 ):
-    subscription, allowed = _check_dashboard_access(user)
+    subscription, allowed = _check_report_center_access(user)
     if not allowed:
-        query = {"reason": "dashboard_locked"}
+        query = {"reason": "report_center_locked"}
         if subscription and subscription.plan and subscription.plan.slug:
             query["current_plan"] = subscription.plan.slug
         redirect_url = "/subscribe"
@@ -1288,7 +1290,7 @@ async def dashboard_page(
             redirect_url = f"/subscribe?{urllib.parse.urlencode(query)}"
         return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
-    target_date, selected_date_iso, selected_date_label = _resolve_dashboard_date(date)
+    target_date, selected_date_iso, selected_date_label = _resolve_report_center_date(date)
     today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     symbol_filter = None
@@ -1300,13 +1302,13 @@ async def dashboard_page(
     raw_reports = fetch_reports_for_date(
         target_date,
         symbol=symbol_filter,
-        max_reports=DEFAULT_DASHBOARD_REPORT_LIMIT,
+        max_reports=DEFAULT_REPORT_CENTER_REPORT_LIMIT,
     )
 
     prepared_reports: List[Dict[str, Any]] = []
     excluded_reports: List[Dict[str, Any]] = []
     for report in raw_reports:
-        summary = _summarize_dashboard_report(report)
+        summary = _summarize_report_center_entry(report)
         if summary:
             prepared_reports.append(summary)
         else:
@@ -1323,7 +1325,7 @@ async def dashboard_page(
     )
 
     logger.info(
-        "User %s loaded dashboard date=%s symbol=%s reports=%s prepared=%s",
+        "User %s loaded report center date=%s symbol=%s reports=%s prepared=%s",
         user.id,
         selected_date_iso,
         symbol_filter,
@@ -1345,9 +1347,9 @@ async def dashboard_page(
         "raw_report_count": len(raw_reports),
         "excluded_report_count": len(excluded_reports),
         "available_symbols": available_symbols,
-        "max_reports": DEFAULT_DASHBOARD_REPORT_LIMIT,
+        "max_reports": DEFAULT_REPORT_CENTER_REPORT_LIMIT,
     }
-    return templates.TemplateResponse("dashboard.html", context)
+    return templates.TemplateResponse("report_center.html", context)
 
 
 def _extract_latest_price(snapshot: Any, symbol: str) -> Tuple[Optional[float], Optional[str], Optional[str]]:
@@ -1427,7 +1429,7 @@ def _send_contact_email(payload: Dict[str, Any]) -> bool:
     subject = f"{CONTACT_EMAIL_PREFIX} - {name}" if CONTACT_EMAIL_PREFIX else f"Contact Request - {name}"
 
     text_body = (
-        "New contact request from VolatilX dashboard.\n\n"
+        "New contact request from VolatilX Report Center.\n\n"
         f"Name: {name}\n"
         f"Email: {email_address}\n"
         f"Submitted At: {submitted_at}\n"
@@ -1591,7 +1593,7 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
-def _prepare_strategy_for_dashboard(strategy: Any) -> Optional[Dict[str, Any]]:
+def _prepare_strategy_for_report_center(strategy: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(strategy, dict):
         return None
 
@@ -1773,7 +1775,7 @@ def _extract_price_details(report: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
     return (price_info or None, price_action_summary or None)
 
 
-def _summarize_dashboard_report(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _summarize_report_center_entry(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     plan_wrapper = report.get("principal_plan")
     if not isinstance(plan_wrapper, dict) or not plan_wrapper.get("success"):
         return None
@@ -1812,7 +1814,7 @@ def _summarize_dashboard_report(report: Dict[str, Any]) -> Optional[Dict[str, An
             "longterm_trading": "Long-Term Trading",
         }
         for key, label in labels.items():
-            prepared = _prepare_strategy_for_dashboard(strategies.get(key))
+            prepared = _prepare_strategy_for_report_center(strategies.get(key))
             if prepared:
                 prepared["label"] = label
                 prepared_strategies[key] = prepared

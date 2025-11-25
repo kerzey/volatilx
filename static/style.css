@@ -1829,7 +1829,7 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   border: 1px solid #dfe6ff;
 }
 
-/* DASHBOARD --------------------------------------------------------------- */
+/* REPORT CENTER ----------------------------------------------------------- */
 .dashboard-container {
   display: flex;
   flex-direction: column;

@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VolatilX - Shared AI Dashboard</title>
+    <title>VolatilX - Shared AI Report Center</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="header">
-        <a class="logo" href="/dashboard">
+        <a class="logo" href="/report-center">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
             <span>VolatilX</span>
         </a>
         <div class="nav-links">
             <a href="/analyze">AI Insights</a>
-            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/report-center" class="active">Report Center</a>
             <a href="/subscribe">Plans</a>
             <a href="/settings">Settings</a>
             <span>{{ user.email }}</span>
@@ -24,11 +24,11 @@
 
     <div class="container dashboard-container">
         <section class="dashboard-meta">
-            <h1>Shared AI Report Dashboard</h1>
+            <h1>Shared AI Report Center</h1>
             <p>Viewing cached multi-agent strategies for <strong>{{ selected_date_label }}</strong>{% if selected_symbol %} focused on <strong>{{ selected_symbol }}</strong>{% endif %}. {{ report_count }} curated report{{ 's' if report_count != 1 else '' }} available.</p>
         </section>
 
-        <form class="dashboard-filters" method="get" action="/dashboard">
+        <form class="dashboard-filters" method="get" action="/report-center">
             <div class="filter-group">
                 <label for="dateInput">Date</label>
                 <input type="date" id="dateInput" name="date" value="{{ selected_date }}" max="{{ today_date }}">
@@ -39,7 +39,7 @@
             </div>
             <button type="submit" class="filter-submit">Refresh</button>
             {% if selected_symbol %}
-            <a class="filter-reset" href="/dashboard?date={{ selected_date }}">Clear symbol</a>
+            <a class="filter-reset" href="/report-center?date={{ selected_date }}">Clear symbol</a>
             {% endif %}
         </form>
 
@@ -47,7 +47,7 @@
         <div class="dashboard-available">
             <span>Symbols found:</span>
             {% for symbol_option in available_symbols %}
-                <a class="symbol-chip" href="/dashboard?date={{ selected_date }}&symbol={{ symbol_option }}">{{ symbol_option }}</a>
+                <a class="symbol-chip" href="/report-center?date={{ selected_date }}&symbol={{ symbol_option }}">{{ symbol_option }}</a>
             {% endfor %}
         </div>
         {% endif %}
@@ -242,7 +242,7 @@
         {% endif %}
     </div>
 
-    <script id="dashboardReportsData" type="application/json">
+    <script id="reportCenterReportsData" type="application/json">
         {{ reports | tojson | safe }}
     </script>
     {% include "_contact_widget.html" %}

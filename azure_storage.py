@@ -139,7 +139,7 @@ def fetch_reports_for_date(
         logger.warning("Azure storage unavailable: %s", exc)
         return []
     except Exception as exc:  # noqa: BLE001 - never propagate storage errors
-        logger.exception("Failed to connect to Azure storage for dashboard fetch")
+        logger.exception("Failed to connect to Azure storage for Report Center fetch")
         return []
 
     prefix = None
