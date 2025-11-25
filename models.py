@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -100,3 +100,19 @@ class SubscriptionUsage(TimestampMixin, Base):
 			f"<SubscriptionUsage subscription_id={self.subscription_id} "
 			f"type={self.usage_type!r} units={self.units_consumed}>"
 		)
+
+
+class UserFavoriteSymbol(TimestampMixin, Base):
+	"""Symbols a user has elected to follow within Action Center."""
+
+	__tablename__ = "user_favorite_symbols"
+	__table_args__ = (UniqueConstraint("user_id", "symbol", name="uq_user_symbol"),)
+
+	id = Column(Integer, primary_key=True, index=True)
+	user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+	symbol = Column(String(24), nullable=False)
+
+	user = relationship("User", backref="favorite_symbols")
+
+	def __repr__(self) -> str:  # pragma: no cover - debug helper
+		return f"<UserFavoriteSymbol user_id={self.user_id} symbol={self.symbol!r}>"

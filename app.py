@@ -53,8 +53,9 @@ from billing import (
     handle_subscription_updated,
     parse_event,
 )
-from models import SubscriptionPlan, UserSubscription
+from models import SubscriptionPlan, UserSubscription, UserFavoriteSymbol
 from sqlalchemy.orm import Session, joinedload
+from pydantic import BaseModel, Field
 
 # FastAPI Users imports
 from fastapi_users import FastAPIUsers
@@ -83,6 +84,7 @@ from symbol_map import (
     normalize_symbol,
 )
 from azure_storage import store_ai_report, fetch_reports_for_date
+from market_data.live_price import LivePriceStream
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -125,6 +127,7 @@ CONTACT_EMAIL_PREFIX = os.getenv("CONTACT_EMAIL_SUBJECT_PREFIX", "VolatilX Conta
 CONTACT_EMAIL_SENDER = os.getenv("CONTACT_EMAIL_SENDER") or SMTP_USERNAME or CONTACT_EMAIL_RECIPIENT
 ACS_CONNECTION_STRING = os.getenv("ACS_CONNECTION_STRING")
 ACS_EMAIL_SENDER = os.getenv("ACS_EMAIL_SENDER") or CONTACT_EMAIL_SENDER
+ENABLE_LIVE_PRICE_STREAM = os.getenv("ENABLE_LIVE_PRICE_STREAM", "true").strip().lower() not in {"0", "false", "no"}
 
 
 def _build_base_url(request: Request) -> str:
@@ -204,6 +207,39 @@ def _check_report_center_access(user: User) -> Tuple[Optional[UserSubscription],
         and subscription.plan.slug.lower() in REPORT_CENTER_ALLOWED_PLAN_SLUGS
     )
     return subscription, allowed
+
+
+def _sanitize_symbol(value: str) -> str:
+    cleaned = (value or "").strip().upper()
+    if not cleaned:
+        return cleaned
+    return re.sub(r"[^A-Z0-9\.\-]", "", cleaned)[:24]
+
+
+def _is_symbol_favorited(session: Session, user_id: int, symbol: str) -> bool:
+    if not symbol:
+        return False
+    return (
+        session.query(UserFavoriteSymbol)
+        .filter(UserFavoriteSymbol.user_id == user_id, UserFavoriteSymbol.symbol == symbol)
+        .first()
+        is not None
+    )
+
+
+def _favorite_symbols(session: Session, user_id: int, limit: int = 25) -> List[str]:
+    rows = (
+        session.query(UserFavoriteSymbol.symbol)
+        .filter(UserFavoriteSymbol.user_id == user_id)
+        .order_by(UserFavoriteSymbol.created_at.desc())
+        .limit(max(limit, 1))
+        .all()
+    )
+    return [row[0] for row in rows if row and row[0]]
+
+
+def _get_live_stream(app: FastAPI) -> Optional[LivePriceStream]:
+    return getattr(app.state, "live_price_stream", None)
 
 
 def _ensure_trial_subscription(session: Session, user: User) -> None:
@@ -370,6 +406,7 @@ def _consume_subscription_units(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    live_stream = None
     try:
         init_db()
         with SessionLocal() as session:
@@ -380,7 +417,28 @@ async def lifespan(app: FastAPI):
         # Try to create tables anyway
         from db import Base, engine
         Base.metadata.create_all(bind=engine)
-    yield
+    if ENABLE_LIVE_PRICE_STREAM:
+        try:
+            live_stream = LivePriceStream()
+            await live_stream.start()
+            await live_stream.subscribe({DEFAULT_ACTION_CENTER_SYMBOL})
+            try:
+                await live_stream.ready(timeout=5.0)
+            except Exception as exc:  # pragma: no cover - startup resilience
+                logger.debug("Live price stream ready wait skipped: %s", exc)
+        except Exception as exc:  # pragma: no cover - startup resilience
+            logger.warning("Live price streaming unavailable: %s", exc)
+            live_stream = None
+    app.state.live_price_stream = live_stream
+    try:
+        yield
+    finally:
+        if live_stream:
+            try:
+                await live_stream.stop()
+            except Exception as exc:  # pragma: no cover - shutdown resilience
+                logger.debug("Live price stream stop failed: %s", exc)
+        app.state.live_price_stream = None
 
 app = FastAPI(lifespan=lifespan)
 
@@ -1632,6 +1690,7 @@ def _derive_action_center_view(
     return {
         "symbol": symbol,
         "latest_price": f"{latest_price:,.2f}" if isinstance(latest_price, (int, float)) else latest_price,
+        "latest_price_value": latest_price,
         "latest_price_timestamp": latest_price_ts,
         "generated_display": plan_generated,
         "primary_action": {
@@ -1685,9 +1744,12 @@ def _derive_action_center_view(
             "min": _fmt(chart_range_min),
             "max": _fmt(chart_range_max),
             "position": chart_position,
+            "min_value": chart_range_min,
+            "max_value": chart_range_max,
         },
         "tags": tags[:6],
         "timeframes": timeframes,
+        "favorite": False,
     }
 
 @app.get("/report-center", response_class=HTMLResponse)
@@ -1808,6 +1870,13 @@ async def action_center_page(
     intent_slug = _normalise_intent(intent)
     symbol_upper = (symbol or DEFAULT_ACTION_CENTER_SYMBOL).strip().upper() or DEFAULT_ACTION_CENTER_SYMBOL
 
+    live_stream = _get_live_stream(request.app)
+    live_price_available = bool(live_stream)
+
+    with SessionLocal() as session:
+        is_favorited = _is_symbol_favorited(session, user.id, symbol_upper)
+        favorite_symbols = _favorite_symbols(session, user.id)
+
     raw_report = _fetch_latest_action_report(symbol_upper)
     if not raw_report:
         context = {
@@ -1819,11 +1888,15 @@ async def action_center_page(
             "intent": intent_slug,
             "action_data": None,
             "error_message": "No recent AI analysis found for this symbol. Try running a new multi-agent analysis first.",
+            "is_favorited": is_favorited,
+            "favorite_symbols": favorite_symbols,
+            "live_price_enabled": live_price_available,
         }
         return templates.TemplateResponse("action_center.html", context)
 
     strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
     action_payload = _derive_action_center_view(raw_report, strategy_key=strategy_key, intent=intent_slug)
+    action_payload["favorite"] = is_favorited
 
     principal_data = (raw_report.get("principal_plan") or {}).get("data") or {}
     strategies = principal_data.get("strategies") or {}
@@ -1840,6 +1913,9 @@ async def action_center_page(
         "action_data": action_payload,
         "action_data_json": json.dumps(action_payload, separators=(",", ":")),
         "latest_report_blob": raw_report.get("_blob_name"),
+        "is_favorited": is_favorited,
+        "favorite_symbols": favorite_symbols,
+        "live_price_enabled": live_price_available,
     }
 
     return templates.TemplateResponse("action_center.html", context)
@@ -1867,6 +1943,9 @@ async def action_center_api(
 
     strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
     payload = _derive_action_center_view(report, strategy_key=strategy_key, intent=intent_slug)
+    with SessionLocal() as session:
+        is_favorited = _is_symbol_favorited(session, user.id, symbol_upper)
+    payload["favorite"] = is_favorited
     return JSONResponse(
         content={
             "symbol": symbol_upper,
@@ -1874,8 +1953,103 @@ async def action_center_api(
             "intent": intent_slug,
             "action": payload,
             "source_blob": report.get("_blob_name"),
+            "favorite": is_favorited,
         }
     )
+
+
+class FavoriteTogglePayload(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=24)
+    follow: bool = True
+
+
+@app.post("/api/action-center/favorites")
+async def set_action_center_favorite(
+    payload: FavoriteTogglePayload,
+    user: User = Depends(get_current_user_sync),
+):
+    symbol_clean = _sanitize_symbol(payload.symbol)
+    if not symbol_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A valid symbol is required.")
+
+    with SessionLocal() as session:
+        existing = (
+            session.query(UserFavoriteSymbol)
+            .filter(UserFavoriteSymbol.user_id == user.id, UserFavoriteSymbol.symbol == symbol_clean)
+            .first()
+        )
+        if payload.follow:
+            if existing is None:
+                session.add(UserFavoriteSymbol(user_id=user.id, symbol=symbol_clean))
+                session.commit()
+            else:
+                session.commit()
+        else:
+            if existing is not None:
+                session.delete(existing)
+                session.commit()
+            else:
+                session.commit()
+        current_state = _is_symbol_favorited(session, user.id, symbol_clean)
+        favorites = _favorite_symbols(session, user.id)
+
+    return {
+        "symbol": symbol_clean,
+        "follow": current_state,
+        "favorites": favorites,
+    }
+
+
+@app.get("/api/action-center/favorites")
+async def list_action_center_favorites(user: User = Depends(get_current_user_sync)):
+    with SessionLocal() as session:
+        favorites = _favorite_symbols(session, user.id, limit=50)
+    return {"symbols": favorites}
+
+
+@app.get("/api/live-price")
+async def get_live_price(symbol: str, request: Request, user: User = Depends(get_current_user_sync)):
+    service = _get_live_stream(request.app)
+    if not service:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "Live price stream unavailable."},
+        )
+
+    symbol_clean = _sanitize_symbol(symbol)
+    if not symbol_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A valid symbol is required.")
+
+    logger.debug("Live price request user=%s symbol=%s", getattr(user, "id", "?"), symbol_clean)
+
+    try:
+        await service.subscribe({symbol_clean})
+    except Exception as exc:  # pragma: no cover - runtime safety
+        logger.debug("Failed to subscribe %s to live stream: %s", symbol_clean, exc)
+
+    try:
+        await service.ready(timeout=5.0)
+    except Exception:
+        pass
+
+    update = service.get_latest(symbol_clean)
+    if update is None:
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"symbol": symbol_clean, "status": "pending"},
+        )
+
+    payload = update.to_dict()
+    return {
+        "symbol": payload.get("symbol", symbol_clean),
+        "price": payload.get("last_trade_price"),
+        "bid": payload.get("bid_price"),
+        "ask": payload.get("ask_price"),
+        "timestamp": payload.get("last_trade_timestamp"),
+        "volume": payload.get("volume"),
+        "source": payload.get("source"),
+        "received_at": payload.get("received_at"),
+    }
 
 
 def _extract_latest_price(snapshot: Any, symbol: str) -> Tuple[Optional[float], Optional[str], Optional[str]]:

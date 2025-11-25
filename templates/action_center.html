@@ -6,7 +6,7 @@
     <title>VolatilX - Action Center</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="action-center-page">
+<body class="action-center-page" data-live-price="{{ 'true' if live_price_enabled else 'false' }}">
     <div class="header">
         <a class="logo" href="/analyze">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
@@ -50,7 +50,15 @@
                     </select>
                 </label>
                 <button type="submit" class="pill-button">Update View</button>
-                <button type="button" class="pill-button pill-button--ghost" id="favoriteSymbol" data-symbol="{{ symbol }}" aria-pressed="false">Follow Symbol</button>
+                <button
+                    type="button"
+                    class="pill-button pill-button--ghost{% if is_favorited %} pill-button--active{% endif %}"
+                    id="favoriteSymbol"
+                    data-symbol="{{ symbol }}"
+                    aria-pressed="{{ 'true' if is_favorited else 'false' }}"
+                >
+                    {{ 'Following' if is_favorited else 'Follow Symbol' }}
+                </button>
                 <label class="toggle" for="autoRefreshToggle">
                     <input type="checkbox" id="autoRefreshToggle" name="autoupdate" value="1">
                     <span>Auto-update</span>
@@ -252,7 +260,18 @@
 
         const autoToggle = document.getElementById('autoRefreshToggle');
         const favoriteButton = document.getElementById('favoriteSymbol');
+        const defaultSymbol = '{{ symbol }}';
+        const livePriceEnabled = document.body.getAttribute('data-live-price') === 'true';
         let refreshTimer = null;
+        let livePriceTimer = null;
+        let favoriteState = favoriteButton ? favoriteButton.getAttribute('aria-pressed') === 'true' : false;
+
+        function updateFavoriteButton(isActive) {
+            if (!favoriteButton) return;
+            favoriteButton.setAttribute('aria-pressed', String(isActive));
+            favoriteButton.classList.toggle('pill-button--active', isActive);
+            favoriteButton.textContent = isActive ? 'Following' : 'Follow Symbol';
+        }
 
         function applyGaugeStyles() {
             document.querySelectorAll('.gauge').forEach((gauge) => {
@@ -271,13 +290,69 @@
             });
         }
 
+        function formatPrice(value) {
+            if (typeof value !== 'number' || Number.isNaN(value)) {
+                return null;
+            }
+            return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function applyLivePrice(price, timestamp) {
+            if (typeof price !== 'number' || Number.isNaN(price)) {
+                return;
+            }
+            if (!state) {
+                state = { symbol: defaultSymbol };
+            }
+            const formatted = formatPrice(price) || String(price);
+            state.latest_price_value = price;
+            state.latest_price = formatted;
+            if (state.radar && state.radar.price) {
+                state.radar.price.value = formatted;
+            }
+            const priceNode = document.querySelector('.level-marker--price .level-marker__value');
+            if (priceNode) {
+                priceNode.textContent = formatted;
+            }
+
+            if (!state.chart) {
+                state.chart = {};
+            }
+            const minRaw = Number(state.chart.min_value);
+            const maxRaw = Number(state.chart.max_value);
+            const canvas = document.querySelector('.chart-preview__canvas');
+            if (canvas && Number.isFinite(minRaw) && Number.isFinite(maxRaw) && maxRaw !== minRaw) {
+                const position = Math.max(0, Math.min(1, (price - minRaw) / (maxRaw - minRaw)));
+                canvas.style.setProperty('--price-position', position);
+                state.chart.position = position;
+            }
+
+            const rangeNode = document.querySelector('.chart-preview__range');
+            if (rangeNode) {
+                const minLabel = state.chart.min || (Number.isFinite(minRaw) ? formatPrice(minRaw) : 'N/A');
+                const maxLabel = state.chart.max || (Number.isFinite(maxRaw) ? formatPrice(maxRaw) : 'N/A');
+                rangeNode.textContent = `${minLabel || 'N/A'} - ${maxLabel || 'N/A'}`;
+            }
+
+            if (state.radar && state.radar.price) {
+                const root = document.querySelector('.level-radar__track');
+                if (root && typeof state.chart.position === 'number') {
+                    root.style.setProperty('--price-position', state.chart.position);
+                }
+            }
+        }
+
         function updateFromPayload(payload) {
             if (!payload) {
                 return;
             }
+            if (typeof payload.favorite === 'boolean') {
+                favoriteState = payload.favorite;
+                updateFavoriteButton(favoriteState);
+            }
             const meta = document.querySelector('.action-center__meta');
             if (meta) {
-                const symbolText = payload.symbol || '{{ symbol }}';
+                const symbolText = payload.symbol || defaultSymbol;
                 const updated = payload.generated_display ? ` &middot; Updated ${payload.generated_display}` : '';
                 meta.innerHTML = `Symbol <strong>${symbolText}</strong>${updated}`;
             }
@@ -469,7 +544,7 @@
         async function refreshData() {
             if (!state) return;
             const params = new URLSearchParams({
-                symbol: state.symbol || '{{ symbol }}',
+                symbol: state.symbol || defaultSymbol,
                 timeframe: '{{ timeframe }}',
                 intent: '{{ intent }}'
             });
@@ -482,10 +557,42 @@
                 const payload = await response.json();
                 if (payload && payload.action) {
                     state = payload.action;
+                    if (typeof payload.favorite === 'boolean') {
+                        favoriteState = payload.favorite;
+                        state.favorite = favoriteState;
+                        updateFavoriteButton(favoriteState);
+                    }
                     updateFromPayload(state);
                 }
             } catch (error) {
                 console.warn('Failed to refresh Action Center data', error);
+            }
+        }
+
+        async function refreshLivePrice() {
+            if (!livePriceEnabled) return;
+            const targetSymbol = (state && state.symbol) || (favoriteButton && favoriteButton.dataset.symbol) || defaultSymbol;
+            if (!targetSymbol) return;
+            try {
+                const response = await fetch(`/api/live-price?symbol=${encodeURIComponent(targetSymbol)}`, { headers: { 'Accept': 'application/json' } });
+                if (response.status === 503) {
+                    console.warn('Live price stream unavailable');
+                    stopLivePrice();
+                    return;
+                }
+                if (response.status === 202) {
+                    return;
+                }
+                if (!response.ok) {
+                    console.warn('Live price request failed', response.status);
+                    return;
+                }
+                const payload = await response.json();
+                if (payload && typeof payload.price === 'number') {
+                    applyLivePrice(payload.price, payload.timestamp);
+                }
+            } catch (error) {
+                console.warn('Failed to refresh live price', error);
             }
         }
 
@@ -500,23 +607,68 @@
             refreshTimer = null;
         }
 
+        function startLivePrice() {
+            if (!livePriceEnabled || livePriceTimer) return;
+            livePriceTimer = window.setInterval(refreshLivePrice, 7000);
+            refreshLivePrice();
+        }
+
+        function stopLivePrice() {
+            if (!livePriceTimer) return;
+            window.clearInterval(livePriceTimer);
+            livePriceTimer = null;
+        }
+
         if (autoToggle) {
             autoToggle.addEventListener('change', (event) => {
                 if (event.target.checked) {
                     startAutoRefresh();
                     refreshData();
+                    startLivePrice();
                 } else {
                     stopAutoRefresh();
+                    stopLivePrice();
                 }
             });
+            if (autoToggle.checked) {
+                startAutoRefresh();
+                startLivePrice();
+            }
         }
 
         if (favoriteButton) {
-            favoriteButton.addEventListener('click', () => {
-                const isActive = favoriteButton.getAttribute('aria-pressed') === 'true';
-                favoriteButton.setAttribute('aria-pressed', String(!isActive));
-                favoriteButton.classList.toggle('pill-button--active', !isActive);
-                favoriteButton.textContent = !isActive ? 'Following' : 'Follow Symbol';
+            favoriteButton.addEventListener('click', async () => {
+                const targetSymbol = (state && state.symbol) || favoriteButton.dataset.symbol || defaultSymbol;
+                if (!targetSymbol) {
+                    return;
+                }
+                const nextState = !favoriteState;
+                favoriteButton.disabled = true;
+                try {
+                    const response = await fetch('/api/action-center/favorites', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ symbol: targetSymbol, follow: nextState })
+                    });
+                    if (!response.ok) {
+                        console.warn('Favorite toggle failed', response.status);
+                        return;
+                    }
+                    const result = await response.json();
+                    favoriteState = Boolean(result.follow);
+                    updateFavoriteButton(favoriteState);
+                    if (!state) {
+                        state = { symbol: targetSymbol };
+                    }
+                    state.favorite = favoriteState;
+                } catch (error) {
+                    console.warn('Failed to update favorite symbol', error);
+                } finally {
+                    favoriteButton.disabled = false;
+                }
             });
         }
 
@@ -524,7 +676,17 @@
         applyConfidenceBar();
 
         if (state) {
+            if (typeof state.favorite === 'boolean') {
+                favoriteState = state.favorite;
+            }
+            updateFavoriteButton(favoriteState);
             updateFromPayload(state);
+        } else {
+            updateFavoriteButton(favoriteState);
+        }
+
+        if (livePriceEnabled) {
+            refreshLivePrice();
         }
     }());
     </script>
