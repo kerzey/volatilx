@@ -314,6 +314,7 @@
             aboveR2: 'above Resistance-2',
         };
         const degToRad = (deg) => (deg * Math.PI) / 180;
+        const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
         function updateFavoriteButton(isActive) {
             if (!favoriteButton) return;
@@ -365,6 +366,7 @@
             if (!payload) {
                 return null;
             }
+
             const radar = payload.radar || {};
             const values = {
                 s2: parseNumeric(radar.s2 && radar.s2.value),
@@ -376,7 +378,7 @@
                         ? payload.latest_price_value
                         : parseNumeric(radar.price && radar.price.value),
             };
-            const isFiniteNumber = (num) => typeof num === 'number' && Number.isFinite(num);
+
             const anchors = {
                 min: Math.PI,
                 s2: degToRad(152.5),
@@ -385,6 +387,7 @@
                 r2: degToRad(22.5),
                 max: 0,
             };
+
             const formatted = {
                 s2: radar.s2 && radar.s2.value ? radar.s2.value : null,
                 s1: radar.s1 && radar.s1.value ? radar.s1.value : null,
@@ -395,6 +398,7 @@
                     || payload.latest_price
                     || (isFiniteNumber(values.price) ? formatPrice(values.price) : null),
             };
+
             const levelKeys = ['s2', 's1', 'r1', 'r2'];
             const points = levelKeys
                 .map((key) => (isFiniteNumber(values[key]) ? { key, value: values[key], angle: anchors[key] } : null))
@@ -409,6 +413,9 @@
                 if (points.length >= 2) {
                     return Math.max(1, Math.abs(points[points.length - 1].value - points[0].value) * 0.1);
                 }
+                if (points.length === 1 && isFiniteNumber(values.price)) {
+                    return Math.max(1, Math.abs(values.price - points[0].value) * 0.5);
+                }
                 if (points.length === 1) {
                     return Math.max(1, Math.abs(points[0].value) * 0.1);
                 }
@@ -417,27 +424,20 @@
                 }
                 return 1;
             })();
-            const extendLowerValue = points.length
-                ? points[0].value - spanHeuristic
-                : isFiniteNumber(values.price)
-                ? values.price - spanHeuristic
-                : 0;
-            const extendUpperValue = points.length
-                ? points[points.length - 1].value + spanHeuristic
-                : isFiniteNumber(values.price)
-                ? values.price + spanHeuristic
-                : 0;
+
+            const lowerBaseline = points.length ? points[0].value : values.price;
+            const upperBaseline = points.length ? points[points.length - 1].value : values.price;
+            const fallbackLower = isFiniteNumber(lowerBaseline) ? lowerBaseline - spanHeuristic : -spanHeuristic;
+            const fallbackUpper = isFiniteNumber(upperBaseline) ? upperBaseline + spanHeuristic : spanHeuristic;
+
             const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
             const resolveAngleForPrice = (priceValue) => {
-                if (!isFiniteNumber(priceValue)) {
-                    return anchors.s1;
-                }
-                if (!points.length) {
+                if (!isFiniteNumber(priceValue) || !points.length) {
                     return anchors.s1;
                 }
                 if (priceValue <= points[0].value) {
-                    const ratio = (priceValue - extendLowerValue) / (points[0].value - extendLowerValue || 1);
+                    const ratio = (priceValue - fallbackLower) / (points[0].value - fallbackLower || 1);
                     return anchors.min + (points[0].angle - anchors.min) * clamp(ratio, 0, 1);
                 }
                 for (let idx = 0; idx < points.length - 1; idx += 1) {
@@ -449,7 +449,7 @@
                     }
                 }
                 const last = points[points.length - 1];
-                const ratio = (priceValue - last.value) / (extendUpperValue - last.value || 1);
+                const ratio = (priceValue - last.value) / (fallbackUpper - last.value || 1);
                 return last.angle + (anchors.max - last.angle) * clamp(ratio, 0, 1);
             };
 
@@ -461,6 +461,7 @@
                 const s1Val = values.s1;
                 const r1Val = values.r1;
                 const r2Val = values.r2;
+
                 if (!isFiniteNumber(priceVal)) {
                     return 'midZone';
                 }
@@ -474,7 +475,7 @@
                     return 'midZone';
                 }
                 if (isFiniteNumber(r2Val) && priceVal <= r2Val) {
-                    return isFiniteNumber(r1Val) ? 'betweenResistances' : 'midZone';
+                    return 'betweenResistances';
                 }
                 if (!isFiniteNumber(r2Val) && isFiniteNumber(r1Val) && priceVal > r1Val) {
                     return 'betweenResistances';
@@ -482,16 +483,20 @@
                 return 'aboveR2';
             };
 
-            const rangeMinValue = isFiniteNumber(values.s2)
+            const rangeMinCandidate = isFiniteNumber(values.s2)
                 ? values.s2
                 : isFiniteNumber(values.s1)
                 ? values.s1
                 : values.price;
-            const rangeMaxValue = isFiniteNumber(values.r2)
+            const rangeMaxCandidate = isFiniteNumber(values.r2)
                 ? values.r2
                 : isFiniteNumber(values.r1)
                 ? values.r1
                 : values.price;
+
+            const resolvedMinValue = isFiniteNumber(rangeMinCandidate) ? rangeMinCandidate : fallbackLower;
+            const resolvedMaxValue = isFiniteNumber(rangeMaxCandidate) ? rangeMaxCandidate : fallbackUpper;
+            const formatOrNull = (num) => (isFiniteNumber(num) ? formatPrice(num) : null);
 
             return {
                 values,
@@ -507,20 +512,10 @@
                 needleAngle: priceAngle,
                 zone: determineZone(),
                 range: {
-                    minValue: isFiniteNumber(rangeMinValue) ? rangeMinValue : null,
-                    maxValue: isFiniteNumber(rangeMaxValue) ? rangeMaxValue : null,
-                    minLabel:
-                        formatted.s2
-                        || formatted.s1
-                        || formatted.price
-                        || (isFiniteNumber(rangeMinValue) ? formatPrice(rangeMinValue) : null)
-                        || 'N/A',
-                    maxLabel:
-                        formatted.r2
-                        || formatted.r1
-                        || formatted.price
-                        || (isFiniteNumber(rangeMaxValue) ? formatPrice(rangeMaxValue) : null)
-                        || 'N/A',
+                    minValue: resolvedMinValue,
+                    maxValue: resolvedMaxValue,
+                    minLabel: formatted.s2 || formatted.s1 || formatted.price || formatOrNull(resolvedMinValue) || 'N/A',
+                    maxLabel: formatted.r2 || formatted.r1 || formatted.price || formatOrNull(resolvedMaxValue) || 'N/A',
                 },
             };
         }
@@ -529,60 +524,65 @@
             if (!canvas || !config) {
                 return;
             }
+
             const ctx = canvas.getContext('2d');
             if (!ctx) {
                 return;
             }
 
-            const width = canvas.clientWidth || canvas.width;
-            const height = canvas.clientHeight || canvas.height;
+            const ratio = window.devicePixelRatio || 1;
+            const width = canvas.clientWidth || canvas.width || 0;
+            const height = canvas.clientHeight || canvas.height || 0;
             if (!width || !height) {
                 return;
             }
 
-            const ratio = window.devicePixelRatio || 1;
             const displayWidth = Math.round(width * ratio);
             const displayHeight = Math.round(height * ratio);
             if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
                 canvas.width = displayWidth;
                 canvas.height = displayHeight;
             }
+
             ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.scale(ratio, ratio);
-            ctx.clearRect(0, 0, width, height);
 
             const centerX = width / 2;
-            const centerY = height;
-            const radius = Math.min(width, height * 2) / 2 - 12;
-            const lineWidth = 18;
+            const centerY = height - 10;
+            const baseRadius = Math.min(width / 2 - 20, height - 20);
+            const radius = Math.max(48, baseRadius);
+            const lineWidth = Math.max(12, radius * 0.22);
 
-            ctx.lineWidth = lineWidth;
             ctx.lineCap = 'round';
+            ctx.lineWidth = lineWidth;
+
             ctx.strokeStyle = 'rgba(15, 23, 42, 0.32)';
             ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
+            ctx.arc(centerX, centerY, radius, Math.PI, 0, true);
             ctx.stroke();
 
-            const innerFillRadius = radius - lineWidth * 0.55;
+            const innerFillRadius = Math.max(0, radius - lineWidth * 0.6);
             const zoneFill = gaugeZoneFill[config.zone] || 'rgba(30, 41, 59, 0.32)';
             ctx.fillStyle = zoneFill;
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, innerFillRadius, Math.PI, 0, false);
+            ctx.arc(centerX, centerY, innerFillRadius, Math.PI, 0, true);
             ctx.closePath();
             ctx.fill();
 
+            ctx.lineWidth = lineWidth;
             config.segments.forEach((segment) => {
                 ctx.strokeStyle = segment.color;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, segment.start, segment.end, false);
+                ctx.arc(centerX, centerY, radius, segment.start, segment.end, true);
                 ctx.stroke();
             });
 
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'rgba(248, 250, 252, 0.65)';
-            const innerRadius = radius - lineWidth / 2 - 4;
-            const outerRadius = innerRadius + 8;
+            const innerRadius = radius - lineWidth / 2 - 6;
+            const outerRadius = innerRadius + 10;
             const tickAngles = [
                 config.anchors.min,
                 config.anchors.s2,
@@ -595,13 +595,39 @@
                 const cos = Math.cos(angle);
                 const sin = Math.sin(angle);
                 ctx.beginPath();
-                ctx.moveTo(centerX + cos * innerRadius, centerY + sin * innerRadius);
-                ctx.lineTo(centerX + cos * outerRadius, centerY + sin * outerRadius);
+                ctx.moveTo(centerX + cos * innerRadius, centerY - sin * innerRadius);
+                ctx.lineTo(centerX + cos * outerRadius, centerY - sin * outerRadius);
                 ctx.stroke();
             });
 
+            const labelFontSize = Math.max(12, Math.min(18, width * 0.08));
+            const labelRadius = radius - lineWidth * 0.45;
+            const renderLevelLabel = (angle, text, highlight = false) => {
+                if (!text) {
+                    return;
+                }
+                ctx.save();
+                ctx.font = `600 ${labelFontSize}px 'Inter', 'Segoe UI', Arial`;
+                ctx.fillStyle = highlight ? '#fef9c3' : 'rgba(241, 245, 249, 0.86)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const x = centerX + Math.cos(angle) * labelRadius;
+                const y = centerY - Math.sin(angle) * labelRadius;
+                const strokeColor = highlight ? 'rgba(15, 23, 42, 0.55)' : 'rgba(15, 23, 42, 0.35)';
+                ctx.lineWidth = highlight ? 2 : 1.5;
+                ctx.strokeStyle = strokeColor;
+                ctx.strokeText(text, x, y);
+                ctx.fillText(text, x, y);
+                ctx.restore();
+            };
+
+            renderLevelLabel(config.anchors.s2, config.formatted.s2);
+            renderLevelLabel(config.anchors.s1, config.formatted.s1);
+            renderLevelLabel(config.anchors.r1, config.formatted.r1);
+            renderLevelLabel(config.anchors.r2, config.formatted.r2);
+
             const needleAngle = typeof config.needleAngle === 'number' ? config.needleAngle : config.anchors.s1;
-            const needleLength = radius - lineWidth / 2;
+            const needleLength = radius - lineWidth * 0.5;
             const needleCos = Math.cos(needleAngle);
             const needleSin = Math.sin(needleAngle);
 
@@ -612,7 +638,7 @@
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
-            ctx.lineTo(centerX + needleCos * needleLength, centerY + needleSin * needleLength);
+            ctx.lineTo(centerX + needleCos * needleLength, centerY - needleSin * needleLength);
             ctx.stroke();
             ctx.restore();
 
@@ -625,15 +651,24 @@
             ctx.beginPath();
             ctx.arc(centerX, centerY, lineWidth * 0.24, 0, Math.PI * 2);
             ctx.fill();
+
+            const tipX = centerX + needleCos * (needleLength - 6);
+            const tipY = centerY - needleSin * (needleLength - 6);
+            ctx.fillStyle = '#fef9c3';
+            ctx.beginPath();
+            ctx.arc(tipX, tipY, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            renderLevelLabel(needleAngle, config.formatted.price || '', true);
         }
 
         function updateGaugeDisplay(payload) {
             if (!gaugeCanvas && !gaugeRange && !gaugePriceValue) {
                 return;
             }
+
             const gaugeContainer = document.querySelector('.level-gauge');
             const gaugeBody = document.querySelector('.level-gauge__body');
-            const isFiniteNumber = (num) => typeof num === 'number' && Number.isFinite(num);
 
             if (!payload) {
                 if (gaugeCanvas) {
@@ -642,6 +677,7 @@
                         ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
                     }
                     gaugeCanvas.removeAttribute('data-zone');
+                    gaugeCanvas.setAttribute('aria-label', 'Price gauge unavailable');
                 }
                 if (gaugeRange) {
                     gaugeRange.textContent = 'N/A - N/A';
@@ -693,12 +729,18 @@
                 if (!node) {
                     return;
                 }
-                const level = payload.radar && payload.radar[key];
                 if (key === 'price') {
-                    node.textContent = (config && config.formatted.price) || (level && level.value) || payload.latest_price || 'N/A';
+                    node.textContent =
+                        (config && config.formatted.price)
+                        || (payload.radar && payload.radar.price && payload.radar.price.value)
+                        || payload.latest_price
+                        || 'N/A';
                     return;
                 }
-                node.textContent = (level && level.value) || 'N/A';
+                const levelValue =
+                    (config && config.formatted[key])
+                    || (payload.radar && payload.radar[key] && payload.radar[key].value);
+                node.textContent = levelValue || 'N/A';
             });
 
             if (!config) {
@@ -743,7 +785,7 @@
                 if (payload.radar && payload.radar.price) {
                     payload.radar.price.position = normalised;
                 }
-            } else if (payload.chart) {
+            } else {
                 payload.chart.position = 0.5;
                 if (payload.radar && payload.radar.price) {
                     payload.radar.price.position = 0.5;
