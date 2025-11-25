@@ -119,12 +119,12 @@
         <section class="level-radar" aria-label="Support and resistance radar">
             <div class="level-radar__track" style="--price-position: {{ action_data.radar.price.position or 0.5 }}">
                 <div class="level-marker level-marker--s2">
-                    <span class="level-marker__title">S2</span>
+                    <span class="level-marker__title">Support-2</span>
                     <span class="level-marker__value">{{ action_data.radar.s2.value or 'N/A' }}</span>
                     <span class="level-marker__delta">{{ action_data.radar.s2.distance or '' }}</span>
                 </div>
                 <div class="level-marker level-marker--s1">
-                    <span class="level-marker__title">S1</span>
+                    <span class="level-marker__title">Support-1</span>
                     <span class="level-marker__value">{{ action_data.radar.s1.value or 'N/A' }}</span>
                     <span class="level-marker__delta">{{ action_data.radar.s1.distance or '' }}</span>
                 </div>
@@ -133,12 +133,12 @@
                     <span class="level-marker__value">{{ action_data.radar.price.value or 'N/A' }}</span>
                 </div>
                 <div class="level-marker level-marker--r1">
-                    <span class="level-marker__title">R1</span>
+                    <span class="level-marker__title">Resistance-1</span>
                     <span class="level-marker__value">{{ action_data.radar.r1.value or 'N/A' }}</span>
                     <span class="level-marker__delta">{{ action_data.radar.r1.distance or '' }}</span>
                 </div>
                 <div class="level-marker level-marker--r2">
-                    <span class="level-marker__title">R2</span>
+                    <span class="level-marker__title">Resistance-2</span>
                     <span class="level-marker__value">{{ action_data.radar.r2.value or 'N/A' }}</span>
                     <span class="level-marker__delta">{{ action_data.radar.r2.distance or '' }}</span>
                 </div>
@@ -227,8 +227,8 @@
                     <span class="chart-preview__range">{{ action_data.chart.min or 'N/A' }} &ndash; {{ action_data.chart.max or 'N/A' }}</span>
                 </div>
                 <div class="chart-preview__canvas" style="--price-position: {{ action_data.chart.position or 0.5 }}">
-                    <div class="chart-preview__level chart-preview__level--support">S1</div>
-                    <div class="chart-preview__level chart-preview__level--resistance">R1</div>
+                    <div class="chart-preview__level chart-preview__level--support">Support-1</div>
+                    <div class="chart-preview__level chart-preview__level--resistance">Resistance-1</div>
                     <div class="chart-preview__needle" role="presentation"></div>
                 </div>
                 <p class="chart-preview__note">Contextual view of price within current range. Live updates refresh automatically when enabled.</p>
