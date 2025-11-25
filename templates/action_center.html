@@ -24,12 +24,16 @@
     </div>
 
     <main class="action-center">
-        <header class="action-center__header">
+        <header class="action-center__header action-center__header--sticky" data-sticky-header>
             <div>
                 <h1>Action Center</h1>
                 <p>Your AI-powered trading cockpit &mdash; real-time signals, levels, and actions.</p>
-                {% if action_data %}
-                <p class="action-center__meta">Symbol <strong>{{ action_data.symbol }}</strong>{% if action_data.generated_display %} &middot; Updated {{ action_data.generated_display }}{% endif %}</p>
+                {% if primary_dashboard %}
+                {% set primary_payload = primary_dashboard.action_data %}
+                {% set primary_symbol = primary_payload.symbol if primary_payload and primary_payload.symbol else primary_dashboard.symbol %}
+                <p class="action-center__meta" data-header-meta>
+                    Symbol <strong>{{ primary_symbol }}</strong>{% if primary_payload and primary_payload.generated_display %} &middot; Updated {{ primary_payload.generated_display }}{% elif not primary_payload %} &middot; No recent analysis available{% endif %}
+                </p>
                 {% endif %}
             </div>
             <form class="action-controls" method="get" action="/action-center">
@@ -66,217 +70,286 @@
             </form>
         </header>
 
-        {% if error_message %}
-        <div class="action-center__empty">
-            <p>{{ error_message }}</p>
-        </div>
-        {% endif %}
+        {% if dashboards %}
+        <section class="action-dashboards" data-dashboard-list>
+            {% for dashboard in dashboards %}
+            {% set payload = dashboard.action_data %}
+            {% set primary_action = payload.primary_action if payload and payload.primary_action else None %}
+            {% set gauges = payload.gauges if payload and payload.gauges else None %}
+            {% set radar = payload.radar if payload and payload.radar else None %}
+            {% set s2 = radar.s2 if radar and radar.s2 else None %}
+            {% set s1 = radar.s1 if radar and radar.s1 else None %}
+            {% set r1 = radar.r1 if radar and radar.r1 else None %}
+            {% set r2 = radar.r2 if radar and radar.r2 else None %}
+            {% set price_info = radar.price if radar and radar.price else None %}
+            {% set price_value = price_info.value if price_info and price_info.value else (payload.latest_price if payload and payload.latest_price else 'N/A') %}
+            {% set gauge_min_label = s2.value if s2 and s2.value else (s1.value if s1 and s1.value else price_value) %}
+            {% set gauge_max_label = r2.value if r2 and r2.value else (r1.value if r1 and r1.value else price_value) %}
+            {% set scenarios = payload.scenarios if payload and payload.scenarios else [] %}
+            {% set trade_plan = payload.trade_plan if payload and payload.trade_plan else None %}
+            {% set trade_entries = trade_plan.entry if trade_plan and trade_plan.entry else {} %}
+            {% set trade_targets = trade_plan.targets if trade_plan and trade_plan.targets else [] %}
+            {% set trade_stops = trade_plan.stops if trade_plan and trade_plan.stops else [] %}
+            {% set risk_notes = trade_plan.risk_notes if trade_plan and trade_plan.risk_notes else [] %}
+            {% set alerts = payload.alerts if payload and payload.alerts else [] %}
+            {% set tags = payload.tags if payload and payload.tags else [] %}
+            <article class="action-dashboard" data-dashboard data-dashboard-symbol="{{ dashboard.symbol }}" data-expanded="false">
+                <button type="button" class="action-dashboard__summary" data-dashboard-toggle aria-expanded="false">
+                    <div class="action-dashboard__summary-top">
+                        <div class="action-dashboard__summary-info">
+                            <span class="action-dashboard__summary-label">What should I do?</span>
+                            <span class="action-dashboard__summary-title" data-summary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
+                            <span class="action-dashboard__summary-subtitle" data-summary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else 'No guidance yet.' }}</span>
+                        </div>
+                        <div class="action-dashboard__summary-meta">
+                            <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
+                            <span class="action-dashboard__summary-timeframe">{{ timeframe|upper }}</span>
+                        </div>
+                    </div>
+                    <div class="action-dashboard__summary-bottom">
+                        <div class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }}" data-dashboard-traffic>
+                            <span data-traffic-label>{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|upper }}</span>
+                        </div>
+                        <div class="level-gauge level-gauge--compact" data-gauge-root>
+                            <div class="level-gauge__body">
+                                <canvas class="level-gauge__canvas" width="180" height="90" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
+                                <div class="level-gauge__needle-value" data-gauge-price>{{ price_value or 'N/A' }}</div>
+                            </div>
+                            <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
+                        </div>
+                    </div>
+                    <span class="action-dashboard__toggle-indicator" aria-hidden="true"></span>
+                </button>
+                <div class="action-dashboard__body" data-dashboard-body hidden>
+                    <div class="action-dashboard__content"{% if not payload %} hidden{% endif %} data-dashboard-content>
+                        <section class="action-card" data-section="primary">
+                            <div class="action-card__label">What should I do?</div>
+                            <div class="action-card__body">
+                                <div class="action-card__status action-card__status--{{ primary_action.icon if primary_action and primary_action.icon else 'neutral' }}">
+                                    <span class="action-card__status-title" data-primary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
+                                    <span class="action-card__status-subtitle" data-primary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else '' }}</span>
+                                </div>
+                                <div class="action-card__details" data-primary-explanation>
+                                    {% set explanation_lines = primary_action.explanation if primary_action and primary_action.explanation else [] %}
+                                    {% if explanation_lines %}
+                                    {% for line in explanation_lines %}
+                                    <p>{{ line }}</p>
+                                    {% endfor %}
+                                    {% else %}
+                                    <p>No narrative guidance available yet.</p>
+                                    {% endif %}
+                                </div>
+                                <div class="confidence-meter" data-confidence="{{ primary_action.confidence_score if primary_action and primary_action.confidence_score else 0 }}">
+                                    <div class="confidence-meter__label" data-primary-confidence>
+                                        Confidence {{ primary_action.confidence if primary_action and primary_action.confidence else 'N/A' }}
+                                    </div>
+                                    <div class="confidence-meter__bar"><span data-confidence-bar data-width="{{ primary_action.confidence_score if primary_action and primary_action.confidence_score else 0 }}"></span></div>
+                                </div>
+                            </div>
+                        </section>
 
-        {% if action_data %}
-        <section class="action-card" data-section="primary">
-            <div class="action-card__label">What should I do?</div>
-            <div class="action-card__body">
-                <div class="action-card__status action-card__status--{{ action_data.primary_action.icon }}">
-                    <span class="action-card__status-title">{{ action_data.primary_action.title }}</span>
-                    <span class="action-card__status-subtitle">{{ action_data.primary_action.subtitle }}</span>
-                </div>
-                <div class="action-card__details">
-                    {% for line in action_data.primary_action.explanation %}
-                    <p>{{ line }}</p>
-                    {% endfor %}
-                </div>
-                <div class="confidence-meter" data-confidence="{{ action_data.primary_action.confidence_score }}">
-                    <div class="confidence-meter__label">Confidence {{ action_data.primary_action.confidence }}</div>
-                    <div class="confidence-meter__bar"><span data-confidence-bar data-width="{{ action_data.primary_action.confidence_score }}"></span></div>
-                </div>
-            </div>
-        </section>
+                        <section class="gauge-cluster" data-dashboard-gauges>
+                            {% set bias = gauges.bias if gauges and gauges.bias else None %}
+                            {% set volatility = gauges.volatility if gauges and gauges.volatility else None %}
+                            {% set signal = gauges.signal if gauges and gauges.signal else None %}
+                            <div class="gauge" data-gauge="bias" style="--gauge-value: {{ bias.score if bias and bias.score is not none else 0 }}">
+                                <div class="gauge__dial"></div>
+                                <div class="gauge__content">
+                                    <span class="gauge__label">Bias</span>
+                                    <strong>{{ bias.label if bias and bias.label else 'N/A' }}</strong>
+                                </div>
+                            </div>
+                            <div class="gauge" data-gauge="volatility" style="--gauge-value: {{ volatility.score if volatility and volatility.score is not none else 0 }}">
+                                <div class="gauge__dial"></div>
+                                <div class="gauge__content">
+                                    <span class="gauge__label">Volatility</span>
+                                    <strong>{{ volatility.label if volatility and volatility.label else 'N/A' }}</strong>
+                                </div>
+                            </div>
+                            <div class="gauge" data-gauge="signal" style="--gauge-value: {{ signal.score if signal and signal.score is not none else 0 }}">
+                                <div class="gauge__dial"></div>
+                                <div class="gauge__content">
+                                    <span class="gauge__label">Signal Strength</span>
+                                    <strong>{{ signal.label if signal and signal.label else 'N/A' }}</strong>
+                                </div>
+                            </div>
+                        </section>
 
-        <section class="gauge-cluster">
-            <div class="gauge" data-gauge="bias" style="--gauge-value: {{ action_data.gauges.bias.score }}">
-                <div class="gauge__dial"></div>
-                <div class="gauge__content">
-                    <span class="gauge__label">Bias</span>
-                    <strong>{{ action_data.gauges.bias.label }}</strong>
-                </div>
-            </div>
-            <div class="gauge" data-gauge="volatility" style="--gauge-value: {{ action_data.gauges.volatility.score }}">
-                <div class="gauge__dial"></div>
-                <div class="gauge__content">
-                    <span class="gauge__label">Volatility</span>
-                    <strong>{{ action_data.gauges.volatility.label }}</strong>
-                </div>
-            </div>
-            <div class="gauge" data-gauge="signal" style="--gauge-value: {{ action_data.gauges.signal.score }}">
-                <div class="gauge__dial"></div>
-                <div class="gauge__content">
-                    <span class="gauge__label">Signal Strength</span>
-                    <strong>{{ action_data.gauges.signal.label }}</strong>
-                </div>
-            </div>
-        </section>
+                        <section class="level-radar" aria-label="Support and resistance radar">
+                            <div class="level-radar__track" data-radar-track style="--price-position: {{ price_info.position if price_info and price_info.position is not none else 0.5 }}">
+                                <div class="level-marker level-marker--s2">
+                                    <span class="level-marker__title">Support-2</span>
+                                    <span class="level-marker__value" data-radar-value="s2">{{ s2.value if s2 and s2.value else 'N/A' }}</span>
+                                    <span class="level-marker__delta" data-radar-delta="s2">{{ s2.distance if s2 and s2.distance else '' }}</span>
+                                </div>
+                                <div class="level-marker level-marker--s1">
+                                    <span class="level-marker__title">Support-1</span>
+                                    <span class="level-marker__value" data-radar-value="s1">{{ s1.value if s1 and s1.value else 'N/A' }}</span>
+                                    <span class="level-marker__delta" data-radar-delta="s1">{{ s1.distance if s1 and s1.distance else '' }}</span>
+                                </div>
+                                <div class="level-marker level-marker--price">
+                                    <span class="level-marker__title">Price</span>
+                                    <span class="level-marker__value" data-radar-value="price">{{ price_value or 'N/A' }}</span>
+                                </div>
+                                <div class="level-marker level-marker--r1">
+                                    <span class="level-marker__title">Resistance-1</span>
+                                    <span class="level-marker__value" data-radar-value="r1">{{ r1.value if r1 and r1.value else 'N/A' }}</span>
+                                    <span class="level-marker__delta" data-radar-delta="r1">{{ r1.distance if r1 and r1.distance else '' }}</span>
+                                </div>
+                                <div class="level-marker level-marker--r2">
+                                    <span class="level-marker__title">Resistance-2</span>
+                                    <span class="level-marker__value" data-radar-value="r2">{{ r2.value if r2 and r2.value else 'N/A' }}</span>
+                                    <span class="level-marker__delta" data-radar-delta="r2">{{ r2.distance if r2 and r2.distance else '' }}</span>
+                                </div>
+                            </div>
+                            <div class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }}" data-dashboard-traffic-expanded aria-label="Market zone indicator">
+                                <span data-traffic-label>{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|upper }}</span>
+                            </div>
+                        </section>
 
-        <section class="level-radar" aria-label="Support and resistance radar">
-            <div class="level-radar__track" style="--price-position: {{ action_data.radar.price.position or 0.5 }}">
-                <div class="level-marker level-marker--s2">
-                    <span class="level-marker__title">Support-2</span>
-                    <span class="level-marker__value">{{ action_data.radar.s2.value or 'N/A' }}</span>
-                    <span class="level-marker__delta">{{ action_data.radar.s2.distance or '' }}</span>
-                </div>
-                <div class="level-marker level-marker--s1">
-                    <span class="level-marker__title">Support-1</span>
-                    <span class="level-marker__value">{{ action_data.radar.s1.value or 'N/A' }}</span>
-                    <span class="level-marker__delta">{{ action_data.radar.s1.distance or '' }}</span>
-                </div>
-                <div class="level-marker level-marker--price">
-                    <span class="level-marker__title">Price</span>
-                    <span class="level-marker__value">{{ action_data.radar.price.value or 'N/A' }}</span>
-                </div>
-                <div class="level-marker level-marker--r1">
-                    <span class="level-marker__title">Resistance-1</span>
-                    <span class="level-marker__value">{{ action_data.radar.r1.value or 'N/A' }}</span>
-                    <span class="level-marker__delta">{{ action_data.radar.r1.distance or '' }}</span>
-                </div>
-                <div class="level-marker level-marker--r2">
-                    <span class="level-marker__title">Resistance-2</span>
-                    <span class="level-marker__value">{{ action_data.radar.r2.value or 'N/A' }}</span>
-                    <span class="level-marker__delta">{{ action_data.radar.r2.distance or '' }}</span>
-                </div>
-            </div>
-            <div class="traffic-light traffic-light--{{ action_data.traffic_light }}" aria-label="Market zone indicator"></div>
-        </section>
+                        <section class="scenario-cards" data-dashboard-scenarios>
+                            {% if scenarios %}
+                            {% for scenario in scenarios %}
+                            <article class="scenario-card scenario-card--{{ scenario.icon }}">
+                                <h3>{{ scenario.title }}</h3>
+                                <p>{{ scenario.body }}</p>
+                            </article>
+                            {% endfor %}
+                            {% else %}
+                            <article class="scenario-card scenario-card--range">
+                                <h3>No scenarios yet</h3>
+                                <p>Fresh scenarios will appear once the analysis is regenerated.</p>
+                            </article>
+                            {% endif %}
+                        </section>
 
-        <section class="scenario-cards">
-            {% for scenario in action_data.scenarios %}
-            <article class="scenario-card scenario-card--{{ scenario.icon }}">
-                <h3>{{ scenario.title }}</h3>
-                <p>{{ scenario.body }}</p>
+                        <section class="trade-plan">
+                            <header>
+                                <h2>Auto-generated trade plan</h2>
+                                {% if dashboard.strategy_summary %}
+                                <p data-strategy-summary>{{ dashboard.strategy_summary }}</p>
+                                {% endif %}
+                            </header>
+                            <div class="trade-plan__grid">
+                                <div>
+                                    <h3>Entries</h3>
+                                    <ul>
+                                        <li><span>Initial</span><strong data-entry-field="primary">{{ trade_entries.primary if trade_entries and trade_entries.primary else 'N/A' }}</strong></li>
+                                        <li><span>Scale</span><strong data-entry-field="scale">{{ trade_entries.scale if trade_entries and trade_entries.scale else 'N/A' }}</strong></li>
+                                        <li><span>Breakout</span><strong data-entry-field="breakout">{{ trade_entries.breakout if trade_entries and trade_entries.breakout else 'N/A' }}</strong></li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h3>Targets</h3>
+                                    <ul data-plan-targets>
+                                        {% if trade_targets %}
+                                        {% for target in trade_targets %}
+                                        <li><strong>{{ target }}</strong></li>
+                                        {% endfor %}
+                                        {% else %}
+                                        <li><strong>N/A</strong></li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h3>Stops</h3>
+                                    <ul data-plan-stops>
+                                        {% if trade_stops %}
+                                        {% for stop in trade_stops %}
+                                        <li><strong>{{ stop }}</strong></li>
+                                        {% endfor %}
+                                        {% else %}
+                                        <li><strong>N/A</strong></li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h3>Position Size</h3>
+                                    <p class="trade-plan__size" data-plan-size>{{ trade_plan.position_size if trade_plan and trade_plan.position_size else 'N/A' }}</p>
+                                    <h3>Risk Notes</h3>
+                                    <ul data-plan-risk>
+                                        {% if risk_notes %}
+                                        {% for note in risk_notes %}
+                                        <li>{{ note }}</li>
+                                        {% endfor %}
+                                        {% else %}
+                                        <li>No additional risk notes.</li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="action-lower">
+                            <div class="alerts">
+                                <h2>Suggested alerts</h2>
+                                <ul data-alerts-list>
+                                    {% if alerts %}
+                                    {% for alert in alerts %}
+                                    <li><button type="button" class="alert-button" data-alert="{{ alert }}">{{ alert }}</button></li>
+                                    {% endfor %}
+                                    {% else %}
+                                    <li>No alerts suggested.</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            <div class="level-gauge level-gauge--full" data-gauge-root>
+                                <div class="level-gauge__header">
+                                    <h2>Price range gauge</h2>
+                                    <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
+                                </div>
+                                <div class="level-gauge__body">
+                                    <canvas class="level-gauge__canvas" width="320" height="160" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
+                                    <div class="level-gauge__needle-value" data-gauge-price>{{ price_value or 'N/A' }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <footer class="action-tags" data-dashboard-tags>
+                            {% if tags %}
+                            {% for tag in tags %}
+                            <span>{{ tag }}</span>
+                            {% endfor %}
+                            {% else %}
+                            <span>No tags available yet.</span>
+                            {% endif %}
+                        </footer>
+                    </div>
+                    <div class="action-dashboard__empty"{% if payload %} hidden{% endif %} data-dashboard-empty>
+                        <p data-dashboard-empty-message>{{ dashboard.error_message or 'No recent AI analysis found for this symbol. Try running a new multi-agent analysis first.' }}</p>
+                    </div>
+                </div>
             </article>
             {% endfor %}
         </section>
-
-        <section class="trade-plan">
-            <header>
-                <h2>Auto-generated trade plan</h2>
-                {% if strategy_summary %}
-                <p>{{ strategy_summary }}</p>
-                {% endif %}
-            </header>
-            <div class="trade-plan__grid">
-                <div>
-                    <h3>Entries</h3>
-                    <ul>
-                        <li><span>Initial</span><strong data-entry-field="primary">{{ action_data.trade_plan.entry.primary or 'N/A' }}</strong></li>
-                        <li><span>Scale</span><strong data-entry-field="scale">{{ action_data.trade_plan.entry.scale or 'N/A' }}</strong></li>
-                        <li><span>Breakout</span><strong data-entry-field="breakout">{{ action_data.trade_plan.entry.breakout or 'N/A' }}</strong></li>
-                    </ul>
-                </div>
-                <div>
-                    <h3>Targets</h3>
-                    <ul data-plan-targets>
-                        {% for target in action_data.trade_plan.targets %}
-                        <li><strong>{{ target }}</strong></li>
-                        {% endfor %}
-                        {% if not action_data.trade_plan.targets %}
-                        <li><strong>N/A</strong></li>
-                        {% endif %}
-                    </ul>
-                </div>
-                <div>
-                    <h3>Stops</h3>
-                    <ul data-plan-stops>
-                        {% for stop in action_data.trade_plan.stops %}
-                        <li><strong>{{ stop }}</strong></li>
-                        {% endfor %}
-                        {% if not action_data.trade_plan.stops %}
-                        <li><strong>N/A</strong></li>
-                        {% endif %}
-                    </ul>
-                </div>
-                <div>
-                    <h3>Position Size</h3>
-                    <p class="trade-plan__size" data-plan-size>{{ action_data.trade_plan.position_size }}</p>
-                    <h3>Risk Notes</h3>
-                    <ul data-plan-risk>
-                        {% for note in action_data.trade_plan.risk_notes %}
-                        <li>{{ note }}</li>
-                        {% endfor %}
-                        {% if not action_data.trade_plan.risk_notes %}
-                        <li>No additional risk notes.</li>
-                        {% endif %}
-                    </ul>
-                </div>
-            </div>
-        </section>
-
-        <section class="action-lower">
-            <div class="alerts">
-                <h2>Suggested alerts</h2>
-                <ul>
-                    {% for alert in action_data.alerts %}
-                    <li><button type="button" class="alert-button" data-alert="{{ alert }}">{{ alert }}</button></li>
-                    {% endfor %}
-                    {% if not action_data.alerts %}
-                    <li>No alerts suggested.</li>
-                    {% endif %}
-                </ul>
-            </div>
-            <div class="level-gauge" aria-label="Support and resistance luxury gauge">
-                <div class="level-gauge__header">
-                    <h2>Price range gauge</h2>
-                    <span class="level-gauge__range" data-gauge-range>
-                        {% set gauge_min = action_data.radar.s2.value if action_data.radar.s2.value else action_data.radar.s1.value %}
-                        {% set gauge_max = action_data.radar.r2.value if action_data.radar.r2.value else action_data.radar.r1.value %}
-                        {{ gauge_min or 'N/A' }} &ndash; {{ gauge_max or 'N/A' }}
-                    </span>
-                </div>
-                <div class="level-gauge__body">
-                    <canvas
-                        class="level-gauge__canvas"
-                        width="320"
-                        height="160"
-                        data-gauge-canvas
-                        role="img"
-                        aria-label="Price gauge"
-                    ></canvas>
-                    <div class="level-gauge__needle-value" data-gauge-price>{{ action_data.radar.price.value or action_data.latest_price or 'N/A' }}</div>
-                </div>
-            </div>
-        </section>
-
-        <footer class="action-tags">
-            {% for tag in action_data.tags %}
-            <span>{{ tag }}</span>
-            {% endfor %}
-        </footer>
+        {% else %}
+        <div class="action-center__empty">
+            <p>No tracked symbols available for the Action Center. Follow a symbol or run an analysis to get started.</p>
+        </div>
         {% endif %}
     </main>
 
-    {% if action_data_json %}
-    <script id="actionCenterData" type="application/json">{{ action_data_json | safe }}</script>
+    {% if dashboards_json %}
+    <script id="actionCenterDashboards" type="application/json">{{ dashboards_json | safe }}</script>
     {% endif %}
     <script>
     (function() {
-        const dataElement = document.getElementById('actionCenterData');
-        let state = null;
-        if (dataElement) {
+        const dashboardsPayloadElement = document.getElementById('actionCenterDashboards');
+        let dashboardsPayload = [];
+        if (dashboardsPayloadElement) {
             try {
-                state = JSON.parse(dataElement.textContent || '{}');
+                dashboardsPayload = JSON.parse(dashboardsPayloadElement.textContent || '[]');
             } catch (error) {
-                console.warn('Failed to parse Action Center data payload', error);
+                console.warn('Failed to parse dashboards payload', error);
             }
         }
 
         const autoToggle = document.getElementById('autoRefreshToggle');
         const favoriteButton = document.getElementById('favoriteSymbol');
+        const headerMeta = document.querySelector('[data-header-meta]');
         const defaultSymbol = '{{ symbol }}';
         const livePriceEnabled = document.body.getAttribute('data-live-price') === 'true';
-        let refreshTimer = null;
-        let livePriceTimer = null;
-        let favoriteState = favoriteButton ? favoriteButton.getAttribute('aria-pressed') === 'true' : false;
-        const gaugeCanvas = document.querySelector('[data-gauge-canvas]');
-        const gaugeRange = document.querySelector('[data-gauge-range]');
-        const gaugePriceValue = document.querySelector('[data-gauge-price]');
+
         const gaugeColors = {
             belowS2: '#3b0f14',
             betweenSupports: '#7f1d1d',
@@ -284,7 +357,6 @@
             betweenResistances: '#0f766e',
             aboveR2: '#064e3b',
         };
-        let gaugeResizeTimer = null;
         const gaugeZoneFill = {
             belowS2: 'rgba(59, 15, 20, 0.5)',
             betweenSupports: 'rgba(127, 29, 29, 0.42)',
@@ -300,31 +372,15 @@
             aboveR2: 'above Resistance-2',
         };
         const degToRad = (deg) => (deg * Math.PI) / 180;
-        const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
-        function updateFavoriteButton(isActive) {
-            if (!favoriteButton) return;
-            favoriteButton.setAttribute('aria-pressed', String(isActive));
-            favoriteButton.classList.toggle('pill-button--active', isActive);
-            favoriteButton.textContent = isActive ? 'Following' : 'Follow Symbol';
-        }
-
-        function applyGaugeStyles() {
-            document.querySelectorAll('.gauge').forEach((gauge) => {
-                const value = gauge.getAttribute('data-live-value') || gauge.style.getPropertyValue('--gauge-value');
-                if (value) {
-                    gauge.style.setProperty('--gauge-value', value);
-                }
-            });
-        }
-
-        function applyConfidenceBar() {
-            document.querySelectorAll('[data-confidence-bar]').forEach((node) => {
-                const width = Number(node.dataset.width || 0);
-                const clamped = Math.max(0, Math.min(width, 100));
-                node.style.width = `${clamped}%`;
-            });
-        }
+        const dashState = {
+            dashboards: new Map(),
+            primarySymbol: dashboardsPayload.length ? dashboardsPayload[0].symbol || defaultSymbol : defaultSymbol,
+            favorite: dashboardsPayload.length ? Boolean(dashboardsPayload[0].is_favorited) : false,
+            refreshTimer: null,
+            livePriceTimer: null,
+            resizeTimer: null,
+        };
 
         function formatPrice(value) {
             if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -339,20 +395,33 @@
             }
             if (typeof value === 'string') {
                 const cleaned = value.replace(/,/g, '').trim();
-                if (!cleaned) {
-                    return null;
-                }
+                if (!cleaned) return null;
                 const parsed = Number(cleaned);
                 return Number.isFinite(parsed) ? parsed : null;
             }
             return null;
         }
 
-        function buildGaugeConfig(payload) {
-            if (!payload) {
-                return null;
-            }
+        function updateFavoriteButton(isActive) {
+            if (!favoriteButton) return;
+            favoriteButton.setAttribute('aria-pressed', String(isActive));
+            favoriteButton.classList.toggle('pill-button--active', isActive);
+            favoriteButton.textContent = isActive ? 'Following' : 'Follow Symbol';
+        }
 
+        function updateTrafficLight(element, status) {
+            if (!element) return;
+            const next = status || 'wait';
+            element.classList.remove('traffic-light--buy', 'traffic-light--sell', 'traffic-light--wait');
+            element.classList.add(`traffic-light--${next}`);
+            const label = element.querySelector('[data-traffic-label]');
+            if (label) {
+                label.textContent = next.toUpperCase();
+            }
+        }
+
+        function buildGaugeConfig(payload) {
+            if (!payload) return null;
             const radar = payload.radar || {};
             const values = {
                 s2: parseNumeric(radar.s2 && radar.s2.value),
@@ -382,16 +451,16 @@
                 price:
                     (radar.price && radar.price.value)
                     || payload.latest_price
-                    || (isFiniteNumber(values.price) ? formatPrice(values.price) : null),
+                    || (typeof values.price === 'number' && Number.isFinite(values.price) ? formatPrice(values.price) : null),
             };
 
             const levelKeys = ['s2', 's1', 'r1', 'r2'];
             const points = levelKeys
-                .map((key) => (isFiniteNumber(values[key]) ? { key, value: values[key], angle: anchors[key] } : null))
+                .map((key) => (typeof values[key] === 'number' && Number.isFinite(values[key]) ? { key, value: values[key], angle: anchors[key] } : null))
                 .filter(Boolean)
                 .sort((a, b) => a.value - b.value);
 
-            if (!points.length && !isFiniteNumber(values.price)) {
+            if (!points.length && !(typeof values.price === 'number' && Number.isFinite(values.price))) {
                 return null;
             }
 
@@ -399,13 +468,13 @@
                 if (points.length >= 2) {
                     return Math.max(1, Math.abs(points[points.length - 1].value - points[0].value) * 0.1);
                 }
-                if (points.length === 1 && isFiniteNumber(values.price)) {
+                if (points.length === 1 && typeof values.price === 'number' && Number.isFinite(values.price)) {
                     return Math.max(1, Math.abs(values.price - points[0].value) * 0.5);
                 }
                 if (points.length === 1) {
                     return Math.max(1, Math.abs(points[0].value) * 0.1);
                 }
-                if (isFiniteNumber(values.price)) {
+                if (typeof values.price === 'number' && Number.isFinite(values.price)) {
                     return Math.max(1, Math.abs(values.price) * 0.1);
                 }
                 return 1;
@@ -413,29 +482,29 @@
 
             const lowerBaseline = points.length ? points[0].value : values.price;
             const upperBaseline = points.length ? points[points.length - 1].value : values.price;
-            const fallbackLower = isFiniteNumber(lowerBaseline) ? lowerBaseline - spanHeuristic : -spanHeuristic;
-            const fallbackUpper = isFiniteNumber(upperBaseline) ? upperBaseline + spanHeuristic : spanHeuristic;
+            const fallbackLower = typeof lowerBaseline === 'number' ? lowerBaseline - spanHeuristic : -spanHeuristic;
+            const fallbackUpper = typeof upperBaseline === 'number' ? upperBaseline + spanHeuristic : spanHeuristic;
 
             const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
             const resolveAngleForPrice = (priceValue) => {
-                if (!isFiniteNumber(priceValue) || !points.length) {
+                if (!(typeof priceValue === 'number' && Number.isFinite(priceValue)) || !points.length) {
                     return anchors.s1;
                 }
                 if (priceValue <= points[0].value) {
-                    const ratio = (priceValue - fallbackLower) / (points[0].value - fallbackLower || 1);
+                    const ratio = (priceValue - fallbackLower) / ((points[0].value - fallbackLower) || 1);
                     return anchors.min + (points[0].angle - anchors.min) * clamp(ratio, 0, 1);
                 }
                 for (let idx = 0; idx < points.length - 1; idx += 1) {
                     const current = points[idx];
                     const next = points[idx + 1];
                     if (priceValue <= next.value) {
-                        const ratio = (priceValue - current.value) / (next.value - current.value || 1);
+                        const ratio = (priceValue - current.value) / ((next.value - current.value) || 1);
                         return current.angle + (next.angle - current.angle) * clamp(ratio, 0, 1);
                     }
                 }
                 const last = points[points.length - 1];
-                const ratio = (priceValue - last.value) / (fallbackUpper - last.value || 1);
+                const ratio = (priceValue - last.value) / ((fallbackUpper - last.value) || 1);
                 return last.angle + (anchors.max - last.angle) * clamp(ratio, 0, 1);
             };
 
@@ -448,41 +517,45 @@
                 const r1Val = values.r1;
                 const r2Val = values.r2;
 
-                if (!isFiniteNumber(priceVal)) {
+                if (!(typeof priceVal === 'number' && Number.isFinite(priceVal))) {
                     return 'midZone';
                 }
-                if (isFiniteNumber(s2Val) && priceVal < s2Val) {
+                if (typeof s2Val === 'number' && Number.isFinite(s2Val) && priceVal < s2Val) {
                     return 'belowS2';
                 }
-                if (isFiniteNumber(s1Val) && priceVal < s1Val) {
+                if (typeof s1Val === 'number' && Number.isFinite(s1Val) && priceVal < s1Val) {
                     return 'betweenSupports';
                 }
-                if (isFiniteNumber(r1Val) && priceVal <= r1Val) {
+                if (typeof r1Val === 'number' && Number.isFinite(r1Val) && priceVal <= r1Val) {
                     return 'midZone';
                 }
-                if (isFiniteNumber(r2Val) && priceVal <= r2Val) {
+                if (typeof r2Val === 'number' && Number.isFinite(r2Val) && priceVal <= r2Val) {
                     return 'betweenResistances';
                 }
-                if (!isFiniteNumber(r2Val) && isFiniteNumber(r1Val) && priceVal > r1Val) {
+                if (!(typeof r2Val === 'number' && Number.isFinite(r2Val)) && typeof r1Val === 'number' && Number.isFinite(r1Val) && priceVal > r1Val) {
                     return 'betweenResistances';
                 }
                 return 'aboveR2';
             };
 
-            const rangeMinCandidate = isFiniteNumber(values.s2)
+            const rangeMinCandidate = typeof values.s2 === 'number' && Number.isFinite(values.s2)
                 ? values.s2
-                : isFiniteNumber(values.s1)
+                : typeof values.s1 === 'number' && Number.isFinite(values.s1)
                 ? values.s1
                 : values.price;
-            const rangeMaxCandidate = isFiniteNumber(values.r2)
+            const rangeMaxCandidate = typeof values.r2 === 'number' && Number.isFinite(values.r2)
                 ? values.r2
-                : isFiniteNumber(values.r1)
+                : typeof values.r1 === 'number' && Number.isFinite(values.r1)
                 ? values.r1
                 : values.price;
 
-            const resolvedMinValue = isFiniteNumber(rangeMinCandidate) ? rangeMinCandidate : fallbackLower;
-            const resolvedMaxValue = isFiniteNumber(rangeMaxCandidate) ? rangeMaxCandidate : fallbackUpper;
-            const formatOrNull = (num) => (isFiniteNumber(num) ? formatPrice(num) : null);
+            const resolvedMinValue = typeof rangeMinCandidate === 'number' && Number.isFinite(rangeMinCandidate)
+                ? rangeMinCandidate
+                : fallbackLower;
+            const resolvedMaxValue = typeof rangeMaxCandidate === 'number' && Number.isFinite(rangeMaxCandidate)
+                ? rangeMaxCandidate
+                : fallbackUpper;
+            const formatOrNull = (num) => (typeof num === 'number' && Number.isFinite(num) ? formatPrice(num) : null);
 
             return {
                 values,
@@ -507,21 +580,15 @@
         }
 
         function drawGauge(canvas, config) {
-            if (!canvas || !config) {
-                return;
-            }
+            if (!canvas || !config) return;
 
             const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                return;
-            }
+            if (!ctx) return;
 
             const ratio = window.devicePixelRatio || 1;
             const width = canvas.clientWidth || canvas.width || 0;
             const height = canvas.clientHeight || canvas.height || 0;
-            if (!width || !height) {
-                return;
-            }
+            if (!width || !height) return;
 
             const displayWidth = Math.round(width * ratio);
             const displayHeight = Math.round(height * ratio);
@@ -547,6 +614,7 @@
             stripeOuterRadius = Math.max(stripeOuterRadius, stripeInnerRadius + 4);
             const effectiveStripeThickness = Math.max(4, stripeOuterRadius - stripeInnerRadius);
 
+            ctx.save();
             ctx.lineCap = 'round';
             ctx.lineWidth = lineWidth;
 
@@ -578,9 +646,6 @@
             }
             ctx.restore();
 
-            ctx.lineCap = 'round';
-            ctx.lineWidth = lineWidth;
-
             ctx.strokeStyle = 'rgba(15, 23, 42, 0.32)';
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, Math.PI, 0, true);
@@ -606,14 +671,7 @@
             ctx.strokeStyle = 'rgba(248, 250, 252, 0.65)';
             const innerRadius = radius - lineWidth / 2 - 6;
             const outerRadius = innerRadius + 10;
-            const tickAngles = [
-                config.anchors.min,
-                config.anchors.s2,
-                config.anchors.s1,
-                config.anchors.r1,
-                config.anchors.r2,
-                config.anchors.max,
-            ];
+            const tickAngles = [config.anchors.min, config.anchors.s2, config.anchors.s1, config.anchors.r1, config.anchors.r2, config.anchors.max];
             tickAngles.forEach((angle) => {
                 const cos = Math.cos(angle);
                 const sin = Math.sin(angle);
@@ -625,20 +683,17 @@
 
             const labelFontSize = Math.max(12, Math.min(18, width * 0.08));
             const labelRadius = radius - lineWidth * 0.45;
-            const renderLevelLabel = (angle, text, highlight = false) => {
-                if (!text) {
-                    return;
-                }
+            const renderLevelLabel = (angle, text) => {
+                if (!text) return;
                 ctx.save();
                 ctx.font = `600 ${labelFontSize}px 'Inter', 'Segoe UI', Arial`;
-                ctx.fillStyle = highlight ? '#fef9c3' : 'rgba(241, 245, 249, 0.86)';
+                ctx.fillStyle = 'rgba(241, 245, 249, 0.86)';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const x = centerX + Math.cos(angle) * labelRadius;
                 const y = centerY - Math.sin(angle) * labelRadius;
-                const strokeColor = highlight ? 'rgba(15, 23, 42, 0.55)' : 'rgba(15, 23, 42, 0.35)';
-                ctx.lineWidth = highlight ? 2 : 1.5;
-                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
                 ctx.strokeText(text, x, y);
                 ctx.fillText(text, x, y);
                 ctx.restore();
@@ -687,9 +742,9 @@
             ctx.arc(tipX, tipY, 4, 0, Math.PI * 2);
             ctx.fill();
 
-            const clampLabelCoordinate = (value, min, max) => Math.max(min, Math.min(max, value));
-            const labelX = clampLabelCoordinate(startXRaw, width * 0.22, width * 0.78);
-            const labelY = clampLabelCoordinate(startYRaw, height * 0.38, height * 0.78);
+            const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+            const labelX = clamp(startXRaw, width * 0.22, width * 0.78);
+            const labelY = clamp(startYRaw, height * 0.38, height * 0.78);
             const parent = canvas.parentElement;
             if (parent) {
                 const labelNode = parent.querySelector('[data-gauge-price]');
@@ -698,389 +753,456 @@
                     const percentY = (labelY / height) * 100;
                     labelNode.style.setProperty('--needle-label-x', `${percentX.toFixed(2)}%`);
                     labelNode.style.setProperty('--needle-label-y', `${percentY.toFixed(2)}%`);
+                    labelNode.style.opacity = '1';
                 }
             }
         }
 
-        function updateGaugeDisplay(payload) {
-            if (!gaugeCanvas && !gaugeRange && !gaugePriceValue) {
-                return;
-            }
-
-            const gaugeContainer = document.querySelector('.level-gauge');
-            const gaugeBody = document.querySelector('.level-gauge__body');
-
-            if (!payload) {
-                if (gaugeCanvas) {
-                    const ctx = gaugeCanvas.getContext('2d');
-                    if (ctx) {
-                        ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
-                    }
-                    gaugeCanvas.removeAttribute('data-zone');
-                    gaugeCanvas.setAttribute('aria-label', 'Price gauge unavailable');
-                }
-                if (gaugeRange) {
-                    gaugeRange.textContent = 'N/A - N/A';
-                }
-                if (gaugePriceValue) {
-                    gaugePriceValue.textContent = 'N/A';
-                    gaugePriceValue.style.opacity = '0';
-                }
-                if (gaugeContainer) {
-                    gaugeContainer.removeAttribute('data-zone');
-                }
-                if (gaugeBody) {
-                    gaugeBody.removeAttribute('data-zone');
-                }
-                return;
-            }
+        function updateGaugeDisplay(node, payload) {
+            const gaugeRoots = node.querySelectorAll('[data-gauge-root]');
+            if (!gaugeRoots.length) return;
 
             const config = buildGaugeConfig(payload);
-
-            if (gaugeBody) {
-                if (config && config.zone) {
-                    gaugeBody.setAttribute('data-zone', config.zone);
-                } else {
-                    gaugeBody.removeAttribute('data-zone');
-                }
-            }
-            if (gaugeContainer) {
-                if (config && config.zone) {
-                    gaugeContainer.setAttribute('data-zone', config.zone);
-                } else {
-                    gaugeContainer.removeAttribute('data-zone');
-                }
-            }
-
-            if (gaugePriceValue) {
-                const priceLabel =
-                    (config && config.formatted.price)
-                    || (payload.radar && payload.radar.price && payload.radar.price.value)
-                    || payload.latest_price
-                    || 'N/A';
-                gaugePriceValue.textContent = priceLabel || 'N/A';
-                gaugePriceValue.style.opacity = config ? '1' : '0';
-            }
-
-            if (!config) {
-                if (gaugeRange) {
-                    gaugeRange.textContent = 'N/A - N/A';
-                }
-                if (gaugeCanvas) {
-                    const ctx = gaugeCanvas.getContext('2d');
-                    if (ctx) {
-                        ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
+            gaugeRoots.forEach((root) => {
+                const canvas = root.querySelector('[data-gauge-canvas]');
+                const rangeLabel = root.querySelector('[data-gauge-range]');
+                const priceLabel = root.querySelector('[data-gauge-price]');
+                const gaugeContainer = root.classList.contains('level-gauge') ? root : root.closest('.level-gauge');
+                if (!config) {
+                    if (canvas) {
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        }
+                        canvas.removeAttribute('data-zone');
+                        canvas.setAttribute('aria-label', 'Price gauge unavailable');
                     }
-                    gaugeCanvas.setAttribute('aria-label', 'Price gauge unavailable');
-                    gaugeCanvas.removeAttribute('data-zone');
+                    if (rangeLabel) {
+                        rangeLabel.textContent = 'N/A - N/A';
+                    }
+                    if (priceLabel) {
+                        priceLabel.textContent = 'N/A';
+                        priceLabel.style.opacity = '0';
+                    }
+                    if (gaugeContainer) {
+                        gaugeContainer.removeAttribute('data-zone');
+                    }
+                    return;
                 }
-                if (gaugePriceValue) {
-                    gaugePriceValue.style.opacity = '0';
+
+                if (rangeLabel) {
+                    rangeLabel.textContent = `${config.range.minLabel || 'N/A'} - ${config.range.maxLabel || 'N/A'}`;
                 }
-                return;
-            }
-
-            const minLabel = config.range.minLabel || 'N/A';
-            const maxLabel = config.range.maxLabel || 'N/A';
-
-            if (gaugeRange) {
-                gaugeRange.textContent = `${minLabel} - ${maxLabel}`;
-            }
-
-            if (!payload.chart) {
-                payload.chart = {};
-            }
-            payload.chart.min_value = config.range.minValue;
-            payload.chart.max_value = config.range.maxValue;
-            payload.chart.min = minLabel;
-            payload.chart.max = maxLabel;
-
-            if (
-                isFiniteNumber(config.values.price)
-                && isFiniteNumber(config.range.minValue)
-                && isFiniteNumber(config.range.maxValue)
-                && config.range.maxValue !== config.range.minValue
-            ) {
-                const span = config.range.maxValue - config.range.minValue;
-                const normalised = Math.max(0, Math.min(1, (config.values.price - config.range.minValue) / span));
-                payload.chart.position = normalised;
-                if (payload.radar && payload.radar.price) {
-                    payload.radar.price.position = normalised;
+                if (priceLabel) {
+                    const priceLabelText = config.formatted.price
+                        || (payload && payload.radar && payload.radar.price && payload.radar.price.value)
+                        || (payload && payload.latest_price)
+                        || 'N/A';
+                    priceLabel.textContent = priceLabelText;
+                    priceLabel.style.opacity = '1';
                 }
-            } else {
-                payload.chart.position = 0.5;
-                if (payload.radar && payload.radar.price) {
-                    payload.radar.price.position = 0.5;
+                if (canvas) {
+                    drawGauge(canvas, config);
+                    if (config.zone) {
+                        canvas.setAttribute('data-zone', config.zone);
+                        canvas.setAttribute('aria-label', `Price gauge · ${gaugeZoneLabels[config.zone] || config.zone}`);
+                    } else {
+                        canvas.removeAttribute('data-zone');
+                    }
                 }
-            }
-
-            if (gaugeCanvas) {
-                drawGauge(gaugeCanvas, config);
-                if (config.zone) {
-                    gaugeCanvas.setAttribute('data-zone', config.zone);
-                } else {
-                    gaugeCanvas.removeAttribute('data-zone');
+                if (gaugeContainer) {
+                    if (config.zone) {
+                        gaugeContainer.setAttribute('data-zone', config.zone);
+                    } else {
+                        gaugeContainer.removeAttribute('data-zone');
+                    }
                 }
-                const zoneLabel = gaugeZoneLabels[config.zone] || config.zone;
-                const ariaDescription = [
-                    payload.symbol ? `Gauge for ${payload.symbol}` : null,
-                    config.formatted.s2 ? `lower bound ${config.formatted.s2}` : null,
-                    config.formatted.s1 ? `support ${config.formatted.s1}` : null,
-                    config.formatted.r1 ? `resistance ${config.formatted.r1}` : null,
-                    config.formatted.r2 ? `higher resistance ${config.formatted.r2}` : null,
-                    config.formatted.price ? `needle at ${config.formatted.price}` : null,
-                    zoneLabel ? `active zone ${zoneLabel}` : null,
-                ]
-                    .filter(Boolean)
-                    .join(', ');
-                if (ariaDescription) {
-                    gaugeCanvas.setAttribute('aria-label', ariaDescription);
-                }
-            }
-        }
+            });
 
-        function applyLivePrice(price, timestamp) {
-            if (typeof price !== 'number' || Number.isNaN(price)) {
-                return;
-            }
-            if (!state) {
-                state = { symbol: defaultSymbol };
-            }
-            const formatted = formatPrice(price) || String(price);
-            state.latest_price_value = price;
-            state.latest_price = formatted;
-            if (!state.radar) {
-                state.radar = {};
-            }
-            if (!state.radar.price) {
-                state.radar.price = {};
-            }
-            state.radar.price.value = formatted;
-            const priceNode = document.querySelector('.level-marker--price .level-marker__value');
-            if (priceNode) {
-                priceNode.textContent = formatted;
-            }
-
-            updateGaugeDisplay(state);
-
-            if (state.radar && state.radar.price) {
-                const root = document.querySelector('.level-radar__track');
-                if (root && typeof state.chart.position === 'number') {
-                    root.style.setProperty('--price-position', state.chart.position);
-                }
-            }
-        }
-
-        function updateFromPayload(payload) {
             if (!payload) {
                 return;
             }
-            if (typeof payload.favorite === 'boolean') {
-                favoriteState = payload.favorite;
-                updateFavoriteButton(favoriteState);
-            }
-            const meta = document.querySelector('.action-center__meta');
-            if (meta) {
-                const symbolText = payload.symbol || defaultSymbol;
-                const updated = payload.generated_display ? ` &middot; Updated ${payload.generated_display}` : '';
-                meta.innerHTML = `Symbol <strong>${symbolText}</strong>${updated}`;
-            }
-            const primary = payload.primary_action || {};
-            const actionCard = document.querySelector('[data-section="primary"]');
-            if (actionCard) {
-                const statusTitle = actionCard.querySelector('.action-card__status-title');
-                const statusSubtitle = actionCard.querySelector('.action-card__status-subtitle');
-                if (statusTitle) statusTitle.textContent = primary.title || 'WAIT';
-                if (statusSubtitle) statusSubtitle.textContent = primary.subtitle || '';
-                actionCard.querySelectorAll('.action-card__details p').forEach((p, index) => {
-                    if (primary.explanation && primary.explanation[index]) {
-                        p.textContent = primary.explanation[index];
-                    }
-                });
-                const confidenceBar = actionCard.querySelector('.confidence-meter__bar span');
-                if (confidenceBar) {
-                    const score = primary.confidence_score || 0;
-                    confidenceBar.style.width = `${Math.max(0, Math.min(score, 100))}%`;
-                    confidenceBar.dataset.width = score;
-                }
-            }
-
-            ['bias', 'volatility', 'signal'].forEach((key) => {
-                const gauge = document.querySelector(`.gauge[data-gauge="${key}"]`);
-                if (!gauge || !payload.gauges || !payload.gauges[key]) {
-                    return;
-                }
-                const info = payload.gauges[key];
-                gauge.setAttribute('data-live-value', info.score || 0);
-                const label = gauge.querySelector('strong');
-                if (label) label.textContent = info.label || '';
-            });
-            applyGaugeStyles();
-            applyConfidenceBar();
-            updateGaugeDisplay(payload);
 
             const radar = payload.radar || {};
-            const radarRoot = document.querySelector('.level-radar__track');
-            if (radarRoot && radar.price && typeof radar.price.position === 'number') {
-                radarRoot.style.setProperty('--price-position', radar.price.position);
-                const priceValue = radarRoot.querySelector('.level-marker--price .level-marker__value');
-                if (priceValue) priceValue.textContent = radar.price.value || 'N/A';
-            }
-            [['s2', 'level-marker--s2'], ['s1', 'level-marker--s1'], ['r1', 'level-marker--r1'], ['r2', 'level-marker--r2']].forEach(([key, cls]) => {
-                const node = document.querySelector(`.${cls}`);
-                if (!node || !radar[key]) return;
-                const info = radar[key];
-                const valueNode = node.querySelector('.level-marker__value');
-                const deltaNode = node.querySelector('.level-marker__delta');
-                if (valueNode) valueNode.textContent = info.value || 'N/A';
-                if (deltaNode) deltaNode.textContent = info.distance || '';
-            });
-
-            const traffic = document.querySelector('.traffic-light');
-            if (traffic) {
-                traffic.classList.remove('traffic-light--buy', 'traffic-light--sell', 'traffic-light--wait');
-                traffic.classList.add(`traffic-light--${payload.traffic_light || 'wait'}`);
-            }
-
-            const alertsList = document.querySelector('.alerts ul');
-            if (alertsList) {
-                alertsList.innerHTML = '';
-                if (payload.alerts && payload.alerts.length) {
-                    payload.alerts.forEach((alertText) => {
-                        const li = document.createElement('li');
-                        const button = document.createElement('button');
-                        button.type = 'button';
-                        button.className = 'alert-button';
-                        button.textContent = alertText;
-                        button.dataset.alert = alertText;
-                        li.appendChild(button);
-                        alertsList.appendChild(li);
-                    });
-                } else {
-                    const li = document.createElement('li');
-                    li.textContent = 'No alerts suggested.';
-                    alertsList.appendChild(li);
-                }
-            }
-
-            const tagsFooter = document.querySelector('.action-tags');
-            if (tagsFooter) {
-                tagsFooter.innerHTML = '';
-                (payload.tags || []).forEach((tag) => {
-                    const span = document.createElement('span');
-                    span.textContent = tag;
-                    tagsFooter.appendChild(span);
-                });
-            }
-
-            const scenarioCards = document.querySelectorAll('.scenario-card');
-            const scenarios = payload.scenarios || [];
-            scenarioCards.forEach((card, index) => {
-                const scenario = scenarios[index];
-                if (!scenario) return;
-                const titleNode = card.querySelector('h3');
-                const bodyNode = card.querySelector('p');
-                if (titleNode) titleNode.textContent = scenario.title || titleNode.textContent;
-                if (bodyNode) bodyNode.textContent = scenario.body || bodyNode.textContent;
-                card.classList.remove('scenario-card--bull', 'scenario-card--bear', 'scenario-card--range');
-                card.classList.add(`scenario-card--${scenario.icon || 'range'}`);
-            });
-
-            const tradePlan = payload.trade_plan || {};
-            const entryFields = tradePlan.entry || {};
-            document.querySelectorAll('[data-entry-field]').forEach((node) => {
-                const field = node.getAttribute('data-entry-field');
-                const value = entryFields[field] || 'N/A';
-                node.textContent = value;
-            });
-
-            const targetsList = document.querySelector('[data-plan-targets]');
-            if (targetsList) {
-                targetsList.innerHTML = '';
-                const targets = tradePlan.targets || [];
-                if (targets.length) {
-                    targets.slice(0, 3).forEach((target) => {
-                        const li = document.createElement('li');
-                        const strong = document.createElement('strong');
-                        strong.textContent = target;
-                        li.appendChild(strong);
-                        targetsList.appendChild(li);
-                    });
-                } else {
-                    const li = document.createElement('li');
-                    const strong = document.createElement('strong');
-                    strong.textContent = 'N/A';
-                    li.appendChild(strong);
-                    targetsList.appendChild(li);
-                }
-            }
-
-            const stopsList = document.querySelector('[data-plan-stops]');
-            if (stopsList) {
-                stopsList.innerHTML = '';
-                const stops = tradePlan.stops || [];
-                if (stops.length) {
-                    stops.slice(0, 3).forEach((stop) => {
-                        const li = document.createElement('li');
-                        const strong = document.createElement('strong');
-                        strong.textContent = stop;
-                        li.appendChild(strong);
-                        stopsList.appendChild(li);
-                    });
-                } else {
-                    const li = document.createElement('li');
-                    const strong = document.createElement('strong');
-                    strong.textContent = 'N/A';
-                    li.appendChild(strong);
-                    stopsList.appendChild(li);
-                }
-            }
-
-            const positionNode = document.querySelector('[data-plan-size]');
-            if (positionNode) {
-                positionNode.textContent = tradePlan.position_size || 'N/A';
-            }
-
-            const riskList = document.querySelector('[data-plan-risk]');
-            if (riskList) {
-                riskList.innerHTML = '';
-                const notes = tradePlan.risk_notes || [];
-                if (notes.length) {
-                    notes.slice(0, 4).forEach((note) => {
-                        const li = document.createElement('li');
-                        li.textContent = note;
-                        riskList.appendChild(li);
-                    });
-                } else {
-                    const li = document.createElement('li');
-                    li.textContent = 'No additional risk notes.';
-                    riskList.appendChild(li);
+            if (config && typeof config.range.minValue === 'number' && typeof config.range.maxValue === 'number') {
+                payload.chart = payload.chart || {};
+                payload.chart.min_value = config.range.minValue;
+                payload.chart.max_value = config.range.maxValue;
+                payload.chart.min = config.range.minLabel;
+                payload.chart.max = config.range.maxLabel;
+                if (typeof config.values.price === 'number' && Number.isFinite(config.values.price) && config.range.maxValue !== config.range.minValue) {
+                    const span = config.range.maxValue - config.range.minValue;
+                    const normalised = Math.max(0, Math.min(1, (config.values.price - config.range.minValue) / span));
+                    payload.chart.position = normalised;
+                    if (radar.price) {
+                        radar.price.position = normalised;
+                    }
                 }
             }
         }
 
+        function renderList(container, items, createContent) {
+            if (!container) return;
+            container.innerHTML = '';
+            if (!items || !items.length) {
+                createContent(container, null, true);
+                return;
+            }
+            items.forEach((item) => {
+                createContent(container, item, false);
+            });
+        }
+
+        function updateDashboardContent(record) {
+            const { node, payload, meta } = record;
+            const hasData = Boolean(payload);
+            node.dataset.hasData = hasData ? 'true' : 'false';
+
+            const summaryTitle = node.querySelector('[data-summary-title]');
+            if (summaryTitle) {
+                summaryTitle.textContent =
+                    (payload && payload.primary_action && payload.primary_action.title)
+                        ? payload.primary_action.title
+                        : 'N/A';
+            }
+            const summarySubtitle = node.querySelector('[data-summary-subtitle]');
+            if (summarySubtitle) {
+                summarySubtitle.textContent =
+                    (payload && payload.primary_action && payload.primary_action.subtitle)
+                        ? payload.primary_action.subtitle
+                        : 'No guidance yet.';
+            }
+
+            const trafficStatus = (payload && payload.traffic_light) ? payload.traffic_light : 'wait';
+            node.querySelectorAll('[data-dashboard-traffic], [data-dashboard-traffic-expanded]').forEach((traffic) => {
+                updateTrafficLight(traffic, trafficStatus);
+            });
+
+            const contentContainer = node.querySelector('[data-dashboard-content]');
+            const emptyContainer = node.querySelector('[data-dashboard-empty]');
+            const emptyMessage = node.querySelector('[data-dashboard-empty-message]');
+            if (contentContainer) {
+                contentContainer.hidden = !hasData;
+            }
+            if (emptyContainer) {
+                emptyContainer.hidden = hasData;
+            }
+            if (!hasData && emptyMessage) {
+                emptyMessage.textContent = (meta && meta.error) || 'No recent AI analysis found for this symbol. Try running a new multi-agent analysis first.';
+            }
+
+            updateGaugeDisplay(node, payload);
+
+            const summaryNode = node.querySelector('[data-strategy-summary]');
+            if (summaryNode) {
+                const summaryText = (meta && meta.strategy_summary) || '';
+                if (summaryText) {
+                    summaryNode.textContent = summaryText;
+                    summaryNode.hidden = false;
+                } else {
+                    summaryNode.hidden = true;
+                }
+            }
+
+            if (!hasData) {
+                return;
+            }
+
+            const actionTitle = node.querySelector('[data-primary-title]');
+            if (actionTitle && payload.primary_action) {
+                actionTitle.textContent = payload.primary_action.title || 'N/A';
+            }
+            const actionSubtitle = node.querySelector('[data-primary-subtitle]');
+            if (actionSubtitle && payload.primary_action) {
+                actionSubtitle.textContent = payload.primary_action.subtitle || '';
+            }
+
+            const explanationContainer = node.querySelector('[data-primary-explanation]');
+            if (explanationContainer) {
+                explanationContainer.innerHTML = '';
+                const explanation = (payload.primary_action && payload.primary_action.explanation) || [];
+                if (explanation.length) {
+                    explanation.forEach((line) => {
+                        const p = document.createElement('p');
+                        p.textContent = line;
+                        explanationContainer.appendChild(p);
+                    });
+                } else {
+                    const p = document.createElement('p');
+                    p.textContent = 'No narrative guidance available yet.';
+                    explanationContainer.appendChild(p);
+                }
+            }
+
+            const confidenceLabel = node.querySelector('[data-primary-confidence]');
+            const confidenceBar = node.querySelector('[data-confidence-bar]');
+            if (confidenceLabel && payload.primary_action) {
+                confidenceLabel.textContent = `Confidence ${payload.primary_action.confidence || 'N/A'}`;
+            }
+            if (confidenceBar && payload.primary_action) {
+                const score = Math.max(0, Math.min(payload.primary_action.confidence_score || 0, 100));
+                confidenceBar.dataset.width = score;
+                confidenceBar.style.width = `${score}%`;
+            }
+
+            const radarTrack = node.querySelector('[data-radar-track]');
+            const radar = payload.radar || {};
+            if (radarTrack && radar.price && typeof radar.price.position === 'number') {
+                radarTrack.style.setProperty('--price-position', radar.price.position);
+            }
+
+            ['s2', 's1', 'price', 'r1', 'r2'].forEach((key) => {
+                const valueNode = node.querySelector(`[data-radar-value="${key}"]`);
+                const deltaNode = node.querySelector(`[data-radar-delta="${key}"]`);
+                const info = radar[key] || {};
+                if (valueNode) {
+                    valueNode.textContent = info.value || (key === 'price' ? (payload.latest_price || 'N/A') : 'N/A');
+                }
+                if (deltaNode) {
+                    deltaNode.textContent = info.distance || '';
+                }
+            });
+
+            node.querySelectorAll('[data-dashboard-gauges] .gauge').forEach((gauge) => {
+                const key = gauge.getAttribute('data-gauge');
+                if (!key || !payload.gauges || !payload.gauges[key]) return;
+                const info = payload.gauges[key];
+                if (typeof info.score === 'number') {
+                    gauge.style.setProperty('--gauge-value', info.score);
+                }
+                const label = gauge.querySelector('strong');
+                if (label && info.label) {
+                    label.textContent = info.label;
+                }
+            });
+
+            const scenariosContainer = node.querySelector('[data-dashboard-scenarios]');
+            if (scenariosContainer) {
+                scenariosContainer.innerHTML = '';
+                const scenarios = payload.scenarios || [];
+                if (scenarios.length) {
+                    scenarios.forEach((scenario) => {
+                        const article = document.createElement('article');
+                        article.className = `scenario-card scenario-card--${scenario.icon || 'range'}`;
+                        const title = document.createElement('h3');
+                        title.textContent = scenario.title || 'Scenario';
+                        const body = document.createElement('p');
+                        body.textContent = scenario.body || '';
+                        article.appendChild(title);
+                        article.appendChild(body);
+                        scenariosContainer.appendChild(article);
+                    });
+                } else {
+                    const article = document.createElement('article');
+                    article.className = 'scenario-card scenario-card--range';
+                    const title = document.createElement('h3');
+                    title.textContent = 'No scenarios yet';
+                    const body = document.createElement('p');
+                    body.textContent = 'Fresh scenarios will appear once the analysis is regenerated.';
+                    article.appendChild(title);
+                    article.appendChild(body);
+                    scenariosContainer.appendChild(article);
+                }
+            }
+
+            if (payload.trade_plan && payload.trade_plan.entry) {
+                node.querySelectorAll('[data-entry-field]').forEach((entryNode) => {
+                    const field = entryNode.getAttribute('data-entry-field');
+                    entryNode.textContent = payload.trade_plan.entry[field] || 'N/A';
+                });
+            }
+
+            const targetsList = node.querySelector('[data-plan-targets]');
+            renderList(targetsList, (payload.trade_plan && payload.trade_plan.targets) || [], (container, item, empty) => {
+                const li = document.createElement('li');
+                const strong = document.createElement('strong');
+                strong.textContent = empty ? 'N/A' : item;
+                li.appendChild(strong);
+                container.appendChild(li);
+            });
+
+            const stopsList = node.querySelector('[data-plan-stops]');
+            renderList(stopsList, (payload.trade_plan && payload.trade_plan.stops) || [], (container, item, empty) => {
+                const li = document.createElement('li');
+                const strong = document.createElement('strong');
+                strong.textContent = empty ? 'N/A' : item;
+                li.appendChild(strong);
+                container.appendChild(li);
+            });
+
+            const planSize = node.querySelector('[data-plan-size]');
+            if (planSize) {
+                planSize.textContent = (payload.trade_plan && payload.trade_plan.position_size) || 'N/A';
+            }
+
+            const riskList = node.querySelector('[data-plan-risk]');
+            renderList(riskList, (payload.trade_plan && payload.trade_plan.risk_notes) || [], (container, item, empty) => {
+                const li = document.createElement('li');
+                li.textContent = empty ? 'No additional risk notes.' : item;
+                container.appendChild(li);
+            });
+
+            const alertsList = node.querySelector('[data-alerts-list]');
+            renderList(alertsList, payload.alerts || [], (container, item, empty) => {
+                if (empty) {
+                    const li = document.createElement('li');
+                    li.textContent = 'No alerts suggested.';
+                    container.appendChild(li);
+                } else {
+                    const li = document.createElement('li');
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'alert-button';
+                    button.dataset.alert = item;
+                    button.textContent = item;
+                    li.appendChild(button);
+                    container.appendChild(li);
+                }
+            });
+
+            const tagsFooter = node.querySelector('[data-dashboard-tags]');
+            if (tagsFooter) {
+                tagsFooter.innerHTML = '';
+                const tags = payload.tags || [];
+                if (tags.length) {
+                    tags.forEach((tag) => {
+                        const span = document.createElement('span');
+                        span.textContent = tag;
+                        tagsFooter.appendChild(span);
+                    });
+                } else {
+                    const span = document.createElement('span');
+                    span.textContent = 'No tags available yet.';
+                    tagsFooter.appendChild(span);
+                }
+            }
+        }
+
+        function updatePrimaryMeta(payload) {
+            if (!headerMeta) return;
+            const symbolLabel = (payload && payload.symbol) || dashState.primarySymbol || '{{ symbol }}';
+            const updated = payload && payload.generated_display ? ` &middot; Updated ${payload.generated_display}` : '';
+            headerMeta.innerHTML = `Symbol <strong>${symbolLabel}</strong>${updated}`;
+        }
+
+        function registerDashboard(entry, index) {
+            if (!entry || !entry.symbol) return;
+            const escapedSymbol = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(entry.symbol) : entry.symbol.replace(/"/g, '\"');
+            const node = document.querySelector(`[data-dashboard-symbol="${escapedSymbol}"]`);
+            if (!node) return;
+
+            const record = {
+                node,
+                payload: entry.action_data || null,
+                meta: {
+                    error: entry.error_message || null,
+                    strategy_summary: entry.strategy_summary || null,
+                    report_blob: entry.report_blob || null,
+                },
+            };
+            dashState.dashboards.set(entry.symbol, record);
+            updateDashboardContent(record);
+
+            initToggle(node, entry.symbol);
+
+            if (index === 0) {
+                dashState.primarySymbol = entry.symbol || dashState.primarySymbol;
+                dashState.favorite = Boolean(entry.is_favorited);
+                if (favoriteButton) {
+                    favoriteButton.dataset.symbol = entry.symbol;
+                }
+                if (record.payload) {
+                    updatePrimaryMeta(record.payload);
+                }
+            }
+        }
+
+        function initToggle(node, symbol) {
+            const toggle = node.querySelector('[data-dashboard-toggle]');
+            const body = node.querySelector('[data-dashboard-body]');
+            if (!toggle || !body) {
+                return;
+            }
+            toggle.addEventListener('click', () => {
+                const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                const nextExpanded = !expanded;
+                toggle.setAttribute('aria-expanded', String(nextExpanded));
+                node.dataset.expanded = nextExpanded ? 'true' : 'false';
+                body.hidden = !nextExpanded;
+                if (nextExpanded) {
+                    const record = dashState.dashboards.get(symbol);
+                    if (record && record.payload) {
+                        requestAnimationFrame(() => {
+                            updateGaugeDisplay(node, record.payload);
+                        });
+                    }
+                }
+            });
+        }
+
+        dashboardsPayload.forEach((entry, index) => {
+            registerDashboard(entry, index);
+        });
+
+        updateFavoriteButton(dashState.favorite);
+
+        function refreshAllGauges() {
+            dashState.dashboards.forEach((record) => {
+                if (record.payload) {
+                    updateGaugeDisplay(record.node, record.payload);
+                }
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            if (dashState.resizeTimer) {
+                window.clearTimeout(dashState.resizeTimer);
+            }
+            dashState.resizeTimer = window.setTimeout(() => {
+                refreshAllGauges();
+            }, 160);
+        });
+
         async function refreshData() {
-            if (!state) return;
+            const symbol = dashState.primarySymbol || defaultSymbol;
+            if (!symbol) return;
             const params = new URLSearchParams({
-                symbol: state.symbol || defaultSymbol,
+                symbol,
                 timeframe: '{{ timeframe }}',
-                intent: '{{ intent }}'
+                intent: '{{ intent }}',
             });
             try {
-                const response = await fetch(`/api/action-center?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
+                const response = await fetch(`/api/action-center?${params.toString()}`, { headers: { Accept: 'application/json' } });
                 if (!response.ok) {
                     console.warn('Action Center refresh skipped', response.status);
                     return;
                 }
                 const payload = await response.json();
-                if (payload && payload.action) {
-                    state = payload.action;
-                    if (typeof payload.favorite === 'boolean') {
-                        favoriteState = payload.favorite;
-                        state.favorite = favoriteState;
-                        updateFavoriteButton(favoriteState);
-                    }
-                    updateFromPayload(state);
+                if (!payload || !payload.action) {
+                    return;
+                }
+                const record = dashState.dashboards.get(symbol);
+                if (record) {
+                    record.payload = payload.action;
+                    record.meta.error = null;
+                    updateDashboardContent(record);
+                    updatePrimaryMeta(record.payload);
+                } else {
+                    registerDashboard(
+                        {
+                            symbol,
+                            is_favorited: payload.favorite,
+                            action_data: payload.action,
+                            strategy_summary: null,
+                            error_message: null,
+                            report_blob: payload.source_blob || null,
+                        },
+                        dashState.dashboards.size,
+                    );
+                }
+                if (typeof payload.favorite === 'boolean') {
+                    dashState.favorite = payload.favorite;
+                    updateFavoriteButton(dashState.favorite);
                 }
             } catch (error) {
                 console.warn('Failed to refresh Action Center data', error);
@@ -1089,10 +1211,10 @@
 
         async function refreshLivePrice() {
             if (!livePriceEnabled) return;
-            const targetSymbol = (state && state.symbol) || (favoriteButton && favoriteButton.dataset.symbol) || defaultSymbol;
-            if (!targetSymbol) return;
+            const symbol = dashState.primarySymbol || defaultSymbol;
+            if (!symbol) return;
             try {
-                const response = await fetch(`/api/live-price?symbol=${encodeURIComponent(targetSymbol)}`, { headers: { 'Accept': 'application/json' } });
+                const response = await fetch(`/api/live-price?symbol=${encodeURIComponent(symbol)}`, { headers: { Accept: 'application/json' } });
                 if (response.status === 503) {
                     console.warn('Live price stream unavailable');
                     stopLivePrice();
@@ -1105,36 +1227,47 @@
                     console.warn('Live price request failed', response.status);
                     return;
                 }
-                const payload = await response.json();
-                if (payload && typeof payload.price === 'number') {
-                    applyLivePrice(payload.price, payload.timestamp);
+                const data = await response.json();
+                if (!data || typeof data.price !== 'number') {
+                    return;
                 }
+                const record = dashState.dashboards.get(symbol);
+                if (!record || !record.payload) {
+                    return;
+                }
+                const formatted = formatPrice(data.price) || String(data.price);
+                record.payload.latest_price_value = data.price;
+                record.payload.latest_price = formatted;
+                record.payload.radar = record.payload.radar || {};
+                record.payload.radar.price = record.payload.radar.price || {};
+                record.payload.radar.price.value = formatted;
+                updateDashboardContent(record);
             } catch (error) {
                 console.warn('Failed to refresh live price', error);
             }
         }
 
         function startAutoRefresh() {
-            if (refreshTimer) return;
-            refreshTimer = window.setInterval(refreshData, 30000);
+            if (dashState.refreshTimer) return;
+            dashState.refreshTimer = window.setInterval(refreshData, 30000);
         }
 
         function stopAutoRefresh() {
-            if (!refreshTimer) return;
-            window.clearInterval(refreshTimer);
-            refreshTimer = null;
+            if (!dashState.refreshTimer) return;
+            window.clearInterval(dashState.refreshTimer);
+            dashState.refreshTimer = null;
         }
 
         function startLivePrice() {
-            if (!livePriceEnabled || livePriceTimer) return;
-            livePriceTimer = window.setInterval(refreshLivePrice, 7000);
+            if (!livePriceEnabled || dashState.livePriceTimer) return;
+            dashState.livePriceTimer = window.setInterval(refreshLivePrice, 7000);
             refreshLivePrice();
         }
 
         function stopLivePrice() {
-            if (!livePriceTimer) return;
-            window.clearInterval(livePriceTimer);
-            livePriceTimer = null;
+            if (!dashState.livePriceTimer) return;
+            window.clearInterval(dashState.livePriceTimer);
+            dashState.livePriceTimer = null;
         }
 
         if (autoToggle) {
@@ -1148,40 +1281,34 @@
                     stopLivePrice();
                 }
             });
-            if (autoToggle.checked) {
-                startAutoRefresh();
-                startLivePrice();
-            }
         }
 
         if (favoriteButton) {
             favoriteButton.addEventListener('click', async () => {
-                const targetSymbol = (state && state.symbol) || favoriteButton.dataset.symbol || defaultSymbol;
-                if (!targetSymbol) {
-                    return;
-                }
-                const nextState = !favoriteState;
+                const symbol = dashState.primarySymbol || favoriteButton.dataset.symbol || defaultSymbol;
+                if (!symbol) return;
+                const nextState = !dashState.favorite;
                 favoriteButton.disabled = true;
                 try {
                     const response = await fetch('/api/action-center/favorites', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Accept': 'application/json'
+                            Accept: 'application/json',
                         },
-                        body: JSON.stringify({ symbol: targetSymbol, follow: nextState })
+                        body: JSON.stringify({ symbol, follow: nextState }),
                     });
                     if (!response.ok) {
                         console.warn('Favorite toggle failed', response.status);
                         return;
                     }
                     const result = await response.json();
-                    favoriteState = Boolean(result.follow);
-                    updateFavoriteButton(favoriteState);
-                    if (!state) {
-                        state = { symbol: targetSymbol };
+                    dashState.favorite = Boolean(result.follow);
+                    updateFavoriteButton(dashState.favorite);
+                    const primaryRecord = dashState.dashboards.get(symbol);
+                    if (primaryRecord && primaryRecord.payload) {
+                        primaryRecord.payload.favorite = dashState.favorite;
                     }
-                    state.favorite = favoriteState;
                 } catch (error) {
                     console.warn('Failed to update favorite symbol', error);
                 } finally {
@@ -1190,40 +1317,10 @@
             });
         }
 
-        if (gaugeCanvas) {
-            window.addEventListener('resize', () => {
-                if (gaugeResizeTimer) {
-                    window.clearTimeout(gaugeResizeTimer);
-                }
-                gaugeResizeTimer = window.setTimeout(() => {
-                    if (state) {
-                        updateGaugeDisplay(state);
-                        const radar = state.radar || {};
-                        if (radar.price && typeof radar.price.position === 'number') {
-                            const radarRoot = document.querySelector('.level-radar__track');
-                            if (radarRoot) {
-                                radarRoot.style.setProperty('--price-position', radar.price.position);
-                            }
-                        }
-                    }
-                }, 150);
-            });
-        }
-
-        applyGaugeStyles();
-        applyConfidenceBar();
-
-        if (state) {
-            if (typeof state.favorite === 'boolean') {
-                favoriteState = state.favorite;
-            }
-            updateFavoriteButton(favoriteState);
-            updateFromPayload(state);
-        } else {
-            updateFavoriteButton(favoriteState);
-        }
-
-        if (livePriceEnabled) {
+        if (autoToggle && autoToggle.checked) {
+            startAutoRefresh();
+            startLivePrice();
+        } else if (livePriceEnabled) {
             refreshLivePrice();
         }
     }());

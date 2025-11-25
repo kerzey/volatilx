@@ -1877,43 +1877,80 @@ async def action_center_page(
         is_favorited = _is_symbol_favorited(session, user.id, symbol_upper)
         favorite_symbols = _favorite_symbols(session, user.id)
 
-    raw_report = _fetch_latest_action_report(symbol_upper)
-    if not raw_report:
-        context = {
-            "request": request,
-            "user": user,
-            "symbol": symbol_upper,
-            "subscription": _serialize_subscription(subscription) if subscription else None,
-            "timeframe": timeframe_slug,
-            "intent": intent_slug,
-            "action_data": None,
-            "error_message": "No recent AI analysis found for this symbol. Try running a new multi-agent analysis first.",
-            "is_favorited": is_favorited,
-            "favorite_symbols": favorite_symbols,
-            "live_price_enabled": live_price_available,
-        }
-        return templates.TemplateResponse("action_center.html", context)
-
     strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
-    action_payload = _derive_action_center_view(raw_report, strategy_key=strategy_key, intent=intent_slug)
-    action_payload["favorite"] = is_favorited
+    raw_report = _fetch_latest_action_report(symbol_upper)
 
-    principal_data = (raw_report.get("principal_plan") or {}).get("data") or {}
-    strategies = principal_data.get("strategies") or {}
-    active_strategy = strategies.get(strategy_key) or {}
+    favorite_symbol_set = {sym.upper() for sym in favorite_symbols}
+    dashboards: List[Dict[str, Any]] = []
+
+    def _build_dashboard(symbol_key: str, report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        resolved_report = report or _fetch_latest_action_report(symbol_key)
+        dashboard_payload: Optional[Dict[str, Any]] = None
+        dashboard_summary: Optional[str] = None
+        error_message: Optional[str] = None
+
+        if resolved_report:
+            dashboard_payload = _derive_action_center_view(resolved_report, strategy_key=strategy_key, intent=intent_slug)
+            dashboard_payload["favorite"] = symbol_key in favorite_symbol_set
+            principal_data = (resolved_report.get("principal_plan") or {}).get("data") or {}
+            strategies = principal_data.get("strategies") or {}
+            active_strategy = strategies.get(strategy_key) or {}
+            dashboard_summary = active_strategy.get("summary")
+        else:
+            error_message = "No recent AI analysis found for this symbol. Try running a new multi-agent analysis first."
+
+        return {
+            "symbol": symbol_key,
+            "is_favorited": symbol_key in favorite_symbol_set,
+            "strategy_summary": dashboard_summary,
+            "action_data": dashboard_payload,
+            "error_message": error_message,
+            "report_blob": resolved_report.get("_blob_name") if resolved_report else None,
+        }
+
+    symbol_order: list[str] = []
+    if symbol_upper not in symbol_order:
+        symbol_order.append(symbol_upper)
+    for fav_symbol in favorite_symbols:
+        fav_upper = fav_symbol.upper()
+        if fav_upper not in symbol_order:
+            symbol_order.append(fav_upper)
+
+    for sym in symbol_order:
+        if sym == symbol_upper:
+            dashboards.append(_build_dashboard(sym, raw_report))
+        else:
+            dashboards.append(_build_dashboard(sym))
+
+    primary_dashboard = dashboards[0] if dashboards else None
+
+    dashboards_json = json.dumps(
+        [
+            {
+                "symbol": dash["symbol"],
+                "is_favorited": dash["is_favorited"],
+                "strategy_summary": dash["strategy_summary"],
+                "error_message": dash["error_message"],
+                "action_data": dash["action_data"],
+                "report_blob": dash["report_blob"],
+            }
+            for dash in dashboards
+        ],
+        separators=(",", ":"),
+    )
 
     context = {
         "request": request,
         "user": user,
-        "symbol": action_payload.get("symbol", symbol_upper),
+        "symbol": primary_dashboard["symbol"] if primary_dashboard else symbol_upper,
         "subscription": _serialize_subscription(subscription) if subscription else None,
         "timeframe": timeframe_slug,
         "intent": intent_slug,
-        "strategy_summary": active_strategy.get("summary"),
-        "action_data": action_payload,
-        "action_data_json": json.dumps(action_payload, separators=(",", ":")),
-        "latest_report_blob": raw_report.get("_blob_name"),
-        "is_favorited": is_favorited,
+        "dashboards": dashboards,
+        "dashboards_json": dashboards_json,
+        "primary_dashboard": primary_dashboard,
+        "latest_report_blob": primary_dashboard["report_blob"] if primary_dashboard else None,
+        "is_favorited": primary_dashboard["is_favorited"] if primary_dashboard else is_favorited,
         "favorite_symbols": favorite_symbols,
         "live_price_enabled": live_price_available,
     }
