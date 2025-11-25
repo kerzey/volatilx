@@ -110,7 +110,7 @@ class LivePriceStream:
         session: Optional[aiohttp.ClientSession] = None,
         message_format: Literal["json", "msgpack"] = "json",
     ) -> None:
-        self._api_key = api_key or os.getenv("APCA_API_KEY_ID")
+        self._api_key = api_key or os.getenv("ALPACA_API_KEY")
         self._api_secret = api_secret or os.getenv("APCA_API_SECRET_KEY")
         if not self._api_key or not self._api_secret:
             raise RuntimeError("Alpaca API credentials are required for live streaming.")
