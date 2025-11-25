@@ -221,17 +221,33 @@
                     {% endif %}
                 </ul>
             </div>
-            <div class="chart-preview" aria-label="Price context chart">
-                <div class="chart-preview__header">
-                    <h2>Chart preview</h2>
-                    <span class="chart-preview__range">{{ action_data.chart.min or 'N/A' }} &ndash; {{ action_data.chart.max or 'N/A' }}</span>
+            <div class="level-gauge" aria-label="Support and resistance luxury gauge">
+                <div class="level-gauge__header">
+                    <h2>Price range gauge</h2>
+                    <span class="level-gauge__range" data-gauge-range>
+                        {% set gauge_min = action_data.radar.s2.value if action_data.radar.s2.value else action_data.radar.s1.value %}
+                        {% set gauge_max = action_data.radar.r2.value if action_data.radar.r2.value else action_data.radar.r1.value %}
+                        {{ gauge_min or 'N/A' }} &ndash; {{ gauge_max or 'N/A' }}
+                    </span>
                 </div>
-                <div class="chart-preview__canvas" style="--price-position: {{ action_data.chart.position or 0.5 }}">
-                    <div class="chart-preview__level chart-preview__level--support">Support-1</div>
-                    <div class="chart-preview__level chart-preview__level--resistance">Resistance-1</div>
-                    <div class="chart-preview__needle" role="presentation"></div>
+                <div class="level-gauge__body">
+                    <canvas
+                        class="level-gauge__canvas"
+                        width="320"
+                        height="160"
+                        data-gauge-canvas
+                        role="img"
+                        aria-label="Price gauge"
+                    ></canvas>
+                    <div class="level-gauge__needle-value" data-gauge-price>{{ action_data.radar.price.value or action_data.latest_price or 'N/A' }}</div>
                 </div>
-                <p class="chart-preview__note">Contextual view of price within current range. Live updates refresh automatically when enabled.</p>
+                <div class="level-gauge__markers" aria-hidden="true">
+                    <span data-gauge-marker="s2">{{ action_data.radar.s2.value or 'N/A' }}</span>
+                    <span data-gauge-marker="s1">{{ action_data.radar.s1.value or 'N/A' }}</span>
+                    <span data-gauge-marker="price">{{ action_data.radar.price.value or action_data.latest_price or 'N/A' }}</span>
+                    <span data-gauge-marker="r1">{{ action_data.radar.r1.value or 'N/A' }}</span>
+                    <span data-gauge-marker="r2">{{ action_data.radar.r2.value or 'N/A' }}</span>
+                </div>
             </div>
         </section>
 
@@ -265,6 +281,24 @@
         let refreshTimer = null;
         let livePriceTimer = null;
         let favoriteState = favoriteButton ? favoriteButton.getAttribute('aria-pressed') === 'true' : false;
+        const gaugeCanvas = document.querySelector('[data-gauge-canvas]');
+        const gaugeRange = document.querySelector('[data-gauge-range]');
+        const gaugeMarkers = {
+            s2: document.querySelector('[data-gauge-marker="s2"]'),
+            s1: document.querySelector('[data-gauge-marker="s1"]'),
+            price: document.querySelector('[data-gauge-marker="price"]'),
+            r1: document.querySelector('[data-gauge-marker="r1"]'),
+            r2: document.querySelector('[data-gauge-marker="r2"]'),
+        };
+        const gaugePriceValue = document.querySelector('[data-gauge-price]');
+        const gaugeColors = {
+            belowS2: '#111827',
+            betweenSupports: '#0f766e',
+            midZone: '#2563eb',
+            betweenResistances: '#f59e0b',
+            aboveR2: '#dc2626',
+        };
+        let gaugeResizeTimer = null;
 
         function updateFavoriteButton(isActive) {
             if (!favoriteButton) return;
@@ -297,6 +331,323 @@
             return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function parseNumeric(value) {
+            if (typeof value === 'number') {
+                return Number.isFinite(value) ? value : null;
+            }
+            if (typeof value === 'string') {
+                const cleaned = value.replace(/,/g, '').trim();
+                if (!cleaned) {
+                    return null;
+                }
+                const parsed = Number(cleaned);
+                return Number.isFinite(parsed) ? parsed : null;
+            }
+            return null;
+        }
+
+        function buildGaugeConfig(payload) {
+            if (!payload) {
+                return null;
+            }
+            const radar = payload.radar || {};
+            const values = {
+                s2: parseNumeric(radar.s2 && radar.s2.value),
+                s1: parseNumeric(radar.s1 && radar.s1.value),
+                r1: parseNumeric(radar.r1 && radar.r1.value),
+                r2: parseNumeric(radar.r2 && radar.r2.value),
+                price:
+                    typeof payload.latest_price_value === 'number' && !Number.isNaN(payload.latest_price_value)
+                        ? payload.latest_price_value
+                        : parseNumeric(radar.price && radar.price.value),
+            };
+
+            const numericValues = Object.values(values).filter((val) => typeof val === 'number' && Number.isFinite(val));
+            if (!numericValues.length) {
+                return null;
+            }
+
+            const minCandidate = Math.min(...numericValues);
+            const maxCandidate = Math.max(...numericValues);
+
+            const spanCandidates = [];
+            if (typeof values.s1 === 'number' && typeof values.s2 === 'number') {
+                spanCandidates.push(Math.abs(values.s1 - values.s2));
+            }
+            if (typeof values.r2 === 'number' && typeof values.r1 === 'number') {
+                spanCandidates.push(Math.abs(values.r2 - values.r1));
+            }
+            if (typeof values.r1 === 'number' && typeof values.s1 === 'number') {
+                spanCandidates.push(Math.abs(values.r1 - values.s1));
+            }
+
+            const primarySpan = Math.max(
+                maxCandidate - minCandidate,
+                spanCandidates.length ? Math.max(...spanCandidates) : 0,
+                Math.abs(numericValues[0]) || 1
+            );
+            const extension = primarySpan * 0.15 || 1;
+
+            let minBound = minCandidate;
+            let maxBound = maxCandidate;
+
+            if (typeof values.s2 === 'number') {
+                minBound = Math.min(values.s2 - extension, minBound);
+            } else {
+                minBound -= extension;
+            }
+
+            if (typeof values.r2 === 'number') {
+                maxBound = Math.max(values.r2 + extension, maxBound);
+            } else {
+                maxBound += extension;
+            }
+
+            if (!(maxBound > minBound)) {
+                maxBound = minBound + (primarySpan || 1);
+            }
+
+            return {
+                values,
+                minBound,
+                maxBound,
+                formatted: {
+                    s2: radar.s2 && radar.s2.value ? radar.s2.value : null,
+                    s1: radar.s1 && radar.s1.value ? radar.s1.value : null,
+                    r1: radar.r1 && radar.r1.value ? radar.r1.value : null,
+                    r2: radar.r2 && radar.r2.value ? radar.r2.value : null,
+                    price: (radar.price && radar.price.value) || payload.latest_price || null,
+                },
+            };
+        }
+
+        function drawGauge(canvas, config) {
+            if (!canvas || !config) {
+                return;
+            }
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return;
+            }
+
+            const width = canvas.clientWidth || canvas.width;
+            const height = canvas.clientHeight || canvas.height;
+            if (!width || !height) {
+                return;
+            }
+
+            const ratio = window.devicePixelRatio || 1;
+            const displayWidth = Math.round(width * ratio);
+            const displayHeight = Math.round(height * ratio);
+            if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+                canvas.width = displayWidth;
+                canvas.height = displayHeight;
+            }
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(ratio, ratio);
+            ctx.clearRect(0, 0, width, height);
+
+            const centerX = width / 2;
+            const centerY = height;
+            const radius = Math.min(width, height * 2) / 2 - 12;
+            const lineWidth = 18;
+            const span = config.maxBound - config.minBound || 1;
+            const epsilon = span * 0.0005;
+
+            const valueToAngle = (value) => {
+                const clamped = Math.max(config.minBound, Math.min(config.maxBound, value));
+                const normalised = (clamped - config.minBound) / span;
+                return Math.PI - normalised * Math.PI;
+            };
+
+            ctx.lineWidth = lineWidth;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
+            ctx.stroke();
+
+            const segments = [];
+            let cursor = config.minBound;
+
+            const addSegment = (boundary, color) => {
+                if (typeof boundary !== 'number' || !Number.isFinite(boundary)) {
+                    return;
+                }
+                const endValue = Math.max(boundary, cursor + epsilon);
+                if (endValue <= cursor) {
+                    return;
+                }
+                segments.push({
+                    start: cursor,
+                    end: Math.min(endValue, config.maxBound),
+                    color,
+                });
+                cursor = Math.min(endValue, config.maxBound);
+            };
+
+            addSegment(config.values.s2, gaugeColors.belowS2);
+            addSegment(config.values.s1, gaugeColors.betweenSupports);
+            addSegment(config.values.r1, gaugeColors.midZone);
+            addSegment(config.values.r2, gaugeColors.betweenResistances);
+
+            if (cursor < config.maxBound) {
+                segments.push({
+                    start: cursor,
+                    end: config.maxBound,
+                    color: gaugeColors.aboveR2,
+                });
+            }
+
+            segments.forEach((segment) => {
+                if (!(segment.end > segment.start)) {
+                    return;
+                }
+                ctx.strokeStyle = segment.color;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, valueToAngle(segment.start), valueToAngle(segment.end), false);
+                ctx.stroke();
+            });
+
+            const tickCount = 5;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(248, 250, 252, 0.65)';
+            const innerRadius = radius - lineWidth / 2 - 4;
+            const outerRadius = innerRadius + 8;
+            for (let i = 0; i <= tickCount; i += 1) {
+                const fraction = i / tickCount;
+                const angle = Math.PI - fraction * Math.PI;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                ctx.beginPath();
+                ctx.moveTo(centerX + cos * innerRadius, centerY + sin * innerRadius);
+                ctx.lineTo(centerX + cos * outerRadius, centerY + sin * outerRadius);
+                ctx.stroke();
+            }
+
+            const needleValue = config.values.price;
+            if (typeof needleValue === 'number' && Number.isFinite(needleValue)) {
+                const angle = valueToAngle(needleValue);
+                const needleLength = radius - lineWidth / 2;
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+
+                ctx.strokeStyle = '#fef3c7';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + cos * needleLength, centerY + sin * needleLength);
+                ctx.stroke();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, lineWidth * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#fde68a';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, lineWidth * 0.24, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function updateGaugeDisplay(payload) {
+            if (!gaugeCanvas && !gaugeRange && !gaugePriceValue) {
+                return;
+            }
+
+            if (!payload) {
+                if (gaugeCanvas) {
+                    const ctx = gaugeCanvas.getContext('2d');
+                    if (ctx) {
+                        ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
+                    }
+                }
+                if (gaugeRange) {
+                    gaugeRange.textContent = 'N/A - N/A';
+                }
+                if (gaugePriceValue) {
+                    gaugePriceValue.textContent = 'N/A';
+                }
+                Object.values(gaugeMarkers).forEach((node) => {
+                    if (node) {
+                        node.textContent = 'N/A';
+                    }
+                });
+                return;
+            }
+
+            const config = buildGaugeConfig(payload);
+
+            if (gaugePriceValue) {
+                const priceLabel = (payload.radar && payload.radar.price && payload.radar.price.value) || payload.latest_price || 'N/A';
+                gaugePriceValue.textContent = priceLabel || 'N/A';
+            }
+
+            Object.entries(gaugeMarkers).forEach(([key, node]) => {
+                if (!node) {
+                    return;
+                }
+                const level = payload.radar && payload.radar[key];
+                node.textContent = (level && level.value) || 'N/A';
+            });
+
+            if (!config) {
+                if (gaugeRange) {
+                    gaugeRange.textContent = 'N/A - N/A';
+                }
+                if (gaugeCanvas) {
+                    const ctx = gaugeCanvas.getContext('2d');
+                    if (ctx) {
+                        ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
+                    }
+                    gaugeCanvas.setAttribute('aria-label', 'Price gauge unavailable');
+                }
+                return;
+            }
+
+            const minLabel = formatPrice(config.minBound) || config.formatted.s2 || config.formatted.s1 || 'N/A';
+            const maxLabel = formatPrice(config.maxBound) || config.formatted.r2 || config.formatted.r1 || 'N/A';
+
+            if (gaugeRange) {
+                gaugeRange.textContent = `${minLabel} - ${maxLabel}`;
+            }
+
+            if (!payload.chart) {
+                payload.chart = {};
+            }
+            payload.chart.min_value = config.minBound;
+            payload.chart.max_value = config.maxBound;
+            payload.chart.min = minLabel;
+            payload.chart.max = maxLabel;
+
+            const span = config.maxBound - config.minBound || 1;
+            if (typeof config.values.price === 'number' && Number.isFinite(config.values.price)) {
+                const normalised = Math.max(0, Math.min(1, (config.values.price - config.minBound) / span));
+                payload.chart.position = normalised;
+                if (payload.radar && payload.radar.price) {
+                    payload.radar.price.position = normalised;
+                }
+            }
+
+            if (gaugeCanvas) {
+                drawGauge(gaugeCanvas, config);
+                const ariaDescription = [
+                    payload.symbol ? `Gauge for ${payload.symbol}` : null,
+                    config.formatted.s2 ? `lower bound ${config.formatted.s2}` : null,
+                    config.formatted.s1 ? `support ${config.formatted.s1}` : null,
+                    config.formatted.r1 ? `resistance ${config.formatted.r1}` : null,
+                    config.formatted.r2 ? `higher resistance ${config.formatted.r2}` : null,
+                    config.formatted.price ? `needle at ${config.formatted.price}` : null,
+                ]
+                    .filter(Boolean)
+                    .join(', ');
+                if (ariaDescription) {
+                    gaugeCanvas.setAttribute('aria-label', ariaDescription);
+                }
+            }
+        }
+
         function applyLivePrice(price, timestamp) {
             if (typeof price !== 'number' || Number.isNaN(price)) {
                 return;
@@ -307,32 +658,19 @@
             const formatted = formatPrice(price) || String(price);
             state.latest_price_value = price;
             state.latest_price = formatted;
-            if (state.radar && state.radar.price) {
-                state.radar.price.value = formatted;
+            if (!state.radar) {
+                state.radar = {};
             }
+            if (!state.radar.price) {
+                state.radar.price = {};
+            }
+            state.radar.price.value = formatted;
             const priceNode = document.querySelector('.level-marker--price .level-marker__value');
             if (priceNode) {
                 priceNode.textContent = formatted;
             }
 
-            if (!state.chart) {
-                state.chart = {};
-            }
-            const minRaw = Number(state.chart.min_value);
-            const maxRaw = Number(state.chart.max_value);
-            const canvas = document.querySelector('.chart-preview__canvas');
-            if (canvas && Number.isFinite(minRaw) && Number.isFinite(maxRaw) && maxRaw !== minRaw) {
-                const position = Math.max(0, Math.min(1, (price - minRaw) / (maxRaw - minRaw)));
-                canvas.style.setProperty('--price-position', position);
-                state.chart.position = position;
-            }
-
-            const rangeNode = document.querySelector('.chart-preview__range');
-            if (rangeNode) {
-                const minLabel = state.chart.min || (Number.isFinite(minRaw) ? formatPrice(minRaw) : 'N/A');
-                const maxLabel = state.chart.max || (Number.isFinite(maxRaw) ? formatPrice(maxRaw) : 'N/A');
-                rangeNode.textContent = `${minLabel || 'N/A'} - ${maxLabel || 'N/A'}`;
-            }
+            updateGaugeDisplay(state);
 
             if (state.radar && state.radar.price) {
                 const root = document.querySelector('.level-radar__track');
@@ -388,6 +726,7 @@
             });
             applyGaugeStyles();
             applyConfidenceBar();
+            updateGaugeDisplay(payload);
 
             const radar = payload.radar || {};
             const radarRoot = document.querySelector('.level-radar__track');
@@ -441,18 +780,6 @@
                     span.textContent = tag;
                     tagsFooter.appendChild(span);
                 });
-            }
-
-            const chartCanvas = document.querySelector('.chart-preview__canvas');
-            const chartRange = document.querySelector('.chart-preview__range');
-            const chartData = payload.chart || {};
-            if (chartCanvas && typeof chartData.position === 'number') {
-                chartCanvas.style.setProperty('--price-position', chartData.position);
-            }
-            if (chartRange) {
-                const min = chartData.min || 'N/A';
-                const max = chartData.max || 'N/A';
-                chartRange.textContent = `${min} - ${max}`;
             }
 
             const scenarioCards = document.querySelectorAll('.scenario-card');
@@ -669,6 +996,26 @@
                 } finally {
                     favoriteButton.disabled = false;
                 }
+            });
+        }
+
+        if (gaugeCanvas) {
+            window.addEventListener('resize', () => {
+                if (gaugeResizeTimer) {
+                    window.clearTimeout(gaugeResizeTimer);
+                }
+                gaugeResizeTimer = window.setTimeout(() => {
+                    if (state) {
+                        updateGaugeDisplay(state);
+                        const radar = state.radar || {};
+                        if (radar.price && typeof radar.price.position === 'number') {
+                            const radarRoot = document.querySelector('.level-radar__track');
+                            if (radarRoot) {
+                                radarRoot.style.setProperty('--price-position', radar.price.position);
+                            }
+                        }
+                    }
+                }, 150);
             });
         }
 

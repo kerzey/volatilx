@@ -2678,72 +2678,125 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   box-shadow: 0 14px 24px rgba(79, 70, 229, 0.18);
 }
 
-.chart-preview {
+.level-gauge {
   background: #ffffff;
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   padding: 1.6rem 1.8rem;
   box-shadow: 0 20px 40px rgba(31, 41, 55, 0.08);
   display: grid;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
-.chart-preview__header {
+.level-gauge__header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
 }
 
-.chart-preview__header h2 {
+.level-gauge__header h2 {
   margin: 0;
   font-size: 1.1rem;
-  color: #1f2350;
-}
-
-.chart-preview__range {
-  font-size: 0.9rem;
-  color: rgba(55, 65, 81, 0.7);
-}
-
-.chart-preview__canvas {
-  --price-position: 0.5;
-  position: relative;
-  height: 160px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(79, 70, 229, 0.08), rgba(79, 70, 229, 0.02));
-  border: 1px dashed rgba(79, 70, 229, 0.22);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 1.1rem;
-}
-
-.chart-preview__level {
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  color: #101631;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 0.35rem 0.55rem;
-  border-radius: 8px;
-  background: rgba(79, 70, 229, 0.12);
-  color: #4338ca;
-  width: fit-content;
 }
 
-.chart-preview__needle {
+.level-gauge__range {
+  font-size: 0.9rem;
+  color: rgba(55, 65, 81, 0.72);
+  font-variant-numeric: tabular-nums;
+}
+
+.level-gauge__body {
+  position: relative;
+  width: min(100%, 360px);
+  aspect-ratio: 2 / 1;
+  margin: 0 auto;
+  border-radius: 999px 999px 0 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 120%, #0f172a 0%, #111d2f 60%, #0b1221 100%);
+  box-shadow: inset 0 -18px 32px rgba(15, 23, 42, 0.55), 0 28px 40px rgba(15, 23, 42, 0.28);
+}
+
+.level-gauge__body::after {
+  content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--price-position) * 100%);
-  width: 2px;
-  background: linear-gradient(180deg, rgba(16, 185, 129, 0), rgba(16, 185, 129, 0.8), rgba(16, 185, 129, 0));
-  transform: translateX(-1px);
+  inset: 12% 10% auto;
+  height: 40%;
+  border-radius: 999px 999px 0 0;
+  background: radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0));
+  pointer-events: none;
+  opacity: 0.8;
 }
 
-.chart-preview__note {
-  margin: 0;
-  font-size: 0.88rem;
-  color: rgba(55, 65, 81, 0.7);
+.level-gauge__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.level-gauge__needle-value {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  transform: translateX(-50%);
+  background: rgba(17, 24, 39, 0.85);
+  color: #fde68a;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.45);
+  z-index: 2;
+  font-variant-numeric: tabular-nums;
+}
+
+.level-gauge__markers {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.6rem;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.level-gauge__markers span {
+  padding: 0.5rem 0.65rem;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.07);
+  color: #0f172a;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.level-gauge__markers span:nth-child(1) {
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(15, 23, 42, 0.5));
+  color: #cbd5f5;
+}
+
+.level-gauge__markers span:nth-child(2) {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.18), rgba(13, 148, 136, 0.05));
+  color: #0f766e;
+}
+
+.level-gauge__markers span:nth-child(3) {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05));
+  color: #1d4ed8;
+}
+
+.level-gauge__markers span:nth-child(4) {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(245, 158, 11, 0.08));
+  color: #b45309;
+}
+
+.level-gauge__markers span:nth-child(5) {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.25), rgba(220, 38, 38, 0.08));
+  color: #991b1b;
 }
 
 .action-tags {
@@ -2806,8 +2859,14 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
     padding: 1.1rem;
   }
 
-  .chart-preview__canvas {
-    height: 140px;
+  .level-gauge__body {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .level-gauge__needle-value {
+    bottom: 10%;
+    font-size: 0.9rem;
   }
 }
 
