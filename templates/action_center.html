@@ -627,9 +627,14 @@
             renderLevelLabel(config.anchors.r2, config.formatted.r2);
 
             const needleAngle = typeof config.needleAngle === 'number' ? config.needleAngle : config.anchors.s1;
-            const needleLength = radius - lineWidth * 0.5;
+            const needleLength = radius - lineWidth * 0.7;
             const needleCos = Math.cos(needleAngle);
             const needleSin = Math.sin(needleAngle);
+            const needleStartOffset = Math.min(radius * 0.18, lineWidth * 0.8);
+            const startX = centerX + needleCos * needleStartOffset;
+            const startY = centerY - needleSin * needleStartOffset;
+            const endX = centerX + needleCos * needleLength;
+            const endY = centerY - needleSin * needleLength;
 
             ctx.save();
             ctx.shadowColor = 'rgba(253, 230, 138, 0.45)';
@@ -637,8 +642,8 @@
             ctx.strokeStyle = '#fde68a';
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(centerX + needleCos * needleLength, centerY - needleSin * needleLength);
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
             ctx.stroke();
             ctx.restore();
 
@@ -658,8 +663,6 @@
             ctx.beginPath();
             ctx.arc(tipX, tipY, 4, 0, Math.PI * 2);
             ctx.fill();
-
-            renderLevelLabel(needleAngle, config.formatted.price || '', true);
         }
 
         function updateGaugeDisplay(payload) {

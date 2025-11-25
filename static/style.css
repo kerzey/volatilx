@@ -2744,9 +2744,9 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
 
 .level-gauge__needle-value {
   position: absolute;
+  top: 58%;
   left: 50%;
-  bottom: 8%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   background: var(--gauge-accent-bg);
   color: var(--gauge-accent);
   padding: 0.4rem 0.85rem;
@@ -2907,7 +2907,7 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   }
 
   .level-gauge__needle-value {
-    bottom: 10%;
+    top: 60%;
     font-size: 0.9rem;
   }
 }
