@@ -299,6 +299,21 @@
             aboveR2: '#dc2626',
         };
         let gaugeResizeTimer = null;
+        const gaugeZoneFill = {
+            belowS2: 'rgba(30, 41, 59, 0.5)',
+            betweenSupports: 'rgba(13, 148, 136, 0.38)',
+            midZone: 'rgba(59, 130, 246, 0.38)',
+            betweenResistances: 'rgba(245, 158, 11, 0.38)',
+            aboveR2: 'rgba(220, 38, 38, 0.38)',
+        };
+        const gaugeZoneLabels = {
+            belowS2: 'below Support-2',
+            betweenSupports: 'between Support-2 and Support-1',
+            midZone: 'between Support-1 and Resistance-1',
+            betweenResistances: 'between Resistance-1 and Resistance-2',
+            aboveR2: 'above Resistance-2',
+        };
+        const degToRad = (deg) => (deg * Math.PI) / 180;
 
         function updateFavoriteButton(isActive) {
             if (!favoriteButton) return;
@@ -357,66 +372,155 @@
                 r1: parseNumeric(radar.r1 && radar.r1.value),
                 r2: parseNumeric(radar.r2 && radar.r2.value),
                 price:
-                    typeof payload.latest_price_value === 'number' && !Number.isNaN(payload.latest_price_value)
+                    typeof payload.latest_price_value === 'number' && Number.isFinite(payload.latest_price_value)
                         ? payload.latest_price_value
                         : parseNumeric(radar.price && radar.price.value),
             };
+            const isFiniteNumber = (num) => typeof num === 'number' && Number.isFinite(num);
+            const anchors = {
+                min: Math.PI,
+                s2: degToRad(152.5),
+                s1: degToRad(112.5),
+                r1: degToRad(67.5),
+                r2: degToRad(22.5),
+                max: 0,
+            };
+            const formatted = {
+                s2: radar.s2 && radar.s2.value ? radar.s2.value : null,
+                s1: radar.s1 && radar.s1.value ? radar.s1.value : null,
+                r1: radar.r1 && radar.r1.value ? radar.r1.value : null,
+                r2: radar.r2 && radar.r2.value ? radar.r2.value : null,
+                price:
+                    (radar.price && radar.price.value)
+                    || payload.latest_price
+                    || (isFiniteNumber(values.price) ? formatPrice(values.price) : null),
+            };
+            const levelKeys = ['s2', 's1', 'r1', 'r2'];
+            const points = levelKeys
+                .map((key) => (isFiniteNumber(values[key]) ? { key, value: values[key], angle: anchors[key] } : null))
+                .filter(Boolean)
+                .sort((a, b) => a.value - b.value);
 
-            const numericValues = Object.values(values).filter((val) => typeof val === 'number' && Number.isFinite(val));
-            if (!numericValues.length) {
+            if (!points.length && !isFiniteNumber(values.price)) {
                 return null;
             }
 
-            const minCandidate = Math.min(...numericValues);
-            const maxCandidate = Math.max(...numericValues);
+            const spanHeuristic = (() => {
+                if (points.length >= 2) {
+                    return Math.max(1, Math.abs(points[points.length - 1].value - points[0].value) * 0.1);
+                }
+                if (points.length === 1) {
+                    return Math.max(1, Math.abs(points[0].value) * 0.1);
+                }
+                if (isFiniteNumber(values.price)) {
+                    return Math.max(1, Math.abs(values.price) * 0.1);
+                }
+                return 1;
+            })();
+            const extendLowerValue = points.length
+                ? points[0].value - spanHeuristic
+                : isFiniteNumber(values.price)
+                ? values.price - spanHeuristic
+                : 0;
+            const extendUpperValue = points.length
+                ? points[points.length - 1].value + spanHeuristic
+                : isFiniteNumber(values.price)
+                ? values.price + spanHeuristic
+                : 0;
+            const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-            const spanCandidates = [];
-            if (typeof values.s1 === 'number' && typeof values.s2 === 'number') {
-                spanCandidates.push(Math.abs(values.s1 - values.s2));
-            }
-            if (typeof values.r2 === 'number' && typeof values.r1 === 'number') {
-                spanCandidates.push(Math.abs(values.r2 - values.r1));
-            }
-            if (typeof values.r1 === 'number' && typeof values.s1 === 'number') {
-                spanCandidates.push(Math.abs(values.r1 - values.s1));
-            }
+            const resolveAngleForPrice = (priceValue) => {
+                if (!isFiniteNumber(priceValue)) {
+                    return anchors.s1;
+                }
+                if (!points.length) {
+                    return anchors.s1;
+                }
+                if (priceValue <= points[0].value) {
+                    const ratio = (priceValue - extendLowerValue) / (points[0].value - extendLowerValue || 1);
+                    return anchors.min + (points[0].angle - anchors.min) * clamp(ratio, 0, 1);
+                }
+                for (let idx = 0; idx < points.length - 1; idx += 1) {
+                    const current = points[idx];
+                    const next = points[idx + 1];
+                    if (priceValue <= next.value) {
+                        const ratio = (priceValue - current.value) / (next.value - current.value || 1);
+                        return current.angle + (next.angle - current.angle) * clamp(ratio, 0, 1);
+                    }
+                }
+                const last = points[points.length - 1];
+                const ratio = (priceValue - last.value) / (extendUpperValue - last.value || 1);
+                return last.angle + (anchors.max - last.angle) * clamp(ratio, 0, 1);
+            };
 
-            const primarySpan = Math.max(
-                maxCandidate - minCandidate,
-                spanCandidates.length ? Math.max(...spanCandidates) : 0,
-                Math.abs(numericValues[0]) || 1
-            );
-            const extension = primarySpan * 0.15 || 1;
+            const priceAngle = resolveAngleForPrice(values.price);
 
-            let minBound = minCandidate;
-            let maxBound = maxCandidate;
+            const determineZone = () => {
+                const priceVal = values.price;
+                const s2Val = values.s2;
+                const s1Val = values.s1;
+                const r1Val = values.r1;
+                const r2Val = values.r2;
+                if (!isFiniteNumber(priceVal)) {
+                    return 'midZone';
+                }
+                if (isFiniteNumber(s2Val) && priceVal < s2Val) {
+                    return 'belowS2';
+                }
+                if (isFiniteNumber(s1Val) && priceVal < s1Val) {
+                    return 'betweenSupports';
+                }
+                if (isFiniteNumber(r1Val) && priceVal <= r1Val) {
+                    return 'midZone';
+                }
+                if (isFiniteNumber(r2Val) && priceVal <= r2Val) {
+                    return isFiniteNumber(r1Val) ? 'betweenResistances' : 'midZone';
+                }
+                if (!isFiniteNumber(r2Val) && isFiniteNumber(r1Val) && priceVal > r1Val) {
+                    return 'betweenResistances';
+                }
+                return 'aboveR2';
+            };
 
-            if (typeof values.s2 === 'number') {
-                minBound = Math.min(values.s2 - extension, minBound);
-            } else {
-                minBound -= extension;
-            }
-
-            if (typeof values.r2 === 'number') {
-                maxBound = Math.max(values.r2 + extension, maxBound);
-            } else {
-                maxBound += extension;
-            }
-
-            if (!(maxBound > minBound)) {
-                maxBound = minBound + (primarySpan || 1);
-            }
+            const rangeMinValue = isFiniteNumber(values.s2)
+                ? values.s2
+                : isFiniteNumber(values.s1)
+                ? values.s1
+                : values.price;
+            const rangeMaxValue = isFiniteNumber(values.r2)
+                ? values.r2
+                : isFiniteNumber(values.r1)
+                ? values.r1
+                : values.price;
 
             return {
                 values,
-                minBound,
-                maxBound,
-                formatted: {
-                    s2: radar.s2 && radar.s2.value ? radar.s2.value : null,
-                    s1: radar.s1 && radar.s1.value ? radar.s1.value : null,
-                    r1: radar.r1 && radar.r1.value ? radar.r1.value : null,
-                    r2: radar.r2 && radar.r2.value ? radar.r2.value : null,
-                    price: (radar.price && radar.price.value) || payload.latest_price || null,
+                formatted,
+                anchors,
+                segments: [
+                    { key: 'belowS2', start: anchors.min, end: anchors.s2, color: gaugeColors.belowS2 },
+                    { key: 'betweenSupports', start: anchors.s2, end: anchors.s1, color: gaugeColors.betweenSupports },
+                    { key: 'midZone', start: anchors.s1, end: anchors.r1, color: gaugeColors.midZone },
+                    { key: 'betweenResistances', start: anchors.r1, end: anchors.r2, color: gaugeColors.betweenResistances },
+                    { key: 'aboveR2', start: anchors.r2, end: anchors.max, color: gaugeColors.aboveR2 },
+                ],
+                needleAngle: priceAngle,
+                zone: determineZone(),
+                range: {
+                    minValue: isFiniteNumber(rangeMinValue) ? rangeMinValue : null,
+                    maxValue: isFiniteNumber(rangeMaxValue) ? rangeMaxValue : null,
+                    minLabel:
+                        formatted.s2
+                        || formatted.s1
+                        || formatted.price
+                        || (isFiniteNumber(rangeMinValue) ? formatPrice(rangeMinValue) : null)
+                        || 'N/A',
+                    maxLabel:
+                        formatted.r2
+                        || formatted.r1
+                        || formatted.price
+                        || (isFiniteNumber(rangeMaxValue) ? formatPrice(rangeMaxValue) : null)
+                        || 'N/A',
                 },
             };
         }
@@ -451,110 +555,85 @@
             const centerY = height;
             const radius = Math.min(width, height * 2) / 2 - 12;
             const lineWidth = 18;
-            const span = config.maxBound - config.minBound || 1;
-            const epsilon = span * 0.0005;
-
-            const valueToAngle = (value) => {
-                const clamped = Math.max(config.minBound, Math.min(config.maxBound, value));
-                const normalised = (clamped - config.minBound) / span;
-                return Math.PI - normalised * Math.PI;
-            };
 
             ctx.lineWidth = lineWidth;
             ctx.lineCap = 'round';
-            ctx.strokeStyle = 'rgba(15, 23, 42, 0.35)';
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.32)';
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, Math.PI, 0, false);
             ctx.stroke();
 
-            const segments = [];
-            let cursor = config.minBound;
+            const innerFillRadius = radius - lineWidth * 0.55;
+            const zoneFill = gaugeZoneFill[config.zone] || 'rgba(30, 41, 59, 0.32)';
+            ctx.fillStyle = zoneFill;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, innerFillRadius, Math.PI, 0, false);
+            ctx.closePath();
+            ctx.fill();
 
-            const addSegment = (boundary, color) => {
-                if (typeof boundary !== 'number' || !Number.isFinite(boundary)) {
-                    return;
-                }
-                const endValue = Math.max(boundary, cursor + epsilon);
-                if (endValue <= cursor) {
-                    return;
-                }
-                segments.push({
-                    start: cursor,
-                    end: Math.min(endValue, config.maxBound),
-                    color,
-                });
-                cursor = Math.min(endValue, config.maxBound);
-            };
-
-            addSegment(config.values.s2, gaugeColors.belowS2);
-            addSegment(config.values.s1, gaugeColors.betweenSupports);
-            addSegment(config.values.r1, gaugeColors.midZone);
-            addSegment(config.values.r2, gaugeColors.betweenResistances);
-
-            if (cursor < config.maxBound) {
-                segments.push({
-                    start: cursor,
-                    end: config.maxBound,
-                    color: gaugeColors.aboveR2,
-                });
-            }
-
-            segments.forEach((segment) => {
-                if (!(segment.end > segment.start)) {
-                    return;
-                }
+            config.segments.forEach((segment) => {
                 ctx.strokeStyle = segment.color;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, valueToAngle(segment.start), valueToAngle(segment.end), false);
+                ctx.arc(centerX, centerY, radius, segment.start, segment.end, false);
                 ctx.stroke();
             });
 
-            const tickCount = 5;
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'rgba(248, 250, 252, 0.65)';
             const innerRadius = radius - lineWidth / 2 - 4;
             const outerRadius = innerRadius + 8;
-            for (let i = 0; i <= tickCount; i += 1) {
-                const fraction = i / tickCount;
-                const angle = Math.PI - fraction * Math.PI;
+            const tickAngles = [
+                config.anchors.min,
+                config.anchors.s2,
+                config.anchors.s1,
+                config.anchors.r1,
+                config.anchors.r2,
+                config.anchors.max,
+            ];
+            tickAngles.forEach((angle) => {
                 const cos = Math.cos(angle);
                 const sin = Math.sin(angle);
                 ctx.beginPath();
                 ctx.moveTo(centerX + cos * innerRadius, centerY + sin * innerRadius);
                 ctx.lineTo(centerX + cos * outerRadius, centerY + sin * outerRadius);
                 ctx.stroke();
-            }
+            });
 
-            const needleValue = config.values.price;
-            if (typeof needleValue === 'number' && Number.isFinite(needleValue)) {
-                const angle = valueToAngle(needleValue);
-                const needleLength = radius - lineWidth / 2;
-                const cos = Math.cos(angle);
-                const sin = Math.sin(angle);
+            const needleAngle = typeof config.needleAngle === 'number' ? config.needleAngle : config.anchors.s1;
+            const needleLength = radius - lineWidth / 2;
+            const needleCos = Math.cos(needleAngle);
+            const needleSin = Math.sin(needleAngle);
 
-                ctx.strokeStyle = '#fef3c7';
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY);
-                ctx.lineTo(centerX + cos * needleLength, centerY + sin * needleLength);
-                ctx.stroke();
+            ctx.save();
+            ctx.shadowColor = 'rgba(253, 230, 138, 0.45)';
+            ctx.shadowBlur = 12;
+            ctx.strokeStyle = '#fde68a';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(centerX + needleCos * needleLength, centerY + needleSin * needleLength);
+            ctx.stroke();
+            ctx.restore();
 
-                ctx.fillStyle = '#0f172a';
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, lineWidth * 0.45, 0, Math.PI * 2);
-                ctx.fill();
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, lineWidth * 0.45, 0, Math.PI * 2);
+            ctx.fill();
 
-                ctx.fillStyle = '#fde68a';
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, lineWidth * 0.24, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            ctx.fillStyle = '#fde68a';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, lineWidth * 0.24, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         function updateGaugeDisplay(payload) {
             if (!gaugeCanvas && !gaugeRange && !gaugePriceValue) {
                 return;
             }
+            const gaugeContainer = document.querySelector('.level-gauge');
+            const gaugeBody = document.querySelector('.level-gauge__body');
+            const isFiniteNumber = (num) => typeof num === 'number' && Number.isFinite(num);
 
             if (!payload) {
                 if (gaugeCanvas) {
@@ -562,6 +641,7 @@
                     if (ctx) {
                         ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
                     }
+                    gaugeCanvas.removeAttribute('data-zone');
                 }
                 if (gaugeRange) {
                     gaugeRange.textContent = 'N/A - N/A';
@@ -574,13 +654,38 @@
                         node.textContent = 'N/A';
                     }
                 });
+                if (gaugeContainer) {
+                    gaugeContainer.removeAttribute('data-zone');
+                }
+                if (gaugeBody) {
+                    gaugeBody.removeAttribute('data-zone');
+                }
                 return;
             }
 
             const config = buildGaugeConfig(payload);
 
+            if (gaugeBody) {
+                if (config && config.zone) {
+                    gaugeBody.setAttribute('data-zone', config.zone);
+                } else {
+                    gaugeBody.removeAttribute('data-zone');
+                }
+            }
+            if (gaugeContainer) {
+                if (config && config.zone) {
+                    gaugeContainer.setAttribute('data-zone', config.zone);
+                } else {
+                    gaugeContainer.removeAttribute('data-zone');
+                }
+            }
+
             if (gaugePriceValue) {
-                const priceLabel = (payload.radar && payload.radar.price && payload.radar.price.value) || payload.latest_price || 'N/A';
+                const priceLabel =
+                    (config && config.formatted.price)
+                    || (payload.radar && payload.radar.price && payload.radar.price.value)
+                    || payload.latest_price
+                    || 'N/A';
                 gaugePriceValue.textContent = priceLabel || 'N/A';
             }
 
@@ -589,6 +694,10 @@
                     return;
                 }
                 const level = payload.radar && payload.radar[key];
+                if (key === 'price') {
+                    node.textContent = (config && config.formatted.price) || (level && level.value) || payload.latest_price || 'N/A';
+                    return;
+                }
                 node.textContent = (level && level.value) || 'N/A';
             });
 
@@ -602,12 +711,13 @@
                         ctx.clearRect(0, 0, gaugeCanvas.width, gaugeCanvas.height);
                     }
                     gaugeCanvas.setAttribute('aria-label', 'Price gauge unavailable');
+                    gaugeCanvas.removeAttribute('data-zone');
                 }
                 return;
             }
 
-            const minLabel = formatPrice(config.minBound) || config.formatted.s2 || config.formatted.s1 || 'N/A';
-            const maxLabel = formatPrice(config.maxBound) || config.formatted.r2 || config.formatted.r1 || 'N/A';
+            const minLabel = config.range.minLabel || 'N/A';
+            const maxLabel = config.range.maxLabel || 'N/A';
 
             if (gaugeRange) {
                 gaugeRange.textContent = `${minLabel} - ${maxLabel}`;
@@ -616,22 +726,38 @@
             if (!payload.chart) {
                 payload.chart = {};
             }
-            payload.chart.min_value = config.minBound;
-            payload.chart.max_value = config.maxBound;
+            payload.chart.min_value = config.range.minValue;
+            payload.chart.max_value = config.range.maxValue;
             payload.chart.min = minLabel;
             payload.chart.max = maxLabel;
 
-            const span = config.maxBound - config.minBound || 1;
-            if (typeof config.values.price === 'number' && Number.isFinite(config.values.price)) {
-                const normalised = Math.max(0, Math.min(1, (config.values.price - config.minBound) / span));
+            if (
+                isFiniteNumber(config.values.price)
+                && isFiniteNumber(config.range.minValue)
+                && isFiniteNumber(config.range.maxValue)
+                && config.range.maxValue !== config.range.minValue
+            ) {
+                const span = config.range.maxValue - config.range.minValue;
+                const normalised = Math.max(0, Math.min(1, (config.values.price - config.range.minValue) / span));
                 payload.chart.position = normalised;
                 if (payload.radar && payload.radar.price) {
                     payload.radar.price.position = normalised;
+                }
+            } else if (payload.chart) {
+                payload.chart.position = 0.5;
+                if (payload.radar && payload.radar.price) {
+                    payload.radar.price.position = 0.5;
                 }
             }
 
             if (gaugeCanvas) {
                 drawGauge(gaugeCanvas, config);
+                if (config.zone) {
+                    gaugeCanvas.setAttribute('data-zone', config.zone);
+                } else {
+                    gaugeCanvas.removeAttribute('data-zone');
+                }
+                const zoneLabel = gaugeZoneLabels[config.zone] || config.zone;
                 const ariaDescription = [
                     payload.symbol ? `Gauge for ${payload.symbol}` : null,
                     config.formatted.s2 ? `lower bound ${config.formatted.s2}` : null,
@@ -639,6 +765,7 @@
                     config.formatted.r1 ? `resistance ${config.formatted.r1}` : null,
                     config.formatted.r2 ? `higher resistance ${config.formatted.r2}` : null,
                     config.formatted.price ? `needle at ${config.formatted.price}` : null,
+                    zoneLabel ? `active zone ${zoneLabel}` : null,
                 ]
                     .filter(Boolean)
                     .join(', ');

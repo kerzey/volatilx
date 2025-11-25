@@ -2686,6 +2686,10 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   box-shadow: 0 20px 40px rgba(31, 41, 55, 0.08);
   display: grid;
   gap: 1.1rem;
+  --gauge-accent: #fde68a;
+  --gauge-accent-bg: rgba(17, 24, 39, 0.85);
+  --gauge-range-color: rgba(55, 65, 81, 0.72);
+  --gauge-accent-shadow: rgba(253, 230, 138, 0.45);
 }
 
 .level-gauge__header {
@@ -2704,7 +2708,7 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
 
 .level-gauge__range {
   font-size: 0.9rem;
-  color: rgba(55, 65, 81, 0.72);
+  color: var(--gauge-range-color);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2743,17 +2747,18 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   left: 50%;
   bottom: 8%;
   transform: translateX(-50%);
-  background: rgba(17, 24, 39, 0.85);
-  color: #fde68a;
+  background: var(--gauge-accent-bg);
+  color: var(--gauge-accent);
   padding: 0.4rem 0.85rem;
   border-radius: 999px;
   font-weight: 600;
   font-size: 0.95rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.45);
+  box-shadow: 0 14px 36px var(--gauge-accent-shadow);
   z-index: 2;
   font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .level-gauge__markers {
@@ -2785,8 +2790,10 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
 }
 
 .level-gauge__markers span:nth-child(3) {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05));
-  color: #1d4ed8;
+  background: var(--gauge-accent-bg);
+  color: var(--gauge-accent);
+  box-shadow: 0 10px 20px var(--gauge-accent-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .level-gauge__markers span:nth-child(4) {
@@ -2797,6 +2804,41 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
 .level-gauge__markers span:nth-child(5) {
   background: linear-gradient(135deg, rgba(220, 38, 38, 0.25), rgba(220, 38, 38, 0.08));
   color: #991b1b;
+}
+
+.level-gauge[data-zone="belowS2"] {
+  --gauge-accent: #dbeafe;
+  --gauge-accent-bg: rgba(17, 24, 39, 0.78);
+  --gauge-range-color: rgba(30, 41, 59, 0.78);
+  --gauge-accent-shadow: rgba(30, 41, 59, 0.45);
+}
+
+.level-gauge[data-zone="betweenSupports"] {
+  --gauge-accent: #ecfdf5;
+  --gauge-accent-bg: rgba(13, 148, 136, 0.82);
+  --gauge-range-color: #0f766e;
+  --gauge-accent-shadow: rgba(13, 148, 136, 0.46);
+}
+
+.level-gauge[data-zone="midZone"] {
+  --gauge-accent: #eff6ff;
+  --gauge-accent-bg: rgba(37, 99, 235, 0.78);
+  --gauge-range-color: #1d4ed8;
+  --gauge-accent-shadow: rgba(37, 99, 235, 0.46);
+}
+
+.level-gauge[data-zone="betweenResistances"] {
+  --gauge-accent: #fff7ed;
+  --gauge-accent-bg: rgba(245, 158, 11, 0.82);
+  --gauge-range-color: #b45309;
+  --gauge-accent-shadow: rgba(245, 158, 11, 0.46);
+}
+
+.level-gauge[data-zone="aboveR2"] {
+  --gauge-accent: #fee2e2;
+  --gauge-accent-bg: rgba(220, 38, 38, 0.82);
+  --gauge-range-color: #b91c1c;
+  --gauge-accent-shadow: rgba(220, 38, 38, 0.5);
 }
 
 .action-tags {
