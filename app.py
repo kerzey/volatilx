@@ -2097,17 +2097,82 @@ def _derive_action_center_view(
             break
         _append_level(resistance_levels, resistance_seen, level, level.get("source") or "price-action")
 
-    if isinstance(latest_price_value, (int, float)):
-        base_price = latest_price_value
-        support_levels.sort(
-            key=lambda lvl: abs(base_price - (_safe_float(lvl.get("price")) or base_price))
-        )
-        resistance_levels.sort(
-            key=lambda lvl: abs(base_price - (_safe_float(lvl.get("price")) or base_price))
-        )
-    else:
-        support_levels.sort(key=lambda lvl: _safe_float(lvl.get("price")) or float("inf"))
-        resistance_levels.sort(key=lambda lvl: _safe_float(lvl.get("price")) or float("inf"))
+    def _level_price(level: Optional[Dict[str, Any]]) -> Optional[float]:
+        if not isinstance(level, dict):
+            return None
+        return _safe_float(level.get("price"))
+
+    support_levels.sort(
+        key=lambda lvl: (price := _level_price(lvl)) if price is not None else float("inf")
+    )
+    resistance_levels.sort(
+        key=lambda lvl: (price := _level_price(lvl)) if price is not None else float("inf")
+    )
+
+    # Prefer levels on the expected side of the current price when anchoring the gauge.
+
+    def _select_support_pair(
+        levels: List[Dict[str, Any]],
+        base_price: Optional[float],
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        valid_levels = [lvl for lvl in levels if _level_price(lvl) is not None]
+        if not valid_levels:
+            return None, None
+        if isinstance(base_price, (int, float)):
+            below = [lvl for lvl in valid_levels if (_level_price(lvl) or base_price) <= base_price]
+            below.sort(key=lambda lvl: _level_price(lvl) or 0.0, reverse=True)
+            above = [lvl for lvl in valid_levels if (_level_price(lvl) or base_price) > base_price]
+            above.sort(key=lambda lvl: _level_price(lvl) or 0.0)
+            ordered: List[Dict[str, Any]] = below + above
+        else:
+            ordered = sorted(valid_levels, key=lambda lvl: _level_price(lvl) or 0.0, reverse=True)
+        if not ordered:
+            ordered = valid_levels
+        primary = ordered[0]
+        secondary = ordered[1] if len(ordered) > 1 else primary
+        if primary and secondary:
+            primary_price = _level_price(primary)
+            secondary_price = _level_price(secondary)
+            if (
+                primary_price is not None
+                and secondary_price is not None
+                and secondary_price > primary_price
+            ):
+                primary, secondary = secondary, primary
+        return primary, secondary
+
+    def _select_resistance_pair(
+        levels: List[Dict[str, Any]],
+        base_price: Optional[float],
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        valid_levels = [lvl for lvl in levels if _level_price(lvl) is not None]
+        if not valid_levels:
+            return None, None
+        if isinstance(base_price, (int, float)):
+            above = [lvl for lvl in valid_levels if (_level_price(lvl) or base_price) >= base_price]
+            above.sort(key=lambda lvl: _level_price(lvl) or float("inf"))
+            below = [lvl for lvl in valid_levels if (_level_price(lvl) or base_price) < base_price]
+            below.sort(key=lambda lvl: _level_price(lvl) or 0.0, reverse=True)
+            ordered = above + below
+        else:
+            ordered = sorted(valid_levels, key=lambda lvl: _level_price(lvl) or float("inf"))
+        if not ordered:
+            ordered = valid_levels
+        primary = ordered[0]
+        secondary = ordered[1] if len(ordered) > 1 else primary
+        if primary and secondary:
+            primary_price = _level_price(primary)
+            secondary_price = _level_price(secondary)
+            if (
+                primary_price is not None
+                and secondary_price is not None
+                and secondary_price < primary_price
+            ):
+                primary, secondary = secondary, primary
+        return primary, secondary
+
+    s1_level, s2_level = _select_support_pair(support_levels, latest_price_value)
+    r1_level, r2_level = _select_resistance_pair(resistance_levels, latest_price_value)
 
     def _distance_to(level: Dict[str, Any]) -> Optional[float]:
         if latest_price_value is None:
@@ -2118,10 +2183,10 @@ def _derive_action_center_view(
         return ((latest_price_value - level_price) / level_price) * 100
 
     radar_levels = {
-        "s1": support_levels[0] if support_levels else None,
-        "s2": support_levels[1] if len(support_levels) > 1 else (support_levels[0] if support_levels else None),
-        "r1": resistance_levels[0] if resistance_levels else None,
-        "r2": resistance_levels[1] if len(resistance_levels) > 1 else (resistance_levels[0] if resistance_levels else None),
+        "s1": s1_level,
+        "s2": s2_level,
+        "r1": r1_level,
+        "r2": r2_level,
     }
 
     for level_key in ("s1", "s2", "r1", "r2"):
