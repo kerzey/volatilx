@@ -1979,6 +1979,57 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
   gap: 1rem;
 }
 
+.dashboard-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.favorite-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.favorite-toggle:hover {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #312e81;
+}
+
+.favorite-toggle--active {
+  background: #fde68a;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.favorite-toggle--active .favorite-toggle__icon {
+  color: #b45309;
+}
+
+.favorite-toggle[disabled] {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.favorite-toggle__icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.favorite-toggle__label {
+  line-height: 1;
+}
+
 .dashboard-card-header h2 {
   margin: 0;
   font-size: 1.45rem;

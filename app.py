@@ -2596,6 +2596,12 @@ async def report_center_page(
 
     prepared_reports.sort(key=lambda item: item.get("generated_unix") or 0, reverse=True)
 
+    with SessionLocal() as session:
+        favorite_equity_symbols = _favorite_symbols(session, user.id, market="equity")
+        favorite_crypto_symbols = _favorite_symbols(session, user.id, market="crypto")
+
+    favorite_union = list(dict.fromkeys(favorite_equity_symbols + favorite_crypto_symbols))
+
     available_symbols = sorted(
         {
             str(report.get("symbol") or "").upper()
@@ -2628,6 +2634,9 @@ async def report_center_page(
         "excluded_report_count": len(excluded_reports),
         "available_symbols": available_symbols,
         "max_reports": DEFAULT_REPORT_CENTER_REPORT_LIMIT,
+        "favorite_symbols": favorite_union,
+        "favorite_equity_symbols": favorite_equity_symbols,
+        "favorite_crypto_symbols": favorite_crypto_symbols,
     }
     return templates.TemplateResponse("report_center.html", context)
 
@@ -2675,14 +2684,27 @@ async def action_center_page(
     live_price_available = bool(live_stream)
 
     with SessionLocal() as session:
-        is_favorited = _is_symbol_favorited(session, user.id, symbol_upper)
         favorite_equity_symbols = _favorite_symbols(session, user.id, market="equity")
         favorite_crypto_symbols = _favorite_symbols(session, user.id, market="crypto")
 
-    strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
-    raw_report = _fetch_latest_action_report(symbol_upper)
+    favorite_symbol_set: Set[str] = set()
+    favorite_union: List[str] = []
+    for favorite_symbol in list(favorite_equity_symbols) + list(favorite_crypto_symbols):
+        favorite_upper = favorite_symbol.upper()
+        if favorite_upper not in favorite_symbol_set:
+            favorite_symbol_set.add(favorite_upper)
+            favorite_union.append(favorite_upper)
 
-    favorite_symbol_set = {sym.upper() for sym in favorite_equity_symbols}
+    if favorite_union:
+        primary_symbol = symbol_upper if symbol_upper in favorite_symbol_set else favorite_union[0]
+    else:
+        primary_symbol = symbol_upper
+
+    primary_is_favorite = primary_symbol in favorite_symbol_set
+
+    strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
+    raw_report = _fetch_latest_action_report(primary_symbol)
+
     dashboards: List[Dict[str, Any]] = []
     price_overrides: Dict[str, Dict[str, Any]] = {}
 
@@ -2719,25 +2741,24 @@ async def action_center_page(
             "intent": intent_slug,
         }
 
-    symbol_order: list[str] = []
-    if symbol_upper not in symbol_order:
-        symbol_order.append(symbol_upper)
-    for fav_symbol in favorite_equity_symbols:
-        fav_upper = fav_symbol.upper()
-        if fav_upper not in symbol_order:
-            symbol_order.append(fav_upper)
+    if favorite_union:
+        symbol_order: List[str] = [primary_symbol] + [sym for sym in favorite_union if sym != primary_symbol]
+    else:
+        symbol_order = [primary_symbol]
 
     price_symbols: Set[str] = set(symbol_order)
-    price_symbols.update(favorite_crypto_symbols)
     price_overrides = await _resolve_rest_prices(price_symbols)
 
     for sym in symbol_order:
-        if sym == symbol_upper:
+        if sym == primary_symbol:
             dashboards.append(_build_dashboard(sym, raw_report))
         else:
             dashboards.append(_build_dashboard(sym))
 
-    await _ensure_equity_stream_symbols(request.app, symbol_order)
+    equity_symbol_set = {fav.upper() for fav in favorite_equity_symbols}
+    equity_stream_symbols = [sym for sym in symbol_order if sym in equity_symbol_set] if equity_symbol_set else [primary_symbol]
+    if equity_stream_symbols:
+        await _ensure_equity_stream_symbols(request.app, equity_stream_symbols)
 
     primary_dashboard = dashboards[0] if dashboards else None
 
@@ -2761,7 +2782,7 @@ async def action_center_page(
     context = {
         "request": request,
         "user": user,
-        "symbol": primary_dashboard["symbol"] if primary_dashboard else symbol_upper,
+        "symbol": primary_dashboard["symbol"] if primary_dashboard else primary_symbol,
         "subscription": _serialize_subscription(subscription) if subscription else None,
         "timeframe": timeframe_slug,
         "intent": intent_slug,
@@ -2769,8 +2790,8 @@ async def action_center_page(
         "dashboards_json": dashboards_json,
         "primary_dashboard": primary_dashboard,
         "latest_report_blob": primary_dashboard["report_blob"] if primary_dashboard else None,
-        "is_favorited": primary_dashboard["is_favorited"] if primary_dashboard else is_favorited,
-        "favorite_symbols": favorite_equity_symbols,
+        "is_favorited": primary_dashboard["is_favorited"] if primary_dashboard else primary_is_favorite,
+        "favorite_symbols": favorite_union,
         "favorite_crypto_symbols": favorite_crypto_symbols,
         "live_price_enabled": live_price_available,
         "rest_price_overrides": price_overrides,
