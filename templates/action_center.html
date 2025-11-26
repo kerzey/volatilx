@@ -97,6 +97,11 @@
                                             </select>
                                         </label>
                                     </div>
+                                    <div class="action-dashboard__callout">
+                                        <span class="action-dashboard__callout-label">What should I do?</span>
+                                        <span class="action-dashboard__callout-title" data-summary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
+                                        <span class="action-dashboard__callout-subtitle" data-summary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else 'No guidance yet.' }}</span>
+                                    </div>
                                 </div>
                                 <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--gauge">
                                     <div class="level-gauge" data-gauge-root>
@@ -107,11 +112,6 @@
                                         <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="action-dashboard__callout">
-                                <span class="action-dashboard__callout-label">What should I do?</span>
-                                <span class="action-dashboard__callout-title" data-summary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
-                                <span class="action-dashboard__callout-subtitle" data-summary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else 'No guidance yet.' }}</span>
                             </div>
                         </div>
                         <span class="action-dashboard__toggle-indicator" aria-hidden="true"></span>
