@@ -1906,6 +1906,8 @@ async def action_center_page(
             "action_data": dashboard_payload,
             "error_message": error_message,
             "report_blob": resolved_report.get("_blob_name") if resolved_report else None,
+            "timeframe": timeframe_slug,
+            "intent": intent_slug,
         }
 
     symbol_order: list[str] = []
@@ -1933,6 +1935,8 @@ async def action_center_page(
                 "error_message": dash["error_message"],
                 "action_data": dash["action_data"],
                 "report_blob": dash["report_blob"],
+                "timeframe": dash.get("timeframe", timeframe_slug),
+                "intent": dash.get("intent", intent_slug),
             }
             for dash in dashboards
         ],
