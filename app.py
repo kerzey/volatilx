@@ -251,6 +251,321 @@ def _filter_symbols_for_market(symbols: Iterable[str], market: str) -> Set[str]:
     return filtered
 
 
+_STRATEGY_SUPPORT_KEYWORDS = (
+    "support",
+    "floor",
+    "base",
+    "bounce",
+)
+_STRATEGY_RESISTANCE_KEYWORDS = (
+    "resistance",
+    "ceiling",
+    "cap",
+    "lid",
+)
+_STRATEGY_SUPPORT_HINTS = (
+    "drop",
+    "below",
+    "falls",
+    "fell",
+    "lose",
+    "loss",
+    "fails",
+    "failure",
+    "downside",
+    "pullback",
+    "slide",
+    "slip",
+    "pressure",
+    "weakness",
+)
+_STRATEGY_RESISTANCE_HINTS = (
+    "above",
+    "break",
+    "reclaim",
+    "rally",
+    "upside",
+    "advance",
+    "surge",
+    "target",
+    "push",
+    "hold above",
+    "close above",
+    "stall under",
+    "remains under",
+    "capped",
+)
+_STRATEGY_RANGE_HINTS = (
+    "between",
+    "range",
+    "band",
+    "zone",
+    "channel",
+    "box",
+    "chop",
+    "balanced",
+)
+
+_PRICE_NUMBER_PATTERN = r"\d+(?:,\d{3})*(?:\.\d+)?"
+_PRICE_RANGE_PATTERN = re.compile(
+    rf"(?P<first>{_PRICE_NUMBER_PATTERN})\s*(?:–|-|to)\s*(?P<second>{_PRICE_NUMBER_PATTERN})",
+    re.UNICODE,
+)
+_PRICE_TOKEN_PATTERN = re.compile(_PRICE_NUMBER_PATTERN)
+_SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[\.\!\?])\s+")
+
+
+def _clean_context_snippet(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _parse_price_value(value: Any) -> Optional[float]:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not value:
+        return None
+    text = str(value)
+    match = _PRICE_TOKEN_PATTERN.search(text)
+    if not match:
+        return None
+    token = match.group(0).replace(",", "")
+    try:
+        return float(token)
+    except ValueError:
+        return None
+
+
+def _split_strategy_sentences(text: str) -> List[str]:
+    if not isinstance(text, str):
+        return []
+    fragments: List[str] = []
+    for segment in re.split(r"[\n;]+", text):
+        trimmed = segment.strip()
+        if not trimmed:
+            continue
+        sentences = _SENTENCE_SPLIT_PATTERN.split(trimmed)
+        if not sentences:
+            fragments.append(trimmed)
+            continue
+        for sentence in sentences:
+            cleaned = sentence.strip(" -")
+            if cleaned:
+                fragments.append(cleaned)
+    return fragments
+
+
+def _extract_price_tokens(chunk: str) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
+    if not chunk:
+        return results
+    spans: List[Tuple[int, int]] = []
+    for match in _PRICE_RANGE_PATTERN.finditer(chunk):
+        start, end = match.span()
+        spans.append((start, end))
+        first = _parse_price_value(match.group("first"))
+        second = _parse_price_value(match.group("second"))
+        if first is not None:
+            results.append({
+                "price": first,
+                "start": match.start("first"),
+                "end": match.end("first"),
+                "raw": match.group("first"),
+            })
+        if second is not None:
+            results.append({
+                "price": second,
+                "start": match.start("second"),
+                "end": match.end("second"),
+                "raw": match.group("second"),
+            })
+    for match in _PRICE_TOKEN_PATTERN.finditer(chunk):
+        start, end = match.span()
+        if any(start >= span_start and end <= span_end for span_start, span_end in spans):
+            continue
+        value = _parse_price_value(match.group(0))
+        if value is None:
+            continue
+        results.append({
+            "price": value,
+            "start": start,
+            "end": end,
+            "raw": match.group(0),
+        })
+    return results
+
+
+def _classify_price_context(
+    chunk: str,
+    token: Dict[str, Any],
+) -> str:
+    start = token.get("start", 0)
+    end = token.get("end", 0)
+    window_start = max(0, start - 60)
+    window_end = min(len(chunk), end + 60)
+    window = chunk[window_start:window_end].lower()
+
+    support_hits = sum(1 for word in _STRATEGY_SUPPORT_KEYWORDS if word in window)
+    resistance_hits = sum(1 for word in _STRATEGY_RESISTANCE_KEYWORDS if word in window)
+    if support_hits and not resistance_hits:
+        return "support"
+    if resistance_hits and not support_hits:
+        return "resistance"
+    if support_hits and resistance_hits:
+        return "support" if support_hits >= resistance_hits else "resistance"
+
+    range_hint = any(word in window for word in _STRATEGY_RANGE_HINTS)
+    if range_hint:
+        return "range"
+
+    support_score = sum(window.count(word) for word in _STRATEGY_SUPPORT_HINTS)
+    resistance_score = sum(window.count(word) for word in _STRATEGY_RESISTANCE_HINTS)
+    if support_score > resistance_score:
+        return "support"
+    if resistance_score > support_score:
+        return "resistance"
+    return ""
+
+
+def _extract_strategy_levels(
+    strategy: Dict[str, Any],
+    *,
+    strategy_key: str,
+    strategy_label: str,
+    latest_price: Optional[float],
+) -> Dict[str, List[Dict[str, Any]]]:
+    supports: List[Dict[str, Any]] = []
+    resistances: List[Dict[str, Any]] = []
+    support_seen: Set[float] = set()
+    resistance_seen: Set[float] = set()
+    ambiguous: List[Tuple[float, str]] = []
+
+    def _register(
+        target: List[Dict[str, Any]],
+        seen: Set[float],
+        price: Optional[float],
+        context: str,
+        *,
+        source: str,
+    ) -> None:
+        if price is None:
+            return
+        key = round(price, 4)
+        if key in seen:
+            return
+        entry = {
+            "price": float(price),
+            "distance_pct": None,
+            "timeframe": strategy_label,
+            "source": source,
+            "context": _clean_context_snippet(context)[:280],
+        }
+        target.append(entry)
+        seen.add(key)
+
+    text_chunks: List[str] = []
+    summary = strategy.get("summary")
+    if isinstance(summary, str):
+        text_chunks.extend(_split_strategy_sentences(summary))
+    next_actions = strategy.get("next_actions") or []
+    if isinstance(next_actions, (list, tuple)):
+        for action in next_actions:
+            text_chunks.extend(_split_strategy_sentences(str(action)))
+    elif isinstance(next_actions, str):
+        text_chunks.extend(_split_strategy_sentences(next_actions))
+
+    for chunk in text_chunks:
+        if not chunk:
+            continue
+        tokens = _extract_price_tokens(chunk)
+        if not tokens:
+            continue
+        chunk_lower = chunk.lower()
+        handled_indices: Set[int] = set()
+        if any(word in chunk_lower for word in _STRATEGY_RANGE_HINTS) and len(tokens) >= 2:
+            ordered = sorted(enumerate(tokens), key=lambda item: item[1].get("price", 0.0))
+            min_index, min_token = ordered[0]
+            max_index, max_token = ordered[-1]
+            _register(
+                supports,
+                support_seen,
+                min_token.get("price"),
+                chunk,
+                source="strategy-text",
+            )
+            _register(
+                resistances,
+                resistance_seen,
+                max_token.get("price"),
+                chunk,
+                source="strategy-text",
+            )
+            handled_indices.update({min_index, max_index})
+        for idx, token in enumerate(tokens):
+            if idx in handled_indices:
+                continue
+            price = token.get("price")
+            if price is None:
+                continue
+            classification = _classify_price_context(chunk, token)
+            if classification == "support":
+                _register(supports, support_seen, price, chunk, source="strategy-text")
+            elif classification == "resistance":
+                _register(resistances, resistance_seen, price, chunk, source="strategy-text")
+            elif classification == "range" and len(tokens) >= 2:
+                # for residual range detection, defer until ambiguity handling
+                ambiguous.append((price, chunk))
+            else:
+                ambiguous.append((price, chunk))
+
+    raw_levels = strategy.get("key_levels")
+    if isinstance(raw_levels, dict):
+        for key, value in raw_levels.items():
+            context = f"{key}: {value}"
+            classification_hint = "support" if isinstance(key, str) and "support" in key.lower() else "resistance" if isinstance(key, str) and "resist" in key.lower() else ""
+            prices = _extract_price_tokens(str(value)) or [{"price": _parse_price_value(value), "start": 0, "end": 0, "raw": value}]
+            for token in prices:
+                price = token.get("price")
+                if price is None:
+                    continue
+                if classification_hint == "support":
+                    _register(supports, support_seen, price, context, source="strategy-key")
+                elif classification_hint == "resistance":
+                    _register(resistances, resistance_seen, price, context, source="strategy-key")
+                else:
+                    ambiguous.append((price, context))
+    elif isinstance(raw_levels, (list, tuple)):
+        for value in raw_levels:
+            price = _parse_price_value(value)
+            if price is None:
+                continue
+            ambiguous.append((price, str(value)))
+
+    for price, context in ambiguous:
+        if price is None:
+            continue
+        if isinstance(latest_price, (int, float)):
+            if price <= latest_price:
+                _register(supports, support_seen, price, context, source="strategy-heuristic")
+            else:
+                _register(resistances, resistance_seen, price, context, source="strategy-heuristic")
+
+    supports.sort(
+        key=lambda entry: (
+            abs((latest_price or 0.0) - entry["price"]) if isinstance(latest_price, (int, float)) else entry["price"]
+        )
+    )
+    resistances.sort(
+        key=lambda entry: (
+            abs((latest_price or 0.0) - entry["price"]) if isinstance(latest_price, (int, float)) else entry["price"]
+        )
+    )
+
+    return {
+        "supports": supports[:6],
+        "resistances": resistances[:6],
+    }
+
+
 def _favorite_symbols(
     session: Session,
     user_id: int,
@@ -1692,11 +2007,18 @@ def _derive_action_center_view(
     if latest_price is None:
         latest_price = report.get("latest_price") or report.get("principal_plan", {}).get("data", {}).get("latest_price")
 
+    if not isinstance(latest_price, (int, float)):
+        numeric_latest = _safe_float(latest_price)
+        if numeric_latest is not None:
+            latest_price = numeric_latest
+
+    latest_price_value = latest_price if isinstance(latest_price, (int, float)) else None
+
     price_action_snapshot = report.get("price_action_snapshot") or {}
     overview = price_action_snapshot.get("overview") or {}
     key_levels = overview.get("key_levels") or []
-    supports: List[Dict[str, Any]] = []
-    resistances: List[Dict[str, Any]] = []
+    pa_supports: List[Dict[str, Any]] = []
+    pa_resistances: List[Dict[str, Any]] = []
     for entry in key_levels:
         if not isinstance(entry, dict):
             continue
@@ -1707,29 +2029,107 @@ def _derive_action_center_view(
             "price": price,
             "distance_pct": _safe_float(entry.get("distance_pct")),
             "timeframe": entry.get("timeframe"),
+            "source": "price-action",
         }
-        if str(entry.get("type")).lower() == "support":
-            supports.append(cleaned)
-        elif str(entry.get("type")).lower() == "resistance":
-            resistances.append(cleaned)
+        level_type = str(entry.get("type") or "").lower()
+        if level_type == "support":
+            pa_supports.append(cleaned)
+        elif level_type == "resistance":
+            pa_resistances.append(cleaned)
+
+    strategy_label_map = {
+        "day_trading": "Day Trading",
+        "swing_trading": "Swing Trading",
+        "longterm_trading": "Long-Term Trading",
+    }
+    strategy_label = (
+        strategy.get("label")
+        or strategy_label_map.get(strategy_key)
+        or strategy.get("name")
+        or strategy.get("strategy")
+        or strategy_key.replace("_", " ").title()
+    )
+
+    strategy_levels = _extract_strategy_levels(
+        strategy,
+        strategy_key=strategy_key,
+        strategy_label=strategy_label,
+        latest_price=latest_price_value,
+    )
+    strategy_supports = strategy_levels.get("supports") or []
+    strategy_resistances = strategy_levels.get("resistances") or []
+
+    support_levels: List[Dict[str, Any]] = []
+    resistance_levels: List[Dict[str, Any]] = []
+    support_seen: Set[float] = set()
+    resistance_seen: Set[float] = set()
+
+    def _append_level(
+        collection: List[Dict[str, Any]],
+        seen: Set[float],
+        level: Dict[str, Any],
+        default_source: str,
+    ) -> None:
+        price_val = _safe_float(level.get("price"))
+        if price_val is None:
+            return
+        key = round(price_val, 4)
+        if key in seen:
+            return
+        clone = dict(level)
+        if not clone.get("timeframe"):
+            clone["timeframe"] = strategy_label
+        clone.setdefault("source", default_source)
+        collection.append(clone)
+        seen.add(key)
+
+    for level in strategy_supports:
+        _append_level(support_levels, support_seen, level, level.get("source") or "strategy-text")
+    for level in strategy_resistances:
+        _append_level(resistance_levels, resistance_seen, level, level.get("source") or "strategy-text")
+
+    for level in pa_supports:
+        if len(support_levels) >= 4:
+            break
+        _append_level(support_levels, support_seen, level, level.get("source") or "price-action")
+    for level in pa_resistances:
+        if len(resistance_levels) >= 4:
+            break
+        _append_level(resistance_levels, resistance_seen, level, level.get("source") or "price-action")
+
+    if isinstance(latest_price_value, (int, float)):
+        base_price = latest_price_value
+        support_levels.sort(
+            key=lambda lvl: abs(base_price - (_safe_float(lvl.get("price")) or base_price))
+        )
+        resistance_levels.sort(
+            key=lambda lvl: abs(base_price - (_safe_float(lvl.get("price")) or base_price))
+        )
+    else:
+        support_levels.sort(key=lambda lvl: _safe_float(lvl.get("price")) or float("inf"))
+        resistance_levels.sort(key=lambda lvl: _safe_float(lvl.get("price")) or float("inf"))
 
     def _distance_to(level: Dict[str, Any]) -> Optional[float]:
-        if latest_price is None:
+        if latest_price_value is None:
             return level.get("distance_pct")
         level_price = _safe_float(level.get("price"))
         if level_price in (None, 0):
             return level.get("distance_pct")
-        return ((latest_price - level_price) / level_price) * 100
-
-    supports.sort(key=lambda lvl: abs(_distance_to(lvl) or 9999))
-    resistances.sort(key=lambda lvl: abs(_distance_to(lvl) or 9999))
+        return ((latest_price_value - level_price) / level_price) * 100
 
     radar_levels = {
-        "s1": supports[0] if supports else None,
-        "s2": supports[1] if len(supports) > 1 else (supports[0] if supports else None),
-        "r1": resistances[0] if resistances else None,
-        "r2": resistances[1] if len(resistances) > 1 else (resistances[0] if resistances else None),
+        "s1": support_levels[0] if support_levels else None,
+        "s2": support_levels[1] if len(support_levels) > 1 else (support_levels[0] if support_levels else None),
+        "r1": resistance_levels[0] if resistance_levels else None,
+        "r2": resistance_levels[1] if len(resistance_levels) > 1 else (resistance_levels[0] if resistance_levels else None),
     }
+
+    for level_key in ("s1", "s2", "r1", "r2"):
+        level = radar_levels.get(level_key)
+        if isinstance(level, dict):
+            distance_value = _distance_to(level)
+            if distance_value is not None:
+                level["distance_pct"] = distance_value
 
     def _format_level(level: Optional[Dict[str, Any]]) -> Optional[str]:
         if not isinstance(level, dict):
