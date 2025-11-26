@@ -2052,11 +2052,13 @@ def _derive_action_center_view(
 
     latest_price_value = latest_price if isinstance(latest_price, (int, float)) else None
 
-    if latest_price_value is None and override_price_value is not None:
+    price_source_label = None
+    if override_price_value is not None:
         latest_price = override_price_value
         latest_price_value = override_price_value
-        if latest_price_ts is None:
+        if override_price_timestamp:
             latest_price_ts = override_price_timestamp
+        price_source_label = override_price_source
 
     price_action_snapshot = report.get("price_action_snapshot") or {}
     overview = price_action_snapshot.get("overview") or {}
@@ -2490,7 +2492,7 @@ def _derive_action_center_view(
         "latest_price": f"{latest_price:,.2f}" if isinstance(latest_price, (int, float)) else latest_price,
         "latest_price_value": latest_price,
         "latest_price_timestamp": latest_price_ts,
-        "latest_price_source": override_price_source if latest_price_value == override_price_value and override_price_source else None,
+        "latest_price_source": price_source_label,
         "generated_display": plan_generated,
         "primary_action": {
             **primary_zone,
