@@ -146,6 +146,42 @@ ACTION_CENTER_SECOND_LEVEL_NEAR_LEVEL_PCT = 0.25
 ACTION_CENTER_LEVEL_BREAK_PARTIAL = "25%"
 ACTION_CENTER_SECOND_LEVEL_PARTIAL = "50%"
 
+LEVEL_DISPLAY_OVERRIDES = {
+    "S1": "Support 1",
+    "S2": "Support 2",
+    "R1": "Resistance 1",
+    "R2": "Resistance 2",
+}
+LEVEL_DISPLAY_PREFIXES = {
+    "S": "Support",
+    "R": "Resistance",
+}
+
+
+def _humanize_level_label(label: Optional[str]) -> Optional[str]:
+    """Convert compact level codes like S1/S2 into human-readable labels."""
+
+    if label is None:
+        return None
+
+    text = str(label).strip()
+    if not text:
+        return text
+
+    upper = text.upper()
+    if upper == "NONE":
+        return "None"
+
+    if upper in LEVEL_DISPLAY_OVERRIDES:
+        return LEVEL_DISPLAY_OVERRIDES[upper]
+
+    prefix = upper[0]
+    suffix = upper[1:]
+    if prefix in LEVEL_DISPLAY_PREFIXES and suffix.isdigit():
+        return f"{LEVEL_DISPLAY_PREFIXES[prefix]} {int(suffix)}"
+
+    return text
+
 
 def _build_base_url(request: Request) -> str:
     """Best-effort reconstruction of the public base URL for redirects."""
@@ -999,9 +1035,9 @@ def validate_level_break(
                 "path": "support_break",
                 "primary_level": "S1",
                 "secondary_target": "S2" if s2_price is not None else None,
-                "message": "Level broken - price likely moving toward S2",
+                "message": "Support break - price likely moving toward Support 2",
                 "reason": (
-                    f"{timeframe_label} close {close_price:,.2f} printed below S1 {s1_price:,.2f}"
+                    f"{timeframe_label} close {close_price:,.2f} printed below Support 1 {s1_price:,.2f}"
                     + (f" ({breach_pct:.2f}% breach)" if breach_pct is not None else "")
                 ),
                 "partial_action": ACTION_CENTER_LEVEL_BREAK_PARTIAL,
@@ -1026,9 +1062,9 @@ def validate_level_break(
                 "path": "resistance_break",
                 "primary_level": "R1",
                 "secondary_target": "R2" if r2_price is not None else None,
-                "message": "Breakout - price likely moving toward R2",
+                "message": "Resistance breakout - price likely moving toward Resistance 2",
                 "reason": (
-                    f"{timeframe_label} close {close_price:,.2f} cleared R1 {r1_price:,.2f}"
+                    f"{timeframe_label} close {close_price:,.2f} cleared Resistance 1 {r1_price:,.2f}"
                     + (f" ({breach_pct:.2f}% breakout)" if breach_pct is not None else "")
                 ),
                 "partial_action": ACTION_CENTER_LEVEL_BREAK_PARTIAL,
@@ -1308,7 +1344,7 @@ def resolve_intent_conflict(
         conflict.update(
             {
                 "validated_zone": "avoid",
-                "message": "Chasing strength - wait for pullback or R2 analysis.",
+                "message": "Chasing strength - wait for pullback or Resistance 2 analysis.",
                 "reason": "Resistance break conflicts with buy intent.",
                 "needs_reanalysis": True,
                 "overridden": True,
@@ -1318,7 +1354,7 @@ def resolve_intent_conflict(
         conflict.update(
             {
                 "validated_zone": "hold",
-                "message": "Acceleration down - wait for S2 or new analysis.",
+                "message": "Acceleration down - wait for Support 2 or new analysis.",
                 "reason": "Support break conflicts with sell intent.",
                 "needs_reanalysis": True,
                 "overridden": True,
@@ -3142,9 +3178,34 @@ def _derive_action_center_view(
     if primary_action_payload["partial_position"] == "none":
         primary_action_payload["partial_position"] = None
 
-    if not decision.get("primary_level"):
+    decision_debug = decision.setdefault("debug", {})
+
+    primary_level_raw = decision.get("primary_level")
+    if isinstance(primary_level_raw, str):
+        normalized = primary_level_raw.strip()
+        if normalized and normalized.lower() != "none":
+            decision_debug["primary_level_code"] = primary_level_raw
+            decision["primary_level"] = _humanize_level_label(primary_level_raw)
+        else:
+            decision["primary_level"] = "None"
+    elif primary_level_raw:
+        decision_debug["primary_level_code"] = primary_level_raw
+        decision["primary_level"] = _humanize_level_label(str(primary_level_raw)) or "None"
+    else:
         decision["primary_level"] = "None"
-    if not decision.get("secondary_target"):
+
+    secondary_target_raw = decision.get("secondary_target")
+    if isinstance(secondary_target_raw, str):
+        normalized_secondary = secondary_target_raw.strip()
+        if normalized_secondary:
+            decision_debug["secondary_target_code"] = secondary_target_raw
+            decision["secondary_target"] = _humanize_level_label(secondary_target_raw)
+        else:
+            decision["secondary_target"] = "None"
+    elif secondary_target_raw:
+        decision_debug["secondary_target_code"] = secondary_target_raw
+        decision["secondary_target"] = _humanize_level_label(str(secondary_target_raw)) or "None"
+    else:
         decision["secondary_target"] = "None"
 
     traffic_light_state = zone_icon_map.get(validated_zone, "wait")

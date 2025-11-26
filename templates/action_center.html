@@ -69,49 +69,49 @@
             {% set dashboard_intent = dashboard.intent if dashboard.intent else intent %}
             <article class="action-dashboard" data-dashboard data-dashboard-symbol="{{ dashboard.symbol }}" data-expanded="false">
                 <div class="action-dashboard__summary">
-                    <button type="button" class="action-dashboard__summary-toggle" data-dashboard-toggle aria-expanded="false">
-                        <div class="action-dashboard__summary-shell">
-                            <div class="action-dashboard__summary-head">
-                                <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--identity">
-                                    <div class="action-dashboard__summary-symbol-row">
-                                        <span class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }} traffic-light--mini action-dashboard__summary-traffic" data-dashboard-traffic role="img" aria-label="{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|title }} signal"></span>
-                                        <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
-                                    </div>
-                                    <span class="action-dashboard__summary-strategy" data-summary-strategy>{{ dashboard_timeframe|title }} Trading &middot; {{ dashboard_intent|title }}</span>
-                                    <div class="action-dashboard__summary-controls" data-dashboard-config>
-                                        <label class="summary-control">
-                                            <span>Time Frame</span>
-                                            <select data-dashboard-timeframe aria-label="Select timeframe for {{ dashboard.symbol }}">
-                                                <option value="day"{% if dashboard_timeframe == 'day' %} selected{% endif %}>Day</option>
-                                                <option value="swing"{% if dashboard_timeframe == 'swing' %} selected{% endif %}>Swing</option>
-                                                <option value="long"{% if dashboard_timeframe == 'long' %} selected{% endif %}>Long</option>
-                                            </select>
-                                        </label>
-                                        <label class="summary-control">
-                                            <span>Intent</span>
-                                            <select data-dashboard-intent aria-label="Select intent for {{ dashboard.symbol }}">
-                                                <option value="buy"{% if dashboard_intent == 'buy' %} selected{% endif %}>Buy</option>
-                                                <option value="sell"{% if dashboard_intent == 'sell' %} selected{% endif %}>Sell</option>
-                                            </select>
-                                        </label>
-                                    </div>
-                                    <div class="action-dashboard__callout">
-                                        <span class="action-dashboard__callout-label">What should I do?</span>
-                                        <span class="action-dashboard__callout-title" data-summary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
-                                        <span class="action-dashboard__callout-subtitle" data-summary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else 'No guidance yet.' }}</span>
-                                    </div>
+                    <div class="action-dashboard__summary-shell">
+                        <div class="action-dashboard__summary-head">
+                            <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--identity">
+                                <div class="action-dashboard__summary-symbol-row">
+                                    <span class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }} traffic-light--mini action-dashboard__summary-traffic" data-dashboard-traffic role="img" aria-label="{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|title }} signal"></span>
+                                    <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
                                 </div>
-                                <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--gauge">
-                                    <div class="level-gauge" data-gauge-root>
-                                        <div class="level-gauge__body">
-                                            <canvas class="level-gauge__canvas" width="320" height="160" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
-                                            <div class="level-gauge__needle-value" data-gauge-price>{{ price_value or 'N/A' }}</div>
-                                        </div>
-                                        <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
+                                <span class="action-dashboard__summary-strategy" data-summary-strategy>{{ dashboard_timeframe|title }} Trading &middot; {{ dashboard_intent|title }}</span>
+                                <div class="action-dashboard__summary-controls" data-dashboard-config>
+                                    <label class="summary-control">
+                                        <span>Time Frame</span>
+                                        <select data-dashboard-timeframe aria-label="Select timeframe for {{ dashboard.symbol }}">
+                                            <option value="day"{% if dashboard_timeframe == 'day' %} selected{% endif %}>Day</option>
+                                            <option value="swing"{% if dashboard_timeframe == 'swing' %} selected{% endif %}>Swing</option>
+                                            <option value="long"{% if dashboard_timeframe == 'long' %} selected{% endif %}>Long</option>
+                                        </select>
+                                    </label>
+                                    <label class="summary-control">
+                                        <span>Intent</span>
+                                        <select data-dashboard-intent aria-label="Select intent for {{ dashboard.symbol }}">
+                                            <option value="buy"{% if dashboard_intent == 'buy' %} selected{% endif %}>Buy</option>
+                                            <option value="sell"{% if dashboard_intent == 'sell' %} selected{% endif %}>Sell</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <div class="action-dashboard__callout">
+                                    <span class="action-dashboard__callout-label">What should I do?</span>
+                                    <span class="action-dashboard__callout-title" data-summary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
+                                    <span class="action-dashboard__callout-subtitle" data-summary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else 'No guidance yet.' }}</span>
+                                </div>
+                            </div>
+                            <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--gauge">
+                                <div class="level-gauge" data-gauge-root>
+                                    <div class="level-gauge__body">
+                                        <canvas class="level-gauge__canvas" width="320" height="160" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
+                                        <div class="level-gauge__needle-value" data-gauge-price>{{ price_value or 'N/A' }}</div>
                                     </div>
+                                    <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    <button type="button" class="action-dashboard__summary-toggle" data-dashboard-toggle aria-expanded="false" aria-label="Expand {{ dashboard.symbol }} dashboard">
                         <span class="action-dashboard__toggle-indicator" aria-hidden="true"></span>
                     </button>
                 </div>
@@ -173,12 +173,12 @@
                         <section class="level-radar" aria-label="Support and resistance radar">
                             <div class="level-radar__track" data-radar-track style="--price-position: {{ price_info.position if price_info and price_info.position is not none else 0.5 }}">
                                 <div class="level-marker level-marker--s2">
-                                    <span class="level-marker__title">Support-2</span>
+                                    <span class="level-marker__title">Support 2</span>
                                     <span class="level-marker__value" data-radar-value="s2">{{ s2.value if s2 and s2.value else 'N/A' }}</span>
                                     <span class="level-marker__delta" data-radar-delta="s2">{{ s2.distance if s2 and s2.distance else '' }}</span>
                                 </div>
                                 <div class="level-marker level-marker--s1">
-                                    <span class="level-marker__title">Support-1</span>
+                                    <span class="level-marker__title">Support 1</span>
                                     <span class="level-marker__value" data-radar-value="s1">{{ s1.value if s1 and s1.value else 'N/A' }}</span>
                                     <span class="level-marker__delta" data-radar-delta="s1">{{ s1.distance if s1 and s1.distance else '' }}</span>
                                 </div>
@@ -187,12 +187,12 @@
                                     <span class="level-marker__value" data-radar-value="price">{{ price_value or 'N/A' }}</span>
                                 </div>
                                 <div class="level-marker level-marker--r1">
-                                    <span class="level-marker__title">Resistance-1</span>
+                                    <span class="level-marker__title">Resistance 1</span>
                                     <span class="level-marker__value" data-radar-value="r1">{{ r1.value if r1 and r1.value else 'N/A' }}</span>
                                     <span class="level-marker__delta" data-radar-delta="r1">{{ r1.distance if r1 and r1.distance else '' }}</span>
                                 </div>
                                 <div class="level-marker level-marker--r2">
-                                    <span class="level-marker__title">Resistance-2</span>
+                                    <span class="level-marker__title">Resistance 2</span>
                                     <span class="level-marker__value" data-radar-value="r2">{{ r2.value if r2 and r2.value else 'N/A' }}</span>
                                     <span class="level-marker__delta" data-radar-delta="r2">{{ r2.distance if r2 and r2.distance else '' }}</span>
                                 </div>
@@ -228,7 +228,7 @@
                             <div class="trade-plan__grid">
                                 <div>
                                     <h3>Entries</h3>
-                                    <ul>
+                                    <ul data-plan-entries>
                                         <li><span>Initial</span><strong data-entry-field="primary">{{ trade_entries.primary if trade_entries and trade_entries.primary else 'N/A' }}</strong></li>
                                         <li><span>Scale</span><strong data-entry-field="scale">{{ trade_entries.scale if trade_entries and trade_entries.scale else 'N/A' }}</strong></li>
                                         <li><span>Breakout</span><strong data-entry-field="breakout">{{ trade_entries.breakout if trade_entries and trade_entries.breakout else 'N/A' }}</strong></li>
@@ -389,11 +389,11 @@
         };
 
         const gaugeZoneLabels = {
-            belowS2: 'Below S2',
+            belowS2: 'Below Support 2',
             betweenSupports: 'Between Supports',
             midZone: 'Mid Zone',
             betweenResistances: 'Between Resistances',
-            aboveR2: 'Above R2',
+            aboveR2: 'Above Resistance 2',
         };
 
         const defaultTimeframe = normaliseTimeframe('{{ timeframe }}');
