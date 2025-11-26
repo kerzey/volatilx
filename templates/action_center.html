@@ -76,8 +76,8 @@
                             <div class="action-dashboard__summary-head">
                                 <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--identity">
                                     <div class="action-dashboard__summary-symbol-row">
-                                        <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
                                         <span class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }} traffic-light--mini action-dashboard__summary-traffic" data-dashboard-traffic role="img" aria-label="{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|title }} signal"></span>
+                                        <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
                                     </div>
                                     <span class="action-dashboard__summary-strategy" data-summary-strategy>{{ dashboard_timeframe|title }} Trading &middot; {{ dashboard_intent|title }}</span>
                                 </div>
