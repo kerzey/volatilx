@@ -332,12 +332,41 @@
     <script id="actionCenterDashboards" type="application/json">{{ dashboards_json | safe }}</script>
     {% endif %}
     <script>
+    (function () {
+        const dataSource = document.getElementById('actionCenterDashboards');
+        if (!dataSource) {
+            return;
+        }
+
+        let dashboardsPayload;
+        try {
+            dashboardsPayload = JSON.parse(dataSource.textContent || '[]');
+        } catch (error) {
+            console.warn('Failed to parse Action Center dashboards payload', error);
+            dashboardsPayload = [];
+        }
+
+        if (!Array.isArray(dashboardsPayload)) {
+            dashboardsPayload = [];
+        }
+
+        const dashboardRoot = document.querySelector('[data-dashboard-list]');
+        if (!dashboardRoot) {
+            return;
+        }
+
+        const bodyNode = document.body;
+        const livePriceEnabled = Boolean(bodyNode && bodyNode.dataset && bodyNode.dataset.livePrice === 'true');
+        const autoToggle = document.querySelector('#autoRefreshToggle');
+        const headerMeta = document.querySelector('[data-header-meta]');
+        const fallbackSymbol = '{{ symbol }}';
+        const defaultSymbol = dashboardsPayload.length ? (dashboardsPayload[0].symbol || fallbackSymbol) : fallbackSymbol;
+
         const degToRad = (deg) => (deg * Math.PI) / 180;
 
         function normaliseTimeframe(value) {
-            refreshAllDashboards();
-        } else if (livePriceEnabled) {
-            refreshLivePrice();
+            const slug = (value == null ? '' : String(value)).trim().toLowerCase();
+            if (slug === 'swing') return 'swing';
             if (slug === 'long') return 'long';
             return 'day';
         }
@@ -346,6 +375,33 @@
             const slug = (value == null ? '' : String(value)).trim().toLowerCase();
             return slug === 'sell' ? 'sell' : 'buy';
         }
+
+        const gaugeColors = {
+            belowS2: '#b91c1c',
+            betweenSupports: '#f97316',
+            midZone: '#facc15',
+            betweenResistances: '#22c55e',
+            aboveR2: '#15803d',
+        };
+
+        const gaugeZoneFill = {
+            belowS2: 'rgba(59, 15, 20, 0.72)',
+            betweenSupports: 'rgba(127, 29, 29, 0.68)',
+            midZone: 'rgba(180, 83, 9, 0.58)',
+            betweenResistances: 'rgba(15, 118, 110, 0.6)',
+            aboveR2: 'rgba(6, 78, 59, 0.62)',
+        };
+
+        const gaugeZoneLabels = {
+            belowS2: 'Below S2',
+            betweenSupports: 'Between Supports',
+            midZone: 'Mid Zone',
+            betweenResistances: 'Between Resistances',
+            aboveR2: 'Above R2',
+        };
+
+        const defaultTimeframe = normaliseTimeframe('{{ timeframe }}');
+        const defaultIntent = normaliseIntent('{{ intent }}');
 
         function formatStrategyLabel(timeframe, intent) {
             const timeframeLabels = {
@@ -365,8 +421,8 @@
         const dashState = {
             dashboards: new Map(),
             primarySymbol: dashboardsPayload.length ? dashboardsPayload[0].symbol || defaultSymbol : defaultSymbol,
-            defaultTimeframe: normaliseTimeframe('{{ timeframe }}'),
-            defaultIntent: normaliseIntent('{{ intent }}'),
+            defaultTimeframe,
+            defaultIntent,
             refreshTimer: null,
             livePriceTimer: null,
             resizeTimer: null,
