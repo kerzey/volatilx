@@ -74,19 +74,17 @@
                     <button type="button" class="action-dashboard__summary-toggle" data-dashboard-toggle aria-expanded="false">
                         <div class="action-dashboard__summary-shell">
                             <div class="action-dashboard__summary-head">
-                                <div class="action-dashboard__summary-head-col">
-                                    <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
+                                <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--identity">
+                                    <div class="action-dashboard__summary-symbol-row">
+                                        <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
+                                        <span class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }} traffic-light--mini action-dashboard__summary-traffic" data-dashboard-traffic role="img" aria-label="{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|title }} signal"></span>
+                                    </div>
                                     <span class="action-dashboard__summary-strategy" data-summary-strategy>{{ dashboard_timeframe|title }} Trading &middot; {{ dashboard_intent|title }}</span>
                                 </div>
-                                <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--traffic">
-                                    <div class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }}" data-dashboard-traffic>
-                                        <span data-traffic-label>{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|upper }}</span>
-                                    </div>
-                                </div>
                                 <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--gauge">
-                                    <div class="level-gauge level-gauge--compact" data-gauge-root>
+                                    <div class="level-gauge" data-gauge-root>
                                         <div class="level-gauge__body">
-                                            <canvas class="level-gauge__canvas" width="180" height="90" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
+                                            <canvas class="level-gauge__canvas" width="320" height="160" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
                                             <div class="level-gauge__needle-value" data-gauge-price>{{ price_value or 'N/A' }}</div>
                                         </div>
                                         <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
@@ -476,6 +474,9 @@
             const next = status || 'wait';
             element.classList.remove('traffic-light--buy', 'traffic-light--sell', 'traffic-light--wait');
             element.classList.add(`traffic-light--${next}`);
+            const readable = next.charAt(0).toUpperCase() + next.slice(1);
+            element.setAttribute('aria-label', `${readable} signal`);
+            element.setAttribute('title', readable);
             const label = element.querySelector('[data-traffic-label]');
             if (label) {
                 label.textContent = next.toUpperCase();
