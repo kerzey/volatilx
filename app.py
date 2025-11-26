@@ -981,7 +981,16 @@ def validate_level_break(
     timeframe_label = _TIMEFRAME_LABELS.get(timeframe_slug, timeframe_slug.upper())
     epsilon = 1e-6
 
+    reclaim_tolerance = ACTION_CENTER_PROXIMITY_TOLERANCE_PCT / 100.0
+
     if s1_price is not None and close_price < s1_price * (1 - epsilon):
+        if latest_price is not None and latest_price >= s1_price * (1 - reclaim_tolerance):
+            debug["reclaimed"] = {
+                "latest_price": latest_price,
+                "threshold": s1_price * (1 - reclaim_tolerance),
+            }
+            result["reason"] = "Primary support reclaimed after intraday breach."
+            return result
         breach_pct = ((s1_price - close_price) / s1_price) * 100 if s1_price else None
         debug["breach_pct"] = breach_pct
         result.update(
@@ -1002,6 +1011,13 @@ def validate_level_break(
         return result
 
     if r1_price is not None and close_price > r1_price * (1 + epsilon):
+        if latest_price is not None and latest_price <= r1_price * (1 + reclaim_tolerance):
+            debug["rejected"] = {
+                "latest_price": latest_price,
+                "threshold": r1_price * (1 + reclaim_tolerance),
+            }
+            result["reason"] = "Primary resistance rejected post breakout attempt."
+            return result
         breach_pct = ((close_price - r1_price) / r1_price) * 100 if r1_price else None
         debug["breach_pct"] = breach_pct
         result.update(
