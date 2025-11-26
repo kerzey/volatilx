@@ -2102,12 +2102,15 @@ def _derive_action_center_view(
             return None
         return _safe_float(level.get("price"))
 
-    support_levels.sort(
-        key=lambda lvl: (price := _level_price(lvl)) if price is not None else float("inf")
-    )
-    resistance_levels.sort(
-        key=lambda lvl: (price := _level_price(lvl)) if price is not None else float("inf")
-    )
+    def _sort_by_price(levels: List[Dict[str, Any]]) -> None:
+        def _key(lvl: Dict[str, Any]) -> float:
+            price_val = _level_price(lvl)
+            return price_val if price_val is not None else float("inf")
+
+        levels.sort(key=_key)
+
+    _sort_by_price(support_levels)
+    _sort_by_price(resistance_levels)
 
     # Prefer levels on the expected side of the current price when anchoring the gauge.
 
