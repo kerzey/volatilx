@@ -80,6 +80,23 @@
                                         <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
                                     </div>
                                     <span class="action-dashboard__summary-strategy" data-summary-strategy>{{ dashboard_timeframe|title }} Trading &middot; {{ dashboard_intent|title }}</span>
+                                    <div class="action-dashboard__summary-controls" data-dashboard-config>
+                                        <label class="summary-control">
+                                            <span>Time Frame</span>
+                                            <select data-dashboard-timeframe aria-label="Select timeframe for {{ dashboard.symbol }}">
+                                                <option value="day"{% if dashboard_timeframe == 'day' %} selected{% endif %}>Day</option>
+                                                <option value="swing"{% if dashboard_timeframe == 'swing' %} selected{% endif %}>Swing</option>
+                                                <option value="long"{% if dashboard_timeframe == 'long' %} selected{% endif %}>Long</option>
+                                            </select>
+                                        </label>
+                                        <label class="summary-control">
+                                            <span>Intent</span>
+                                            <select data-dashboard-intent aria-label="Select intent for {{ dashboard.symbol }}">
+                                                <option value="buy"{% if dashboard_intent == 'buy' %} selected{% endif %}>Buy</option>
+                                                <option value="sell"{% if dashboard_intent == 'sell' %} selected{% endif %}>Sell</option>
+                                            </select>
+                                        </label>
+                                    </div>
                                 </div>
                                 <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--gauge">
                                     <div class="level-gauge" data-gauge-root>
@@ -99,23 +116,6 @@
                         </div>
                         <span class="action-dashboard__toggle-indicator" aria-hidden="true"></span>
                     </button>
-                    <div class="action-dashboard__summary-controls" data-dashboard-config>
-                        <label class="summary-control">
-                            <span>Time Frame</span>
-                            <select data-dashboard-timeframe aria-label="Select timeframe for {{ dashboard.symbol }}">
-                                <option value="day"{% if dashboard_timeframe == 'day' %} selected{% endif %}>Day</option>
-                                <option value="swing"{% if dashboard_timeframe == 'swing' %} selected{% endif %}>Swing</option>
-                                <option value="long"{% if dashboard_timeframe == 'long' %} selected{% endif %}>Long</option>
-                            </select>
-                        </label>
-                        <label class="summary-control">
-                            <span>Intent</span>
-                            <select data-dashboard-intent aria-label="Select intent for {{ dashboard.symbol }}">
-                                <option value="buy"{% if dashboard_intent == 'buy' %} selected{% endif %}>Buy</option>
-                                <option value="sell"{% if dashboard_intent == 'sell' %} selected{% endif %}>Sell</option>
-                            </select>
-                        </label>
-                    </div>
                 </div>
                 <div class="action-dashboard__body" data-dashboard-body hidden>
                     <div class="action-dashboard__content"{% if not payload %} hidden{% endif %} data-dashboard-content>
