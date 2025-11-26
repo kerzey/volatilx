@@ -74,13 +74,13 @@
                         {% endif %}
                     </div>
                     <div class="dashboard-card-actions">
+                        {% if report.consensus and report.consensus.recommendation %}
+                        <span class="badge consensus-{{ report.consensus.recommendation|lower|replace(' ', '-') }}">{{ report.consensus.recommendation }}</span>
+                        {% endif %}
                         <button type="button" class="favorite-toggle{% if is_favorite %} favorite-toggle--active{% endif %}" data-favorite-toggle data-favorite-symbol="{{ symbol_upper }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}" title="{% if is_favorite %}Remove from favorites{% else %}Add to favorites{% endif %}">
                             <span class="favorite-toggle__icon" data-favorite-icon aria-hidden="true">{% if is_favorite %}&#9733;{% else %}&#9734;{% endif %}</span>
                             <span class="favorite-toggle__label" data-favorite-label>{% if is_favorite %}Favorited{% else %}Favorite{% endif %}</span>
                         </button>
-                        {% if report.consensus and report.consensus.recommendation %}
-                        <span class="badge consensus-{{ report.consensus.recommendation|lower|replace(' ', '-') }}">{{ report.consensus.recommendation }}</span>
-                        {% endif %}
                     </div>
                 </header>
 
