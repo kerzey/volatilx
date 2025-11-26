@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import (
@@ -821,6 +821,36 @@ async def _fetch_rest_crypto_price(symbol: str) -> Optional[Dict[str, Any]]:
         logger.debug("Alpaca REST crypto price fallback error for %s: %s", symbol, exc)
 
     return None
+
+
+async def _resolve_rest_prices(symbols: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+    sanitized_symbols = {_sanitize_symbol(sym) for sym in symbols if _sanitize_symbol(sym)}
+    if not sanitized_symbols:
+        return {}
+
+    results: Dict[str, Dict[str, Any]] = {}
+
+    async def _collect(targets: Set[str], fetcher: Callable[[str], Awaitable[Optional[Dict[str, Any]]]]) -> None:
+        for ticker in targets:
+            try:
+                payload = await fetcher(ticker)
+            except Exception as exc:  # pragma: no cover - diagnostic logging
+                logger.debug("REST price fallback batch fetch failed for %s: %s", ticker, exc)
+                continue
+            if isinstance(payload, dict) and payload.get("price") is not None:
+                mapped_symbol = _sanitize_symbol(payload.get("symbol") or ticker)
+                if mapped_symbol:
+                    results[mapped_symbol] = payload
+
+    equity_targets = _filter_symbols_for_market(sanitized_symbols, "equity")
+    crypto_targets = _filter_symbols_for_market(sanitized_symbols, "crypto")
+
+    await asyncio.gather(
+        _collect(equity_targets, _fetch_rest_live_price),
+        _collect(crypto_targets, _fetch_rest_crypto_price),
+    )
+
+    return results
 
 
 def _ensure_trial_subscription(session: Session, user: User) -> None:
@@ -1966,6 +1996,7 @@ def _derive_action_center_view(
     *,
     strategy_key: str,
     intent: str,
+    price_override: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build a presentation-friendly payload for the Action Center UI."""
 
@@ -1990,6 +2021,13 @@ def _derive_action_center_view(
 
     latest_price = None
     latest_price_ts = None
+    override_price_value = None
+    override_price_timestamp = None
+    override_price_source = None
+    if isinstance(price_override, dict):
+        override_price_value = _safe_float(price_override.get("price"))
+        override_price_timestamp = price_override.get("timestamp")
+        override_price_source = price_override.get("source")
     technical_snapshot = (report.get("technical_snapshot") or {})
     symbol_snapshot = None
     if isinstance(technical_snapshot, dict):
@@ -2013,6 +2051,12 @@ def _derive_action_center_view(
             latest_price = numeric_latest
 
     latest_price_value = latest_price if isinstance(latest_price, (int, float)) else None
+
+    if latest_price_value is None and override_price_value is not None:
+        latest_price = override_price_value
+        latest_price_value = override_price_value
+        if latest_price_ts is None:
+            latest_price_ts = override_price_timestamp
 
     price_action_snapshot = report.get("price_action_snapshot") or {}
     overview = price_action_snapshot.get("overview") or {}
@@ -2446,6 +2490,7 @@ def _derive_action_center_view(
         "latest_price": f"{latest_price:,.2f}" if isinstance(latest_price, (int, float)) else latest_price,
         "latest_price_value": latest_price,
         "latest_price_timestamp": latest_price_ts,
+        "latest_price_source": override_price_source if latest_price_value == override_price_value and override_price_source else None,
         "generated_display": plan_generated,
         "primary_action": {
             **primary_zone,
@@ -2629,13 +2674,15 @@ async def action_center_page(
 
     with SessionLocal() as session:
         is_favorited = _is_symbol_favorited(session, user.id, symbol_upper)
-        favorite_symbols = _favorite_symbols(session, user.id, market="equity")
+        favorite_equity_symbols = _favorite_symbols(session, user.id, market="equity")
+        favorite_crypto_symbols = _favorite_symbols(session, user.id, market="crypto")
 
     strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
     raw_report = _fetch_latest_action_report(symbol_upper)
 
-    favorite_symbol_set = {sym.upper() for sym in favorite_symbols}
+    favorite_symbol_set = {sym.upper() for sym in favorite_equity_symbols}
     dashboards: List[Dict[str, Any]] = []
+    price_overrides: Dict[str, Dict[str, Any]] = {}
 
     def _build_dashboard(symbol_key: str, report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         resolved_report = report or _fetch_latest_action_report(symbol_key)
@@ -2644,7 +2691,13 @@ async def action_center_page(
         error_message: Optional[str] = None
 
         if resolved_report:
-            dashboard_payload = _derive_action_center_view(resolved_report, strategy_key=strategy_key, intent=intent_slug)
+            price_override = price_overrides.get(symbol_key)
+            dashboard_payload = _derive_action_center_view(
+                resolved_report,
+                strategy_key=strategy_key,
+                intent=intent_slug,
+                price_override=price_override,
+            )
             dashboard_payload["favorite"] = symbol_key in favorite_symbol_set
             principal_data = (resolved_report.get("principal_plan") or {}).get("data") or {}
             strategies = principal_data.get("strategies") or {}
@@ -2667,10 +2720,14 @@ async def action_center_page(
     symbol_order: list[str] = []
     if symbol_upper not in symbol_order:
         symbol_order.append(symbol_upper)
-    for fav_symbol in favorite_symbols:
+    for fav_symbol in favorite_equity_symbols:
         fav_upper = fav_symbol.upper()
         if fav_upper not in symbol_order:
             symbol_order.append(fav_upper)
+
+    price_symbols: Set[str] = set(symbol_order)
+    price_symbols.update(favorite_crypto_symbols)
+    price_overrides = await _resolve_rest_prices(price_symbols)
 
     for sym in symbol_order:
         if sym == symbol_upper:
@@ -2711,8 +2768,10 @@ async def action_center_page(
         "primary_dashboard": primary_dashboard,
         "latest_report_blob": primary_dashboard["report_blob"] if primary_dashboard else None,
         "is_favorited": primary_dashboard["is_favorited"] if primary_dashboard else is_favorited,
-        "favorite_symbols": favorite_symbols,
+        "favorite_symbols": favorite_equity_symbols,
+        "favorite_crypto_symbols": favorite_crypto_symbols,
         "live_price_enabled": live_price_available,
+        "rest_price_overrides": price_overrides,
     }
 
     return templates.TemplateResponse("action_center.html", context)
@@ -2739,7 +2798,13 @@ async def action_center_api(
         )
 
     strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
-    payload = _derive_action_center_view(report, strategy_key=strategy_key, intent=intent_slug)
+    price_overrides = await _resolve_rest_prices({symbol_upper})
+    payload = _derive_action_center_view(
+        report,
+        strategy_key=strategy_key,
+        intent=intent_slug,
+        price_override=price_overrides.get(symbol_upper),
+    )
     with SessionLocal() as session:
         is_favorited = _is_symbol_favorited(session, user.id, symbol_upper)
     payload["favorite"] = is_favorited
