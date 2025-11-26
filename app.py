@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 import os
@@ -28,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import (
@@ -239,6 +240,77 @@ def _favorite_symbols(session: Session, user_id: int, limit: int = 25) -> List[s
         .all()
     )
     return [row[0] for row in rows if row and row[0]]
+
+
+def _all_favorite_symbols(session: Session) -> Set[str]:
+    rows = session.query(UserFavoriteSymbol.symbol).distinct().all()
+    symbols: Set[str] = set()
+    for row in rows:
+        if not row:
+            continue
+        candidate = _sanitize_symbol(row[0])
+        if candidate:
+            symbols.add(candidate)
+    return symbols
+
+
+class _EquitySubscriptionRegistry:
+    def __init__(self) -> None:
+        self._symbols: Set[str] = set()
+        self._lock = asyncio.Lock()
+
+    def snapshot(self) -> Set[str]:
+        return set(self._symbols)
+
+    async def ensure(
+        self,
+        app: FastAPI,
+        symbols: Iterable[str],
+        stream: Optional[LivePriceStream] = None,
+    ) -> None:
+        normalized: Set[str] = set()
+        for raw_symbol in symbols:
+            sanitized = _sanitize_symbol(raw_symbol)
+            if sanitized:
+                normalized.add(sanitized)
+        if not normalized:
+            return
+
+        async with self._lock:
+            additions = normalized - self._symbols
+            if not additions:
+                return
+            self._symbols.update(additions)
+
+        target_stream = stream if stream is not None else _get_live_stream(app)
+        if not target_stream:
+            logger.debug(
+                "Live price stream unavailable; pooled symbols pending subscription: %s",
+                sorted(additions),
+            )
+            return
+
+        try:
+            await target_stream.subscribe(additions)
+        except Exception as exc:  # pragma: no cover - runtime safety
+            logger.debug(
+                "Failed to subscribe pooled equity symbols %s: %s",
+                sorted(additions),
+                exc,
+            )
+
+
+def _get_equity_registry(app: FastAPI) -> _EquitySubscriptionRegistry:
+    registry = getattr(app.state, "equity_symbol_registry", None)
+    if registry is None:
+        registry = _EquitySubscriptionRegistry()
+        app.state.equity_symbol_registry = registry
+    return registry
+
+
+async def _ensure_equity_stream_symbols(app: FastAPI, symbols: Iterable[str]) -> None:
+    registry = _get_equity_registry(app)
+    await registry.ensure(app, symbols)
 
 
 def _get_live_stream(app: FastAPI) -> Optional[LivePriceStream]:
@@ -483,7 +555,6 @@ async def lifespan(app: FastAPI):
         try:
             live_stream = LivePriceStream()
             await live_stream.start()
-            await live_stream.subscribe({DEFAULT_ACTION_CENTER_SYMBOL})
             try:
                 await live_stream.ready(timeout=5.0)
             except Exception as exc:  # pragma: no cover - startup resilience
@@ -492,6 +563,18 @@ async def lifespan(app: FastAPI):
             logger.warning("Live price streaming unavailable: %s", exc)
             live_stream = None
     app.state.live_price_stream = live_stream
+    if live_stream:
+        try:
+            registry = _get_equity_registry(app)
+            initial_symbols = {DEFAULT_ACTION_CENTER_SYMBOL}
+            try:
+                with SessionLocal() as session:
+                    initial_symbols.update(_all_favorite_symbols(session))
+            except Exception as exc:  # pragma: no cover - startup resilience
+                logger.debug("Unable to load pooled favorite symbols: %s", exc)
+            await registry.ensure(app, initial_symbols, stream=live_stream)
+        except Exception as exc:  # pragma: no cover - startup resilience
+            logger.debug("Unable to prime pooled equity subscriptions: %s", exc)
     try:
         yield
     finally:
@@ -1986,6 +2069,8 @@ async def action_center_page(
         else:
             dashboards.append(_build_dashboard(sym))
 
+    await _ensure_equity_stream_symbols(request.app, symbol_order)
+
     primary_dashboard = dashboards[0] if dashboards else None
 
     dashboards_json = json.dumps(
@@ -2069,6 +2154,7 @@ class FavoriteTogglePayload(BaseModel):
 @app.post("/api/action-center/favorites")
 async def set_action_center_favorite(
     payload: FavoriteTogglePayload,
+    request: Request,
     user: User = Depends(get_current_user_sync),
 ):
     symbol_clean = _sanitize_symbol(payload.symbol)
@@ -2095,6 +2181,9 @@ async def set_action_center_favorite(
                 session.commit()
         current_state = _is_symbol_favorited(session, user.id, symbol_clean)
         favorites = _favorite_symbols(session, user.id)
+
+    if current_state:
+        await _ensure_equity_stream_symbols(request.app, {symbol_clean})
 
     return {
         "symbol": symbol_clean,
@@ -2128,10 +2217,7 @@ async def get_live_price(symbol: str, request: Request, user: User = Depends(get
 
     logger.debug("Live price request user=%s symbol=%s", getattr(user, "id", "?"), symbol_clean)
 
-    try:
-        await service.subscribe({symbol_clean})
-    except Exception as exc:  # pragma: no cover - runtime safety
-        logger.debug("Failed to subscribe %s to live stream: %s", symbol_clean, exc)
+    await _ensure_equity_stream_symbols(request.app, {symbol_clean})
 
     try:
         await service.ready(timeout=5.0)
