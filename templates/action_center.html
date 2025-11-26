@@ -95,27 +95,43 @@
             {% set tags = payload.tags if payload and payload.tags else [] %}
             <article class="action-dashboard" data-dashboard data-dashboard-symbol="{{ dashboard.symbol }}" data-expanded="false">
                 <button type="button" class="action-dashboard__summary" data-dashboard-toggle aria-expanded="false">
-                    <div class="action-dashboard__summary-top">
-                        <div class="action-dashboard__summary-info">
-                            <span class="action-dashboard__summary-label">What should I do?</span>
-                            <span class="action-dashboard__summary-title" data-summary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
-                            <span class="action-dashboard__summary-subtitle" data-summary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else 'No guidance yet.' }}</span>
-                        </div>
-                        <div class="action-dashboard__summary-meta">
-                            <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
-                            <span class="action-dashboard__summary-timeframe">{{ timeframe|upper }}</span>
-                        </div>
-                    </div>
-                    <div class="action-dashboard__summary-bottom">
-                        <div class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }}" data-dashboard-traffic>
-                            <span data-traffic-label>{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|upper }}</span>
-                        </div>
-                        <div class="level-gauge level-gauge--compact" data-gauge-root>
-                            <div class="level-gauge__body">
-                                <canvas class="level-gauge__canvas" width="180" height="90" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
-                                <div class="level-gauge__needle-value" data-gauge-price>{{ price_value or 'N/A' }}</div>
+                    <div class="action-dashboard__summary-shell">
+                        <div class="action-dashboard__summary-left">
+                            <div class="action-dashboard__summary-heading">
+                                <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
+                                <span class="action-dashboard__summary-strategy" data-summary-strategy>{{ timeframe|title }} Trading &middot; {{ intent|title }}</span>
                             </div>
-                            <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
+                            <div class="action-dashboard__summary-controls">
+                                <div class="summary-chip" aria-label="Selected timeframe">
+                                    <span class="summary-chip__label">Time Frame</span>
+                                    <span class="summary-chip__value">{{ timeframe|title }}</span>
+                                </div>
+                                <div class="summary-chip" aria-label="Selected intent">
+                                    <span class="summary-chip__label">Intent</span>
+                                    <span class="summary-chip__value">{{ intent|title }}</span>
+                                </div>
+                                <div class="summary-chip summary-chip--follow{% if dashboard.is_favorited %} summary-chip--active{% endif %}" aria-label="Following symbol" data-summary-follow>
+                                    <span class="summary-chip__label">Following</span>
+                                    <span class="summary-chip__value" data-summary-follow-value>{{ 'On' if dashboard.is_favorited else 'Off' }}</span>
+                                </div>
+                            </div>
+                            <div class="action-dashboard__callout">
+                                <span class="action-dashboard__callout-label">What should I do?</span>
+                                <span class="action-dashboard__callout-title" data-summary-title>{{ primary_action.title if primary_action else 'N/A' }}</span>
+                                <span class="action-dashboard__callout-subtitle" data-summary-subtitle>{{ primary_action.subtitle if primary_action and primary_action.subtitle else 'No guidance yet.' }}</span>
+                            </div>
+                        </div>
+                        <div class="action-dashboard__summary-right">
+                            <div class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }}" data-dashboard-traffic>
+                                <span data-traffic-label>{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|upper }}</span>
+                            </div>
+                            <div class="level-gauge level-gauge--compact" data-gauge-root>
+                                <div class="level-gauge__body">
+                                    <canvas class="level-gauge__canvas" width="180" height="90" data-gauge-canvas role="img" aria-label="Price gauge"></canvas>
+                                    <div class="level-gauge__needle-value" data-gauge-price>{{ price_value or 'N/A' }}</div>
+                                </div>
+                                <span class="level-gauge__range" data-gauge-range>{{ gauge_min_label or 'N/A' }} &ndash; {{ gauge_max_label or 'N/A' }}</span>
+                            </div>
                         </div>
                     </div>
                     <span class="action-dashboard__toggle-indicator" aria-hidden="true"></span>
@@ -858,6 +874,20 @@
             const hasData = Boolean(payload);
             node.dataset.hasData = hasData ? 'true' : 'false';
 
+            const followChip = node.querySelector('[data-summary-follow]');
+            const followValue = node.querySelector('[data-summary-follow-value]');
+            const isFollowing = payload && Object.prototype.hasOwnProperty.call(payload, 'favorite')
+                ? Boolean(payload.favorite)
+                : Boolean(meta && meta.favorite);
+            record.meta.favorite = isFollowing;
+            if (followChip) {
+                followChip.classList.toggle('summary-chip--active', isFollowing);
+                followChip.setAttribute('data-following', String(isFollowing));
+            }
+            if (followValue) {
+                followValue.textContent = isFollowing ? 'On' : 'Off';
+            }
+
             const summaryTitle = node.querySelector('[data-summary-title]');
             if (summaryTitle) {
                 summaryTitle.textContent =
@@ -1098,8 +1128,12 @@
                     error: entry.error_message || null,
                     strategy_summary: entry.strategy_summary || null,
                     report_blob: entry.report_blob || null,
+                    favorite: Boolean(entry.is_favorited),
                 },
             };
+            if (record.payload && !Object.prototype.hasOwnProperty.call(record.payload, 'favorite')) {
+                record.payload.favorite = Boolean(entry.is_favorited);
+            }
             dashState.dashboards.set(entry.symbol, record);
             updateDashboardContent(record);
 
@@ -1185,6 +1219,9 @@
                 if (record) {
                     record.payload = payload.action;
                     record.meta.error = null;
+                    if (typeof payload.favorite === 'boolean') {
+                        record.meta.favorite = payload.favorite;
+                    }
                     updateDashboardContent(record);
                     updatePrimaryMeta(record.payload);
                 } else {
@@ -1306,8 +1343,12 @@
                     dashState.favorite = Boolean(result.follow);
                     updateFavoriteButton(dashState.favorite);
                     const primaryRecord = dashState.dashboards.get(symbol);
-                    if (primaryRecord && primaryRecord.payload) {
-                        primaryRecord.payload.favorite = dashState.favorite;
+                    if (primaryRecord) {
+                        if (primaryRecord.payload) {
+                            primaryRecord.payload.favorite = dashState.favorite;
+                        }
+                        primaryRecord.meta.favorite = dashState.favorite;
+                        updateDashboardContent(primaryRecord);
                     }
                 } catch (error) {
                     console.warn('Failed to update favorite symbol', error);
