@@ -225,6 +225,44 @@ def _sanitize_symbol(value: str) -> str:
     return re.sub(r"[^A-Z0-9\.\-]", "", cleaned)[:24]
 
 
+def _report_symbol_candidates(symbol: str) -> List[str]:
+    """Generate storage-friendly lookup candidates for a symbol."""
+
+    base = (symbol or "").strip().upper()
+    sanitized = _sanitize_symbol(base)
+    candidates: List[str] = []
+
+    def _push(candidate: Optional[str]) -> None:
+        if not candidate:
+            return
+        normalised = candidate.strip().upper()
+        if not normalised:
+            return
+        candidates.append(normalised)
+
+    # Direct azure-storage friendly variant used during report persistence.
+    _push(base.replace("/", "-").replace(" ", "_"))
+    _push(sanitized)
+
+    for market in ("equity", "crypto"):
+        try:
+            ticker_map = get_ticker_map(market)
+        except ValueError:
+            continue
+        lookup = {_sanitize_symbol(ticker): ticker for ticker in ticker_map.keys()}
+        canonical = lookup.get(sanitized)
+        if not canonical and base:
+            canonical = lookup.get(_sanitize_symbol(base))
+        if canonical:
+            azure_symbol = canonical.upper().replace("/", "-").replace(" ", "_")
+            _push(azure_symbol)
+            _push(_sanitize_symbol(canonical))
+
+    # Remove duplicates while preserving order.
+    unique_candidates = list(dict.fromkeys(candidates))
+    return unique_candidates
+
+
 def _is_symbol_favorited(session: Session, user_id: int, symbol: str) -> bool:
     if not symbol:
         return False
@@ -1967,26 +2005,30 @@ def _resolve_report_center_date(raw_date: Optional[str]) -> Tuple[datetime, str,
 def _fetch_latest_action_report(symbol: str, *, lookback_days: int = ACTION_CENTER_LOOKBACK_DAYS) -> Optional[Dict[str, Any]]:
     """Fetch the most recent stored AI report for *symbol* within the lookback window."""
 
-    safe_symbol = (symbol or DEFAULT_ACTION_CENTER_SYMBOL).strip().upper()
+    raw_symbol = (symbol or DEFAULT_ACTION_CENTER_SYMBOL) or DEFAULT_ACTION_CENTER_SYMBOL
+    candidates = _report_symbol_candidates(raw_symbol)
+    if not candidates:
+        candidates = _report_symbol_candidates(DEFAULT_ACTION_CENTER_SYMBOL) or [DEFAULT_ACTION_CENTER_SYMBOL]
     now = datetime.now(timezone.utc)
     max_days = max(1, lookback_days)
 
     for offset in range(max_days):
         target_day = now - timedelta(days=offset)
         day_anchor = target_day.replace(hour=0, minute=0, second=0, microsecond=0)
-        reports = fetch_reports_for_date(day_anchor, symbol=safe_symbol, max_reports=20)
-        if not reports:
-            continue
+        for candidate in candidates:
+            reports = fetch_reports_for_date(day_anchor, symbol=candidate, max_reports=20)
+            if not reports:
+                continue
 
-        def sort_key(item: Dict[str, Any]) -> datetime:
-            timestamp = item.get("stored_at") or item.get("_blob_last_modified")
-            parsed = _parse_iso_datetime(timestamp) if isinstance(timestamp, str) else None
-            if parsed is None:
-                return datetime.min.replace(tzinfo=timezone.utc)
-            return parsed
+            def sort_key(item: Dict[str, Any]) -> datetime:
+                timestamp = item.get("stored_at") or item.get("_blob_last_modified")
+                parsed = _parse_iso_datetime(timestamp) if isinstance(timestamp, str) else None
+                if parsed is None:
+                    return datetime.min.replace(tzinfo=timezone.utc)
+                return parsed
 
-        reports.sort(key=sort_key, reverse=True)
-        return reports[0]
+            reports.sort(key=sort_key, reverse=True)
+            return reports[0]
 
     return None
 
