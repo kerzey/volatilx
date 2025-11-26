@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import (
@@ -88,6 +88,7 @@ from symbol_map import (
 )
 from azure_storage import store_ai_report, fetch_reports_for_date
 from market_data.live_price import LivePriceStream
+from market_data.live_crypto import LiveCryptoStream
 
 load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -132,6 +133,10 @@ CONTACT_EMAIL_SENDER = os.getenv("CONTACT_EMAIL_SENDER") or SMTP_USERNAME or CON
 ACS_CONNECTION_STRING = os.getenv("ACS_CONNECTION_STRING")
 ACS_EMAIL_SENDER = os.getenv("ACS_EMAIL_SENDER") or CONTACT_EMAIL_SENDER
 ENABLE_LIVE_PRICE_STREAM = os.getenv("ENABLE_LIVE_PRICE_STREAM", "true").strip().lower() not in {"0", "false", "no"}
+ENABLE_LIVE_CRYPTO_STREAM = os.getenv("ENABLE_LIVE_CRYPTO_STREAM", "true").strip().lower() not in {"0", "false", "no"}
+DEFAULT_CRYPTO_STREAM_SYMBOL = os.getenv("CRYPTO_CENTER_DEFAULT_SYMBOL", "BTCUSD").strip().upper() or "BTCUSD"
+ALPACA_CRYPTO_REST_MARKET = os.getenv("ALPACA_CRYPTO_REST_MARKET", os.getenv("ALPACA_CRYPTO_MARKET", "us")).strip().lower() or "us"
+ALPACA_CRYPTO_REST_FEED = os.getenv("ALPACA_CRYPTO_REST_FEED", os.getenv("ALPACA_CRYPTO_FEED", "us")).strip().lower() or "us"
 
 
 def _build_base_url(request: Request) -> str:
@@ -231,7 +236,28 @@ def _is_symbol_favorited(session: Session, user_id: int, symbol: str) -> bool:
     )
 
 
-def _favorite_symbols(session: Session, user_id: int, limit: int = 25) -> List[str]:
+def _filter_symbols_for_market(symbols: Iterable[str], market: str) -> Set[str]:
+    try:
+        ticker_map = get_ticker_map(market)
+    except ValueError:
+        return set()
+
+    lookup = {_sanitize_symbol(ticker): ticker for ticker in ticker_map.keys()}
+    filtered: Set[str] = set()
+    for raw_symbol in symbols:
+        candidate = _sanitize_symbol(raw_symbol)
+        if candidate and candidate in lookup:
+            filtered.add(candidate)
+    return filtered
+
+
+def _favorite_symbols(
+    session: Session,
+    user_id: int,
+    limit: int = 25,
+    *,
+    market: Optional[str] = None,
+) -> List[str]:
     rows = (
         session.query(UserFavoriteSymbol.symbol)
         .filter(UserFavoriteSymbol.user_id == user_id)
@@ -239,23 +265,38 @@ def _favorite_symbols(session: Session, user_id: int, limit: int = 25) -> List[s
         .limit(max(limit, 1))
         .all()
     )
-    return [row[0] for row in rows if row and row[0]]
-
-
-def _all_favorite_symbols(session: Session) -> Set[str]:
-    rows = session.query(UserFavoriteSymbol.symbol).distinct().all()
-    symbols: Set[str] = set()
+    sanitized: List[str] = []
     for row in rows:
         if not row:
             continue
         candidate = _sanitize_symbol(row[0])
         if candidate:
-            symbols.add(candidate)
+            sanitized.append(candidate)
+
+    if market:
+        allowed = _filter_symbols_for_market(sanitized, market)
+        sanitized = [symbol for symbol in sanitized if symbol in allowed]
+
+    return sanitized
+
+
+def _all_favorite_symbols(session: Session, market: Optional[str] = None) -> Set[str]:
+    rows = session.query(UserFavoriteSymbol.symbol).distinct().all()
+    symbols = {_sanitize_symbol(row[0]) for row in rows if row and row[0]}
+    symbols.discard("")
+    if market:
+        return _filter_symbols_for_market(symbols, market)
     return symbols
 
 
-class _EquitySubscriptionRegistry:
-    def __init__(self) -> None:
+class _PooledSubscriptionRegistry:
+    def __init__(
+        self,
+        market: str,
+        stream_getter: Callable[[FastAPI], Optional[LivePriceStream]],
+    ) -> None:
+        self._market = market
+        self._stream_getter = stream_getter
         self._symbols: Set[str] = set()
         self._lock = asyncio.Lock()
 
@@ -276,16 +317,18 @@ class _EquitySubscriptionRegistry:
         if not normalized:
             return
 
+        additions: Set[str]
         async with self._lock:
             additions = normalized - self._symbols
             if not additions:
                 return
             self._symbols.update(additions)
 
-        target_stream = stream if stream is not None else _get_live_stream(app)
+        target_stream = stream if stream is not None else self._stream_getter(app)
         if not target_stream:
             logger.debug(
-                "Live price stream unavailable; pooled symbols pending subscription: %s",
+                "Live %s stream unavailable; pooled symbols pending subscription: %s",
+                self._market,
                 sorted(additions),
             )
             return
@@ -294,22 +337,36 @@ class _EquitySubscriptionRegistry:
             await target_stream.subscribe(additions)
         except Exception as exc:  # pragma: no cover - runtime safety
             logger.debug(
-                "Failed to subscribe pooled equity symbols %s: %s",
+                "Failed to subscribe pooled %s symbols %s: %s",
+                self._market,
                 sorted(additions),
                 exc,
             )
 
 
-def _get_equity_registry(app: FastAPI) -> _EquitySubscriptionRegistry:
+def _get_equity_registry(app: FastAPI) -> _PooledSubscriptionRegistry:
     registry = getattr(app.state, "equity_symbol_registry", None)
     if registry is None:
-        registry = _EquitySubscriptionRegistry()
+        registry = _PooledSubscriptionRegistry("equity", _get_live_stream)
         app.state.equity_symbol_registry = registry
+    return registry
+
+
+def _get_crypto_registry(app: FastAPI) -> _PooledSubscriptionRegistry:
+    registry = getattr(app.state, "crypto_symbol_registry", None)
+    if registry is None:
+        registry = _PooledSubscriptionRegistry("crypto", _get_crypto_stream)
+        app.state.crypto_symbol_registry = registry
     return registry
 
 
 async def _ensure_equity_stream_symbols(app: FastAPI, symbols: Iterable[str]) -> None:
     registry = _get_equity_registry(app)
+    await registry.ensure(app, symbols)
+
+
+async def _ensure_crypto_stream_symbols(app: FastAPI, symbols: Iterable[str]) -> None:
+    registry = _get_crypto_registry(app)
     await registry.ensure(app, symbols)
 
 
@@ -321,6 +378,19 @@ def _get_live_stream(app: FastAPI) -> Optional[LivePriceStream]:
         reason = getattr(stream, "disabled_reason", None)
         if reason and not getattr(stream, "_disabled_notice_logged", False):
             logger.warning("Live price streaming disabled: %s", reason)
+            setattr(stream, "_disabled_notice_logged", True)
+        return None
+    return stream
+
+
+def _get_crypto_stream(app: FastAPI) -> Optional[LiveCryptoStream]:
+    stream = getattr(app.state, "live_crypto_stream", None)
+    if not stream:
+        return None
+    if hasattr(stream, "is_active") and not stream.is_active:
+        reason = getattr(stream, "disabled_reason", None)
+        if reason and not getattr(stream, "_disabled_notice_logged", False):
+            logger.warning("Live crypto streaming disabled: %s", reason)
             setattr(stream, "_disabled_notice_logged", True)
         return None
     return stream
@@ -372,6 +442,68 @@ async def _fetch_rest_live_price(symbol: str) -> Optional[Dict[str, Any]]:
             )
     except Exception as exc:  # pragma: no cover - diagnostic logging
         logger.debug("Alpaca REST live price fallback error for %s: %s", symbol, exc)
+
+    return None
+
+
+async def _fetch_rest_crypto_price(symbol: str) -> Optional[Dict[str, Any]]:
+    api_key = os.getenv("ALPACA_API_KEY")
+    api_secret = os.getenv("ALPACA_SECRET_KEY")
+    if not api_key or not api_secret:
+        return None
+
+    url = f"{ALPACA_DATA_REST_URL}/v1beta3/crypto/{ALPACA_CRYPTO_REST_MARKET}/latest/trades"
+    params = {"symbols": symbol.upper()}
+    if ALPACA_CRYPTO_REST_FEED:
+        params["feed"] = ALPACA_CRYPTO_REST_FEED
+    timeout = aiohttp.ClientTimeout(total=5)
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            response = await session.get(
+                url,
+                headers={
+                    "APCA-API-KEY-ID": api_key,
+                    "APCA-API-SECRET-KEY": api_secret,
+                },
+                params=params,
+            )
+            if response.status == 200:
+                payload = await response.json()
+                trades = (payload.get("trades") or {}) if isinstance(payload, dict) else {}
+                trade = trades.get(symbol.upper()) or trades.get(symbol)
+                if trade is None:
+                    for key, candidate in trades.items():
+                        if _sanitize_symbol(key) == symbol.upper():
+                            trade = candidate
+                            break
+                if not trade:
+                    return None
+                price = trade.get("p") or trade.get("price")
+                if price is None:
+                    return None
+                return {
+                    "symbol": trade.get("S") or symbol.upper(),
+                    "price": price,
+                    "bid": None,
+                    "ask": None,
+                    "timestamp": trade.get("t") or trade.get("timestamp"),
+                    "volume": trade.get("s") or trade.get("size"),
+                    "source": "alpaca-crypto-rest",
+                    "received_at": datetime.now(timezone.utc).isoformat(),
+                }
+
+            if response.status in {404, 422}:
+                return None
+
+            body = await response.text()
+            logger.debug(
+                "Alpaca REST crypto price fallback failed (%s): %s",
+                response.status,
+                body,
+            )
+    except Exception as exc:  # pragma: no cover - diagnostic logging
+        logger.debug("Alpaca REST crypto price fallback error for %s: %s", symbol, exc)
 
     return None
 
@@ -541,6 +673,7 @@ def _consume_subscription_units(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     live_stream = None
+    crypto_stream = None
     try:
         init_db()
         with SessionLocal() as session:
@@ -566,15 +699,39 @@ async def lifespan(app: FastAPI):
     if live_stream:
         try:
             registry = _get_equity_registry(app)
-            initial_symbols = {DEFAULT_ACTION_CENTER_SYMBOL}
+            initial_symbols = {_sanitize_symbol(DEFAULT_ACTION_CENTER_SYMBOL)} if DEFAULT_ACTION_CENTER_SYMBOL else set()
             try:
                 with SessionLocal() as session:
-                    initial_symbols.update(_all_favorite_symbols(session))
+                    initial_symbols.update(_all_favorite_symbols(session, market="equity"))
             except Exception as exc:  # pragma: no cover - startup resilience
                 logger.debug("Unable to load pooled favorite symbols: %s", exc)
             await registry.ensure(app, initial_symbols, stream=live_stream)
         except Exception as exc:  # pragma: no cover - startup resilience
             logger.debug("Unable to prime pooled equity subscriptions: %s", exc)
+    if ENABLE_LIVE_CRYPTO_STREAM:
+        try:
+            crypto_stream = LiveCryptoStream()
+            await crypto_stream.start()
+            try:
+                await crypto_stream.ready(timeout=5.0)
+            except Exception as exc:  # pragma: no cover - startup resilience
+                logger.debug("Live crypto stream ready wait skipped: %s", exc)
+        except Exception as exc:  # pragma: no cover - startup resilience
+            logger.warning("Live crypto streaming unavailable: %s", exc)
+            crypto_stream = None
+    app.state.live_crypto_stream = crypto_stream
+    if crypto_stream:
+        try:
+            registry = _get_crypto_registry(app)
+            initial_crypto = {_sanitize_symbol(DEFAULT_CRYPTO_STREAM_SYMBOL)} if DEFAULT_CRYPTO_STREAM_SYMBOL else set()
+            try:
+                with SessionLocal() as session:
+                    initial_crypto.update(_all_favorite_symbols(session, market="crypto"))
+            except Exception as exc:  # pragma: no cover - startup resilience
+                logger.debug("Unable to load pooled crypto favorites: %s", exc)
+            await registry.ensure(app, initial_crypto, stream=crypto_stream)
+        except Exception as exc:  # pragma: no cover - startup resilience
+            logger.debug("Unable to prime pooled crypto subscriptions: %s", exc)
     try:
         yield
     finally:
@@ -583,7 +740,13 @@ async def lifespan(app: FastAPI):
                 await live_stream.stop()
             except Exception as exc:  # pragma: no cover - shutdown resilience
                 logger.debug("Live price stream stop failed: %s", exc)
+        if crypto_stream:
+            try:
+                await crypto_stream.stop()
+            except Exception as exc:  # pragma: no cover - shutdown resilience
+                logger.debug("Live crypto stream stop failed: %s", exc)
         app.state.live_price_stream = None
+        app.state.live_crypto_stream = None
 
 app = FastAPI(lifespan=lifespan)
 
@@ -741,53 +904,32 @@ async def azure_callback(request: Request):
 ##############################################################################################
 @app.get("/auth/google/login")
 async def google_login(request: Request):
-    # host = request.headers.get("host", "www.volatilx.com")
-    # redirect_uri = f"https://{host}/auth/google/callback"
-    # return await oauth.google.authorize_redirect(request, redirect_uri)
     host = request.headers.get("host", "www.volatilx.com")
-
-    is_local = host.startswith(("127.0.0.1", "localhost"))
-    scheme = "http" if is_local else "https"
-
-    redirect_uri = f"{scheme}://{host}/auth/google/callback"
-    client_host = request.client.host if request.client else "unknown"
-    logger.info("Google login initiated from %s", client_host)
+    redirect_uri = f"https://{host}/auth/google/callback"
     return await oauth.google.authorize_redirect(request, redirect_uri)
+
 
 @app.get("/auth/google/callback")
 async def google_callback(request: Request):
     try:
         token = await oauth.google.authorize_access_token(request)
-        
-        # Extract user info
-        if 'userinfo' in token:
-            userinfo = token['userinfo']
-        else:
-            import jwt
-            id_token = token.get('id_token')
-            userinfo = jwt.decode(id_token, options={"verify_signature": False})
-        
-        email = userinfo.get("email")
-        oauth_sub = userinfo.get("sub")
-        
+        user_info = token.get("userinfo") or {}
+        email = user_info.get("email")
+        oauth_sub = user_info.get("sub") or user_info.get("id")
+
         if not email:
-            print("No email found in OAuth response")
             return RedirectResponse(url="/signin?error=no_email")
-        
-        print(f"Processing OAuth for email: {email}")
+
         client_host = request.client.host if request.client else "unknown"
         logger.info("Google OAuth callback for %s from %s", email, client_host)
-        
-        # Use sync database operations
+
         db = SessionLocal()
         try:
             # Query user directly with SQLAlchemy
             user = db.query(User).filter(User.email == email).first()
-            
             if user is None:
                 print(f"Creating new user for {email}")
                 logger.info("Creating Google user record for %s", email)
-                # Create new user
                 user = User(
                     email=email,
                     hashed_password=password_helper.hash(os.urandom(8).hex()),
@@ -803,27 +945,26 @@ async def google_callback(request: Request):
                 print(f"User created successfully with ID: {user.id}")
             else:
                 print(f"Existing user found: {user.id}")
-            
+
             _ensure_trial_subscription(db, user)
             logger.info("Google user %s assigned to tier %s", user.email, user.tier)
 
-            # Create JWT token
             jwt_strategy = get_jwt_strategy()
             access_token = await jwt_strategy.write_token(user)
-            
+
             response = RedirectResponse(url="/analyze")
             response.set_cookie(
-                key="volatilx_cookie", 
-                value=access_token, 
+                key="volatilx_cookie",
+                value=access_token,
                 httponly=True,
                 secure=False,
                 samesite="lax",
-                max_age=3600,  # Add explicit max_age
-                path="/"       # Add explicit path
+                max_age=3600,
+                path="/",
             )
             print("OAuth successful, redirecting to /analyze")
             return response
-            
+
         except Exception as e:
             db.rollback()
             error_detail = urllib.parse.quote_plus(str(e))
@@ -832,7 +973,7 @@ async def google_callback(request: Request):
             return RedirectResponse(url=f"/signin?error=db_error&detail={error_detail}")
         finally:
             db.close()
-            
+
     except Exception as e:
         logger.exception("Google OAuth error")
         print(f"OAuth error in Google callback: {e}")
@@ -2020,7 +2161,7 @@ async def action_center_page(
 
     with SessionLocal() as session:
         is_favorited = _is_symbol_favorited(session, user.id, symbol_upper)
-        favorite_symbols = _favorite_symbols(session, user.id)
+        favorite_symbols = _favorite_symbols(session, user.id, market="equity")
 
     strategy_key = _STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
     raw_report = _fetch_latest_action_report(symbol_upper)
@@ -2180,10 +2321,16 @@ async def set_action_center_favorite(
             else:
                 session.commit()
         current_state = _is_symbol_favorited(session, user.id, symbol_clean)
-        favorites = _favorite_symbols(session, user.id)
+        favorites = _favorite_symbols(session, user.id, market="equity")
 
     if current_state:
-        await _ensure_equity_stream_symbols(request.app, {symbol_clean})
+        symbol_set = {symbol_clean}
+        equity_symbols = _filter_symbols_for_market(symbol_set, "equity")
+        if equity_symbols:
+            await _ensure_equity_stream_symbols(request.app, equity_symbols)
+        crypto_symbols = _filter_symbols_for_market(symbol_set, "crypto")
+        if crypto_symbols:
+            await _ensure_crypto_stream_symbols(request.app, crypto_symbols)
 
     return {
         "symbol": symbol_clean,
@@ -2195,29 +2342,52 @@ async def set_action_center_favorite(
 @app.get("/api/action-center/favorites")
 async def list_action_center_favorites(user: User = Depends(get_current_user_sync)):
     with SessionLocal() as session:
-        favorites = _favorite_symbols(session, user.id, limit=50)
+        favorites = _favorite_symbols(session, user.id, limit=50, market="equity")
     return {"symbols": favorites}
 
 
 @app.get("/api/live-price")
-async def get_live_price(symbol: str, request: Request, user: User = Depends(get_current_user_sync)):
+async def get_live_price(
+    symbol: str,
+    request: Request,
+    market: Optional[str] = None,
+    user: User = Depends(get_current_user_sync),
+):
     symbol_clean = _sanitize_symbol(symbol)
     if not symbol_clean:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A valid symbol is required.")
 
-    service = _get_live_stream(request.app)
+    market_slug = (market or "equity").strip().lower()
+    if market_slug not in {"equity", "crypto"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported market requested.")
+
+    logger.debug(
+        "Live price request user=%s market=%s symbol=%s",
+        getattr(user, "id", "?"),
+        market_slug,
+        symbol_clean,
+    )
+
+    if market_slug == "crypto":
+        await _ensure_crypto_stream_symbols(request.app, {symbol_clean})
+        service = _get_crypto_stream(request.app)
+        fallback_fetcher = _fetch_rest_crypto_price
+        unavailable_detail = "Live crypto stream unavailable."
+    else:
+        await _ensure_equity_stream_symbols(request.app, {symbol_clean})
+        service = _get_live_stream(request.app)
+        fallback_fetcher = _fetch_rest_live_price
+        unavailable_detail = "Live price stream unavailable."
+
     if not service:
-        fallback = await _fetch_rest_live_price(symbol_clean)
+        fallback = await fallback_fetcher(symbol_clean)
         if fallback:
+            fallback.setdefault("market", market_slug)
             return fallback
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"detail": "Live price stream unavailable."},
+            content={"detail": unavailable_detail},
         )
-
-    logger.debug("Live price request user=%s symbol=%s", getattr(user, "id", "?"), symbol_clean)
-
-    await _ensure_equity_stream_symbols(request.app, {symbol_clean})
 
     try:
         await service.ready(timeout=5.0)
@@ -2226,15 +2396,17 @@ async def get_live_price(symbol: str, request: Request, user: User = Depends(get
 
     update = service.get_latest(symbol_clean)
     if update is None:
-        fallback = await _fetch_rest_live_price(symbol_clean)
+        fallback = await fallback_fetcher(symbol_clean)
         if fallback:
+            fallback.setdefault("market", market_slug)
             return fallback
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
-            content={"symbol": symbol_clean, "status": "pending"},
+            content={"symbol": symbol_clean, "status": "pending", "market": market_slug},
         )
 
     payload = update.to_dict()
+    payload["market"] = market_slug
     return {
         "symbol": payload.get("symbol", symbol_clean),
         "price": payload.get("last_trade_price"),
@@ -2244,6 +2416,7 @@ async def get_live_price(symbol: str, request: Request, user: User = Depends(get
         "volume": payload.get("volume"),
         "source": payload.get("source"),
         "received_at": payload.get("received_at"),
+        "market": payload.get("market", market_slug),
     }
 
 
