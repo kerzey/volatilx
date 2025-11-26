@@ -49,6 +49,10 @@ _DEFAULT_VERSION = os.getenv("ALPACA_DATA_VERSION", "v2").lower()
 _SANDBOX_HINT = "sandbox" in (os.getenv("APCA_API_BASE_URL", "") or "")
 
 
+class LivePriceHandshakeError(RuntimeError):
+    """Raised when the Alpaca websocket handshake fails."""
+
+
 @dataclass(slots=True)
 class PriceUpdate:
     """Represents the latest known trade and quote for a symbol."""
@@ -141,19 +145,37 @@ class LivePriceStream:
         self._listeners: Set[StreamListener] = set()
         self._lock = asyncio.Lock()
         self._runner_task: Optional[asyncio.Task[None]] = None
+        self._handshake_failures = 0
+        self._handshake_failure_limit = 5
+        self._disabled_reason: Optional[str] = None
+        self._disabled_notice_logged = False
 
     @property
     def url(self) -> str:
         base = "wss://stream.data.sandbox.alpaca.markets" if self._sandbox else "wss://stream.data.alpaca.markets"
         return f"{base}/{self._version}/{self._feed}"
 
+    @property
+    def is_active(self) -> bool:
+        if self._disabled_reason is not None:
+            return False
+        return self._runner_task is not None and not self._runner_task.done() and not self._stop_event.is_set()
+
+    @property
+    def disabled_reason(self) -> Optional[str]:
+        return self._disabled_reason
+
     async def start(self) -> None:
         """Start the streaming task if it is not already running."""
 
         async with self._lock:
+            if self._disabled_reason:
+                logger.warning("Live price stream is disabled: %s", self._disabled_reason)
+                return
             if self._runner_task and not self._runner_task.done():
                 return
             self._stop_event.clear()
+            self._handshake_failures = 0
             loop = asyncio.get_running_loop()
             self._runner_task = loop.create_task(self._run_loop(), name="live-price-stream")
 
@@ -230,6 +252,21 @@ class LivePriceStream:
                 await self._connect()
                 backoff = self._reconnect_min
                 await self._consume()
+            except LivePriceHandshakeError as exc:
+                self._handshake_failures += 1
+                logger.error("Live price stream handshake failed (%d/%d): %s", self._handshake_failures, self._handshake_failure_limit, exc)
+                should_disable = False
+                if "unauthorized" in str(exc).lower() or "forbidden" in str(exc).lower():
+                    should_disable = True
+                elif self._handshake_failures >= self._handshake_failure_limit:
+                    should_disable = True
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, self._reconnect_max)
+                if should_disable:
+                    self._disabled_reason = str(exc)
+                    self._disabled_notice_logged = False
+                    logger.error("Disabling live price stream after handshake failures: %s", self._disabled_reason)
+                    break
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # pragma: no cover - runtime resilience
@@ -347,11 +384,14 @@ class LivePriceStream:
     async def _expect_success(self, message: str, timeout: float = 5.0) -> None:
         assert self._ws is not None
         while True:
-            response = await asyncio.wait_for(self._ws.receive(), timeout=timeout)
+            try:
+                response = await asyncio.wait_for(self._ws.receive(), timeout=timeout)
+            except asyncio.TimeoutError as exc:
+                raise LivePriceHandshakeError(f"Timed out waiting for '{message}' confirmation from Alpaca stream") from exc
             if response.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED):
-                raise RuntimeError("Websocket closed during handshake")
+                raise LivePriceHandshakeError("Websocket closed during handshake")
             if response.type == aiohttp.WSMsgType.ERROR:
-                raise RuntimeError(f"Websocket error during handshake: {response.data}")
+                raise LivePriceHandshakeError(f"Websocket error during handshake: {response.data}")
             payload = self._decode_payload(response)
             if payload is None:
                 continue
@@ -359,6 +399,10 @@ class LivePriceStream:
             for event in events:
                 if not isinstance(event, dict):
                     continue
+                if event.get("T") == "error":
+                    msg = event.get("msg") or "unknown error"
+                    code = event.get("code")
+                    raise LivePriceHandshakeError(f"Alpaca stream error during handshake: {msg} (code={code})")
                 if event.get("T") == "success" and event.get("msg") == message:
                     return
                 logger.debug("Handshake passthrough: %s", event)

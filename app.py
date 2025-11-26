@@ -9,6 +9,8 @@ import smtplib
 from email.message import EmailMessage
 import html
 
+import aiohttp
+
 try:
     from azure.communication.email import EmailClient
 except ImportError:  # pragma: no cover - optional dependency
@@ -118,6 +120,7 @@ DEFAULT_REPORT_CENTER_REPORT_LIMIT = int(
 DEFAULT_ACTION_CENTER_SYMBOL = os.getenv("ACTION_CENTER_DEFAULT_SYMBOL", "SPY").upper()
 ACTION_CENTER_LOOKBACK_DAYS = int(os.getenv("ACTION_CENTER_LOOKBACK_DAYS", "3"))
 CONTACT_EMAIL_RECIPIENT = os.getenv("CONTACT_EMAIL_RECIPIENT")
+ALPACA_DATA_REST_URL = os.getenv("ALPACA_DATA_REST_URL", "https://data.alpaca.markets").rstrip("/")
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME")
@@ -239,7 +242,66 @@ def _favorite_symbols(session: Session, user_id: int, limit: int = 25) -> List[s
 
 
 def _get_live_stream(app: FastAPI) -> Optional[LivePriceStream]:
-    return getattr(app.state, "live_price_stream", None)
+    stream = getattr(app.state, "live_price_stream", None)
+    if not stream:
+        return None
+    if hasattr(stream, "is_active") and not stream.is_active:
+        reason = getattr(stream, "disabled_reason", None)
+        if reason and not getattr(stream, "_disabled_notice_logged", False):
+            logger.warning("Live price streaming disabled: %s", reason)
+            setattr(stream, "_disabled_notice_logged", True)
+        return None
+    return stream
+
+
+async def _fetch_rest_live_price(symbol: str) -> Optional[Dict[str, Any]]:
+    api_key = os.getenv("ALPACA_API_KEY")
+    api_secret = os.getenv("ALPACA_SECRET_KEY")
+    if not api_key or not api_secret:
+        return None
+
+    url = f"{ALPACA_DATA_REST_URL}/v2/stocks/{symbol}/trades/latest"
+    params = {"feed": os.getenv("ALPACA_DATA_FEED", "iex")}
+    timeout = aiohttp.ClientTimeout(total=5)
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            response = await session.get(
+                url,
+                headers={
+                    "APCA-API-KEY-ID": api_key,
+                    "APCA-API-SECRET-KEY": api_secret,
+                },
+                params=params,
+            )
+            if response.status == 200:
+                payload = await response.json()
+                trade = payload.get("trade") or {}
+                price = trade.get("p")
+                if price is None:
+                    return None
+                return {
+                    "symbol": payload.get("symbol", symbol),
+                    "price": price,
+                    "bid": None,
+                    "ask": None,
+                    "timestamp": trade.get("t"),
+                    "volume": trade.get("s"),
+                    "source": "alpaca-rest",
+                    "received_at": datetime.now(timezone.utc).isoformat(),
+                }
+
+            if response.status in {404, 422}:
+                return None
+
+            body = await response.text()
+            logger.debug(
+                "Alpaca REST live price fallback failed (%s): %s", response.status, body
+            )
+    except Exception as exc:  # pragma: no cover - diagnostic logging
+        logger.debug("Alpaca REST live price fallback error for %s: %s", symbol, exc)
+
+    return None
 
 
 def _ensure_trial_subscription(session: Session, user: User) -> None:
@@ -2050,16 +2112,19 @@ async def list_action_center_favorites(user: User = Depends(get_current_user_syn
 
 @app.get("/api/live-price")
 async def get_live_price(symbol: str, request: Request, user: User = Depends(get_current_user_sync)):
+    symbol_clean = _sanitize_symbol(symbol)
+    if not symbol_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A valid symbol is required.")
+
     service = _get_live_stream(request.app)
     if not service:
+        fallback = await _fetch_rest_live_price(symbol_clean)
+        if fallback:
+            return fallback
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": "Live price stream unavailable."},
         )
-
-    symbol_clean = _sanitize_symbol(symbol)
-    if not symbol_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A valid symbol is required.")
 
     logger.debug("Live price request user=%s symbol=%s", getattr(user, "id", "?"), symbol_clean)
 
@@ -2075,6 +2140,9 @@ async def get_live_price(symbol: str, request: Request, user: User = Depends(get
 
     update = service.get_latest(symbol_clean)
     if update is None:
+        fallback = await _fetch_rest_live_price(symbol_clean)
+        if fallback:
+            return fallback
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
             content={"symbol": symbol_clean, "status": "pending"},
