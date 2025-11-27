@@ -301,7 +301,6 @@ class PrincipalAgent(OpenAIResponsesMixin):
             "Output requirements:\n"
             "- Respond ONLY with a single valid JSON object (no markdown, no commentary).\n"
             "- Use plain, simple language in summaries (no jargon, no indicator names like MACD, RSI, Fibonacci, Elliott wave).\n"
-            "- Describe effects in terms of momentum, trend strength, support, resistance, potential reversal, or conflicting signals.\n"
             "- For EACH strategy you MUST provide: a summary, a BUY setup, a SELL setup, and at least one NO-TRADE zone.\n"
             "- For BOTH BUY and SELL setups, you MUST provide:\n"
             "    - a single numeric entry level,\n"
@@ -347,8 +346,9 @@ class PrincipalAgent(OpenAIResponsesMixin):
             "- \"buy_setup.entry\" and \"sell_setup.entry\" are the main trigger prices for that strategy.\n"
             "- \"buy_setup.stop\" and \"sell_setup.stop\" are the protective stop levels.\n"
             "- \"buy_setup.targets\" and \"sell_setup.targets\" MUST each include at least TWO numeric target prices; you may include more.\n"
-            "- \"no_trade_zone\" is an array of one or more objects, each with numeric \"min\" and \"max\" fields defining a price range where conditions are too noisy or unclear.\n"
-            "- Use only numeric literals for all price values (no strings, no text in numeric fields).\n"
+            "- \"no_trade_zone\" is an array of one or more objects, each with numeric \"min\" and \"max\" fields defining price ranges where trading is discouraged.\n"
+            "- Use only numeric literals for all price values (no strings for prices).\n"
+            "- DO NOT include fields like \"key_levels\", \"next_actions\", \"Name\", \"Type\", or \"Risk Reward Ratio\" anywhere in the JSON.\n"
             "- Do NOT add any extra top-level keys beyond \"day_trading\", \"swing_trading\", and \"longterm_trading\".\n"
             "- Do NOT wrap the JSON in backticks or any markdown formatting.\n"
             # "Format your response as a strict JSON object with these top-level keys: \"day_trading\", \"swing_trading\", and \"longterm_trading\". "
@@ -442,34 +442,113 @@ class PrincipalAgent(OpenAIResponsesMixin):
             lines.append(f"Tokens used: {tokens_used}")
         lines.append("")
 
-        for heading, key in (
-            ("Day Trading", "day_trading"),
-            ("Swing Trading", "swing_trading"),
-            ("Long-Term Trading", "longterm_trading"),
-        ):
+        def _render_strategy(title: str, key: str) -> None:
             section = strategies.get(key)
             if not isinstance(section, dict):
-                continue
-            lines.append(heading)
+                return
+
             summary = self._coerce_to_sentence(section.get("summary")) or "No summary provided."
+            buy = section.get("buy_setup") or {}
+            sell = section.get("sell_setup") or {}
+            no_trade = section.get("no_trade_zone") or []
+
+            lines.append(f"{title} — ACTION PLAN")
+            lines.append("")
             lines.append(f"Summary: {summary}")
-
-            key_levels = section.get("key_levels")
-            if isinstance(key_levels, dict) and key_levels:
-                lines.append("Key Levels:")
-                for level_key, level_value in key_levels.items():
-                    label = self._humanise_key(level_key)
-                    value_text = self._coerce_to_sentence(level_value) or str(level_value)
-                    lines.append(f"{label}: {value_text}")
-            elif isinstance(key_levels, list) and key_levels:
-                lines.append("Key Levels: " + ", ".join(self._coerce_to_list_of_strings(key_levels)))
-
-            actions = self._coerce_to_list_of_strings(section.get("next_actions"))
-            if actions:
-                lines.append("Next Actions: " + "; ".join(actions))
             lines.append("")
 
+            # BUY SETUP
+            if isinstance(buy, dict) and buy:
+                lines.append("🔵 BUY SETUP")
+                entry = buy.get("entry")
+                stop = buy.get("stop")
+                targets = buy.get("targets") or []
+                if entry is not None:
+                    lines.append(f"  • Entry: {entry}")
+                if stop is not None:
+                    lines.append(f"  • Stop: {stop}")
+                if isinstance(targets, list) and targets:
+                    target_str = " → ".join(str(t) for t in targets)
+                    lines.append(f"  • Targets: {target_str}")
+                lines.append("")
+
+            # SELL SETUP
+            if isinstance(sell, dict) and sell:
+                lines.append("🔴 SELL SETUP")
+                entry = sell.get("entry")
+                stop = sell.get("stop")
+                targets = sell.get("targets") or []
+                if entry is not None:
+                    lines.append(f"  • Entry: {entry}")
+                if stop is not None:
+                    lines.append(f"  • Stop: {stop}")
+                if isinstance(targets, list) and targets:
+                    target_str = " → ".join(str(t) for t in targets)
+                    lines.append(f"  • Targets: {target_str}")
+                lines.append("")
+
+            # NO-TRADE ZONE
+            if isinstance(no_trade, list) and no_trade:
+                lines.append("⚠️ NO-TRADE ZONE")
+                for zone in no_trade:
+                    if not isinstance(zone, dict):
+                        continue
+                    zmin = zone.get("min")
+                    zmax = zone.get("max")
+                    if zmin is not None and zmax is not None:
+                        lines.append(f"  • {zmin} → {zmax}")
+                lines.append("")
+
+        for heading, key in (
+            ("DAY TRADING", "day_trading"),
+            ("SWING TRADING", "swing_trading"),
+            ("LONG-TERM TRADING", "longterm_trading"),
+        ):
+            _render_strategy(heading, key)
+
         return "\n".join(line.rstrip() for line in lines).strip()
+            
+    #     self,
+    #     symbol: str,
+    #     generated_display: str,
+    #     tokens_used: Optional[int],
+    #     strategies: Dict[str, Any],
+    # ) -> str:
+    #     lines: List[str] = []
+    #     lines.append(f"Symbol: {symbol}")
+    #     lines.append(f"Generated: {generated_display}")
+    #     if tokens_used is not None:
+    #         lines.append(f"Tokens used: {tokens_used}")
+    #     lines.append("")
+
+    #     for heading, key in (
+    #         ("Day Trading", "day_trading"),
+    #         ("Swing Trading", "swing_trading"),
+    #         ("Long-Term Trading", "longterm_trading"),
+    #     ):
+    #         section = strategies.get(key)
+    #         if not isinstance(section, dict):
+    #             continue
+    #         lines.append(heading)
+    #         summary = self._coerce_to_sentence(section.get("summary")) or "No summary provided."
+    #         lines.append(f"Summary: {summary}")
+
+    #         key_levels = section.get("key_levels")
+    #         if isinstance(key_levels, dict) and key_levels:
+    #             lines.append("Key Levels:")
+    #             for level_key, level_value in key_levels.items():
+    #                 label = self._humanise_key(level_key)
+    #                 value_text = self._coerce_to_sentence(level_value) or str(level_value)
+    #                 lines.append(f"{label}: {value_text}")
+    #         elif isinstance(key_levels, list) and key_levels:
+    #             lines.append("Key Levels: " + ", ".join(self._coerce_to_list_of_strings(key_levels)))
+
+    #         actions = self._coerce_to_list_of_strings(section.get("next_actions"))
+    #         if actions:
+    #             lines.append("Next Actions: " + "; ".join(actions))
+    #         lines.append("")
+
+    #     return "\n".join(line.rstrip() for line in lines).strip()
 
     # ------------------------------------------------------------------
     # Normalisation helpers
