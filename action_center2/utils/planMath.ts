@@ -424,15 +424,6 @@ function resolveBuySummary(context: SummaryContext): ZoneResponse {
     longStop,
     longTargets,
     shortEntry,
-    neutralBands,
-  } = context;
-
-  const firstLongTarget = longTargets[0];
-  const finalLongTarget = longTargets[longTargets.length - 1];
-  const lowestShort = shortTargets[shortTargets.length - 1];
-  const highestShort = shortTargets[0];
-  const primaryNeutral = neutralBands[0];
-  const ladderBounds = classification.ladderBounds;
     shortTargets,
     neutralBands,
   } = context;
