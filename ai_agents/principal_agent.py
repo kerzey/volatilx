@@ -589,32 +589,85 @@ class PrincipalAgent(OpenAIResponsesMixin):
 
         return strategies, supplemental
 
+    # def _fallback_strategies_from_experts(self, expert_outputs: Dict[str, Any]) -> Dict[str, Any]:
+    #     fallback: Dict[str, Any] = {}
+    #     summary_texts: List[str] = []
+    #     key_levels: Dict[str, Any] = {}
+    #     next_actions: List[str] = []
+
+    #     for key in ("technical", "price_action"):
+    #         summarised, levels, actions = self._summarise_expert_output(key, expert_outputs.get(key))
+    #         if summarised:
+    #             summary_texts.append(f"{self._humanise_key(key)}: {summarised}")
+    #         if levels:
+    #             key_levels.update(levels)
+    #         if actions:
+    #             next_actions.extend(actions)
+
+    #     default_summary = summary_texts[0] if summary_texts else "Awaiting detailed guidance from expert agents."
+    #     default_levels = key_levels or {"Reference": "Monitor recent swing highs and lows."}
+    #     default_actions = next_actions or [
+    #         "Track momentum alignment before committing capital.",
+    #         "Place alerts near key support and resistance clusters.",
+    #     ]
+
+    #     template = {
+    #         "summary": default_summary,
+    #         "key_levels": default_levels,
+    #         "next_actions": default_actions,
+    #     }
+
+    #     return {
+    #         "day_trading": template,
+    #         "swing_trading": template,
+    #         "longterm_trading": template,
+    #     }
+
     def _fallback_strategies_from_experts(self, expert_outputs: Dict[str, Any]) -> Dict[str, Any]:
-        fallback: Dict[str, Any] = {}
-        summary_texts: List[str] = []
-        key_levels: Dict[str, Any] = {}
-        next_actions: List[str] = []
+        fallback = {}
+        summary_texts, support_prices, resistance_prices = [], [], []
 
         for key in ("technical", "price_action"):
             summarised, levels, actions = self._summarise_expert_output(key, expert_outputs.get(key))
             if summarised:
                 summary_texts.append(f"{self._humanise_key(key)}: {summarised}")
-            if levels:
-                key_levels.update(levels)
-            if actions:
-                next_actions.extend(actions)
+            for label, value in (levels or {}).items():
+                for token in self._coerce_to_list_of_strings(value, limit=4):
+                    price = safe_float(token.replace(",", ""))
+                    if price is None:
+                        continue
+                    if "support" in label.lower():
+                        support_prices.append(price)
+                    elif "resistance" in label.lower():
+                        resistance_prices.append(price)
 
-        default_summary = summary_texts[0] if summary_texts else "Awaiting detailed guidance from expert agents."
-        default_levels = key_levels or {"Reference": "Monitor recent swing highs and lows."}
-        default_actions = next_actions or [
-            "Track momentum alignment before committing capital.",
-            "Place alerts near key support and resistance clusters.",
-        ]
+        def default_setup(entry_hint: Optional[float], direction: str) -> Dict[str, Any]:
+            entry = entry_hint or 0.0
+            step = abs(entry * 0.005) if entry else 1.0
+            if direction == "buy":
+                targets = [entry + step, entry + step * 2]
+                stop = entry - step
+            else:
+                targets = [entry - step, entry - step * 2]
+                stop = entry + step
+            return {
+                "entry": round(entry, 2),
+                "stop": round(stop, 2),
+                "targets": [round(t, 2) for t in targets],
+            }
+
+        buy_entry = support_prices[0] if support_prices else (resistance_prices[0] if resistance_prices else None)
+        sell_entry = resistance_prices[0] if resistance_prices else (support_prices[0] if support_prices else None)
+        summary = summary_texts[0] if summary_texts else "No structured output generated. Re-run analysis."
 
         template = {
-            "summary": default_summary,
-            "key_levels": default_levels,
-            "next_actions": default_actions,
+            "summary": summary,
+            "buy_setup": default_setup(buy_entry, "buy"),
+            "sell_setup": default_setup(sell_entry, "sell"),
+            "no_trade_zone": [{
+                "min": round(min(buy_entry or 0.0, sell_entry or 0.0), 2),
+                "max": round(max(buy_entry or 0.0, sell_entry or 0.0), 2),
+            }],
         }
 
         return {
@@ -622,7 +675,6 @@ class PrincipalAgent(OpenAIResponsesMixin):
             "swing_trading": template,
             "longterm_trading": template,
         }
-
     def _summarise_expert_output(
         self,
         expert_key: str,
