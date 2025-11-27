@@ -324,33 +324,23 @@ class PrincipalAgent(OpenAIResponsesMixin):
         template_instruction = (
             "Format your response as a STRICT JSON object with EXACTLY these top-level keys: "
             "\"day_trading\", \"swing_trading\", and \"longterm_trading\".\n"
-            "Each key MUST contain an object with this structure:\n"
+            "Each key MUST contain this structure:\n"
             "{\n"
-            "  \"summary\": \"string\",\n"
-            "  \"buy_setup\": {\n"
-            "    \"entry\": number,\n"
-            "    \"stop\": number,\n"
-            "    \"targets\": [number, number]\n"
-            "  },\n"
-            "  \"sell_setup\": {\n"
-            "    \"entry\": number,\n"
-            "    \"stop\": number,\n"
-            "    \"targets\": [number, number]\n"
-            "  },\n"
-            "  \"no_trade_zone\": [\n"
-            "    {\"min\": number, \"max\": number}\n"
-            "  ]\n"
-            "}\n\n"
-            "Additional rules:\n"
-            "- \"summary\" is 1–2 sentences describing the overall outlook for that strategy (timeframe, dominant direction, and any conflict between expert opinions).\n"
-            "- \"buy_setup.entry\" and \"sell_setup.entry\" are the main trigger prices for that strategy.\n"
-            "- \"buy_setup.stop\" and \"sell_setup.stop\" are the protective stop levels.\n"
-            "- \"buy_setup.targets\" and \"sell_setup.targets\" MUST each include at least TWO numeric target prices; you may include more.\n"
-            "- \"no_trade_zone\" is an array of one or more objects, each with numeric \"min\" and \"max\" fields defining price ranges where trading is discouraged.\n"
-            "- Use only numeric literals for all price values (no strings for prices).\n"
-            "- DO NOT include fields like \"key_levels\", \"next_actions\", \"Name\", \"Type\", or \"Risk Reward Ratio\" anywhere in the JSON.\n"
-            "- Do NOT add any extra top-level keys beyond \"day_trading\", \"swing_trading\", and \"longterm_trading\".\n"
-            "- Do NOT wrap the JSON in backticks or any markdown formatting.\n"
+            " \"summary\": \"string\",\n"
+            " \"buy_setup\": {\n"
+            " \"entry\": number,\n"
+            " \"stop\": number,\n"
+            " \"targets\": [number, number]\n"
+            " },\n"
+            " \"sell_setup\": {\n"
+            " \"entry\": number,\n"
+            " \"stop\": number,\n"
+            " \"targets\": [number, number]\n"
+            " },\n"
+            " \"no_trade_zone\": [ {\"min\": number, \"max\": number} ]\n"
+            "}\n"
+            "- Do NOT produce next_actions or key_levels anywhere.\n"
+            "- Do NOT output anything except valid JSON.\n"
             # "Format your response as a strict JSON object with these top-level keys: \"day_trading\", \"swing_trading\", and \"longterm_trading\". "
             # "Each key must contain a dictionary with:\n"
             # "  - \"summary\": 1–2 sentences summarizing the overall outlook for that strategy (mention timeframe, direction, and degree of agreement or conflict between expert opinions).\n"
@@ -416,6 +406,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
             raise RuntimeError(f"Principal agent failed to summarise strategies: {exc}") from exc
 
         raw_text = _extract_output_text(response)
+        logger.info("Principal raw_text for %s: %s", symbol, raw_text[:800])
         parsed_summary = self._parse_json_from_text(raw_text)
         if parsed_summary is None:
             logger.debug("Principal agent returned unstructured summary for %s: %s", symbol, raw_text[:250])
@@ -435,6 +426,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
         tokens_used: Optional[int],
         strategies: Dict[str, Any],
     ) -> str:
+
         lines: List[str] = []
         lines.append(f"Symbol: {symbol}")
         lines.append(f"Generated: {generated_display}")
@@ -447,10 +439,11 @@ class PrincipalAgent(OpenAIResponsesMixin):
             if not isinstance(section, dict):
                 return
 
-            summary = self._coerce_to_sentence(section.get("summary")) or "No summary provided."
-            buy = section.get("buy_setup") or {}
-            sell = section.get("sell_setup") or {}
-            no_trade = section.get("no_trade_zone") or []
+            summary = section.get("summary", "")
+
+            buy = section.get("buy_setup", {})
+            sell = section.get("sell_setup", {})
+            no_trade = section.get("no_trade_zone", [])
 
             lines.append(f"{title} — ACTION PLAN")
             lines.append("")
@@ -458,55 +451,36 @@ class PrincipalAgent(OpenAIResponsesMixin):
             lines.append("")
 
             # BUY SETUP
-            if isinstance(buy, dict) and buy:
-                lines.append("🔵 BUY SETUP")
-                entry = buy.get("entry")
-                stop = buy.get("stop")
-                targets = buy.get("targets") or []
-                if entry is not None:
-                    lines.append(f"  • Entry: {entry}")
-                if stop is not None:
-                    lines.append(f"  • Stop: {stop}")
-                if isinstance(targets, list) and targets:
-                    target_str = " → ".join(str(t) for t in targets)
-                    lines.append(f"  • Targets: {target_str}")
-                lines.append("")
+            lines.append("🔵 BUY SETUP")
+            lines.append(f" • Entry: {buy.get('entry')}")
+            lines.append(f" • Stop: {buy.get('stop')}")
+            targets = buy.get("targets", [])
+            if targets:
+                lines.append(" • Targets: " + " → ".join(map(str, targets)))
+            lines.append("")
 
             # SELL SETUP
-            if isinstance(sell, dict) and sell:
-                lines.append("🔴 SELL SETUP")
-                entry = sell.get("entry")
-                stop = sell.get("stop")
-                targets = sell.get("targets") or []
-                if entry is not None:
-                    lines.append(f"  • Entry: {entry}")
-                if stop is not None:
-                    lines.append(f"  • Stop: {stop}")
-                if isinstance(targets, list) and targets:
-                    target_str = " → ".join(str(t) for t in targets)
-                    lines.append(f"  • Targets: {target_str}")
-                lines.append("")
+            lines.append("🔴 SELL SETUP")
+            lines.append(f" • Entry: {sell.get('entry')}")
+            lines.append(f" • Stop: {sell.get('stop')}")
+            targets = sell.get("targets", [])
+            if targets:
+                lines.append(" • Targets: " + " → ".join(map(str, targets)))
+            lines.append("")
 
             # NO-TRADE ZONE
-            if isinstance(no_trade, list) and no_trade:
+            if no_trade:
                 lines.append("⚠️ NO-TRADE ZONE")
                 for zone in no_trade:
-                    if not isinstance(zone, dict):
-                        continue
-                    zmin = zone.get("min")
-                    zmax = zone.get("max")
-                    if zmin is not None and zmax is not None:
-                        lines.append(f"  • {zmin} → {zmax}")
+                    if isinstance(zone, dict):
+                        lines.append(f" • {zone['min']} → {zone['max']}")
                 lines.append("")
 
-        for heading, key in (
-            ("DAY TRADING", "day_trading"),
-            ("SWING TRADING", "swing_trading"),
-            ("LONG-TERM TRADING", "longterm_trading"),
-        ):
-            _render_strategy(heading, key)
+        _render_strategy("DAY TRADING", "day_trading")
+        _render_strategy("SWING TRADING", "swing_trading")
+        _render_strategy("LONG-TERM TRADING", "longterm_trading")
 
-        return "\n".join(line.rstrip() for line in lines).strip()
+        return "\n".join(lines)
             
     #     self,
     #     symbol: str,
