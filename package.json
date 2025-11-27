@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build:action-center2": "node scripts/build-action-center2.mjs"
+    "build:action-center2": "tailwindcss -c tailwind.config.js -i ./action_center2/tailwind.css -o ./static/css/action-center2.css --minify && node scripts/build-action-center2.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -13,6 +13,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.2",
     "esbuild": "^0.23.0",
+    "tailwindcss": "^3.4.13",
     "typescript": "^5.6.3"
   }
 }
