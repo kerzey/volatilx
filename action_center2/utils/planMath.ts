@@ -1043,12 +1043,25 @@ function buildPlanSnapshot({
   const longSnapshot = longSnapshotParts.join(" • ");
   const shortSnapshot = shortSnapshotParts.join(" • ");
 
-  if ((intent === "buy" || intent === "sell" || intent === "both") && longSnapshotParts.length) {
-    snapshots.push(longSnapshot);
-  }
-
-  if (intent === "both" && shortSnapshotParts.length) {
-    snapshots.push(shortSnapshot);
+  if (intent === "buy") {
+    if (longSnapshotParts.length) {
+      snapshots.push(longSnapshot);
+    } else if (shortSnapshotParts.length) {
+      snapshots.push(shortSnapshot);
+    }
+  } else if (intent === "sell") {
+    if (shortSnapshotParts.length) {
+      snapshots.push(shortSnapshot);
+    } else if (longSnapshotParts.length) {
+      snapshots.push(longSnapshot);
+    }
+  } else {
+    if (longSnapshotParts.length) {
+      snapshots.push(longSnapshot);
+    }
+    if (shortSnapshotParts.length) {
+      snapshots.push(shortSnapshot);
+    }
   }
 
   return snapshots;

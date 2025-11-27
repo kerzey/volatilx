@@ -13,62 +13,169 @@ type Segment = {
   label: string;
   value: string;
   className: string;
+  width: number;
 };
 
 export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
-  const sellTargets = sellSetup?.targets ?? [];
-  const buyTargets = buySetup?.targets ?? [];
-  const lowest = Math.min(
-    sellTargets[0] ?? sellSetup?.entry ?? latestPrice,
-    ...noTradeZones.map((z) => z.min),
-    buySetup?.entry ?? latestPrice,
-    buyTargets[0] ?? latestPrice,
-  );
-  const highest = Math.max(
-    sellTargets[sellTargets.length - 1] ?? sellSetup?.entry ?? latestPrice,
-    ...noTradeZones.map((z) => z.max),
-    buySetup?.entry ?? latestPrice,
-    buyTargets[buyTargets.length - 1] ?? latestPrice,
-  );
+  const toNumber = (value: number | string | null | undefined): number => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : NaN;
+  };
 
-  const pointer = highest === lowest ? 50 : clampToRange(((latestPrice - lowest) / (highest - lowest)) * 100, 0, 100);
+  const normalizedSellTargets = Array.isArray(sellSetup?.targets)
+    ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
+    : [];
+  const normalizedBuyTargets = Array.isArray(buySetup?.targets)
+    ? [...buySetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
+    : [];
 
-  const noTradeLabel = noTradeZones.length
-    ? noTradeZones.map((zone) => `${formatPrice(zone.min)} – ${formatPrice(zone.max)}`).join(" | ")
+  const shortEntry = toNumber(sellSetup?.entry);
+  const longEntry = toNumber(buySetup?.entry);
+  const lowestShortTarget = normalizedSellTargets[0];
+  const highestLongTarget = normalizedBuyTargets[normalizedBuyTargets.length - 1];
+
+  const normalizedZones = Array.isArray(noTradeZones)
+    ? noTradeZones
+      .map((zone) => {
+        const lower = toNumber(zone?.min);
+        const upper = toNumber(zone?.max);
+        if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+          return null;
+        }
+        return {
+          lower: Math.min(lower, upper),
+          upper: Math.max(lower, upper),
+        };
+      })
+      .filter((value): value is { lower: number; upper: number } => Boolean(value))
+    : [];
+
+  const neutralLower = normalizedZones.length ? Math.min(...normalizedZones.map((zone) => zone.lower)) : NaN;
+  const neutralUpper = normalizedZones.length ? Math.max(...normalizedZones.map((zone) => zone.upper)) : NaN;
+
+  const boundaryCandidates = [
+    lowestShortTarget,
+    shortEntry,
+    neutralLower,
+    neutralUpper,
+    longEntry,
+    highestLongTarget,
+    latestPrice,
+  ].filter((value): value is number => Number.isFinite(value));
+
+  let minBound = boundaryCandidates.length ? Math.min(...boundaryCandidates) : latestPrice;
+  let maxBound = boundaryCandidates.length ? Math.max(...boundaryCandidates) : latestPrice;
+
+  if (minBound === maxBound) {
+    minBound -= 1;
+    maxBound += 1;
+  }
+
+  const range = Math.max(maxBound - minBound, 1e-6);
+  const pointer = clampToRange(((latestPrice - minBound) / range) * 100, 0, 100);
+
+  const noTradeLabel = normalizedZones.length
+    ? normalizedZones.map((zone) => `${formatPrice(zone.lower)} – ${formatPrice(zone.upper)}`).join(" | ")
     : "No neutral zone";
 
-  const segments: Segment[] = [
-    {
-      key: "sellTarget",
-      label: "Short Targets",
-      value: formatPrice(sellTargets[sellTargets.length - 1] ?? sellSetup?.entry),
-      className: "bg-rose-600/20 text-rose-200 border-r border-rose-500/20",
-    },
-    {
-      key: "sellEntry",
-      label: "Short Entry",
-      value: formatPrice(sellSetup?.entry),
-      className: "bg-rose-500/15 text-rose-100 border-r border-rose-400/20",
-    },
-    {
-      key: "neutral",
-      label: "No-Trade",
-      value: noTradeLabel,
-      className: "bg-amber-500/15 text-amber-100 border-r border-amber-400/20",
-    },
-    {
-      key: "buyEntry",
-      label: "Long Entry",
-      value: formatPrice(buySetup?.entry),
-      className: "bg-emerald-500/15 text-emerald-100 border-r border-emerald-400/20",
-    },
-    {
-      key: "buyTarget",
-      label: "Long Targets",
-      value: formatPrice(buyTargets[buyTargets.length - 1] ?? buySetup?.entry),
-      className: "bg-emerald-600/20 text-emerald-200",
-    },
-  ];
+  const segments: Segment[] = [];
+  let cursor = minBound;
+
+  const pushSegment = (key: string, label: string, endValue: number, value: string, className: string) => {
+    if (!Number.isFinite(endValue)) {
+      return;
+    }
+    const clampedEnd = Math.max(endValue, cursor);
+    if (clampedEnd <= cursor) {
+      return;
+    }
+    const width = ((clampedEnd - cursor) / range) * 100;
+    if (width <= 0) {
+      return;
+    }
+    segments.push({ key, label, value, className, width });
+    cursor = clampedEnd;
+  };
+
+  const nextAfterShortTargets = Number.isFinite(shortEntry)
+    ? shortEntry
+    : Number.isFinite(neutralLower)
+      ? neutralLower
+      : Number.isFinite(longEntry)
+        ? longEntry
+        : maxBound;
+
+  if (nextAfterShortTargets > cursor) {
+    const displayValue = Number.isFinite(lowestShortTarget) ? lowestShortTarget : cursor;
+    pushSegment(
+      "sellTarget",
+      "Short Targets",
+      nextAfterShortTargets,
+      formatPrice(displayValue),
+      "bg-rose-600/20 text-rose-200 border-r border-rose-500/20",
+    );
+  }
+
+  const nextAfterShortEntry = Number.isFinite(neutralLower)
+    ? neutralLower
+    : Number.isFinite(longEntry)
+      ? longEntry
+      : maxBound;
+
+  if (Number.isFinite(shortEntry) && nextAfterShortEntry > cursor) {
+    pushSegment(
+      "sellEntry",
+      "Short Entry",
+      nextAfterShortEntry,
+      formatPrice(shortEntry),
+      "bg-rose-500/15 text-rose-100 border-r border-rose-400/20",
+    );
+  }
+
+  if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > cursor) {
+    pushSegment(
+      "neutral",
+      "No-Trade",
+      neutralUpper,
+      noTradeLabel,
+      "bg-amber-500/15 text-amber-100 border-r border-amber-400/20",
+    );
+  }
+
+  if (Number.isFinite(longEntry) && longEntry > cursor) {
+    pushSegment(
+      "buyEntry",
+      "Long Entry",
+      longEntry,
+      formatPrice(longEntry),
+      "bg-emerald-500/15 text-emerald-100 border-r border-emerald-400/20",
+    );
+  }
+
+  if (cursor < maxBound) {
+    const displayTarget = Number.isFinite(highestLongTarget)
+      ? highestLongTarget
+      : Number.isFinite(longEntry)
+        ? longEntry
+        : maxBound;
+    pushSegment(
+      "buyTarget",
+      "Long Targets",
+      maxBound,
+      formatPrice(displayTarget),
+      "bg-emerald-600/20 text-emerald-200",
+    );
+  }
+
+  if (!segments.length) {
+    segments.push({
+      key: "range",
+      label: "Price Range",
+      value: formatPrice(latestPrice),
+      className: "bg-slate-800/60 text-slate-200",
+      width: 100,
+    });
+  }
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm">
@@ -87,7 +194,8 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
           {segments.map((segment, index) => (
             <div
               key={segment.key}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 p-4 text-center ${segment.className} ${index === segments.length - 1 ? "border-r-0" : ""}`}
+              className={`flex flex-col items-center justify-center gap-1 p-4 text-center ${segment.className} ${index === segments.length - 1 ? "border-r-0" : ""}`}
+              style={{ flexBasis: `${segment.width}%`, flexGrow: 0, flexShrink: 0 }}
             >
               <span>{segment.label}</span>
               <span className="text-[10px] normal-case text-slate-300">{segment.value}</span>

@@ -5,17 +5,29 @@ export type ActionSummaryProps = {
 };
 
 export function ActionSummaryPanel({ summary }: ActionSummaryProps) {
-  const badgeClass = summary.status === "bullish"
-    ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/40"
+  const palette = summary.status === "bullish"
+    ? {
+      panel: "border-emerald-500/30 bg-slate-900/80 ring-1 ring-emerald-500/15",
+      badge: "bg-emerald-500/20 text-emerald-100 border border-emerald-400/40",
+      bullet: "text-emerald-300",
+    }
     : summary.status === "bearish"
-      ? "bg-rose-500/15 text-rose-200 border border-rose-400/40"
-      : "bg-slate-500/15 text-slate-200 border border-slate-400/40";
+      ? {
+        panel: "border-rose-500/30 bg-slate-900/80 ring-1 ring-rose-500/15",
+        badge: "bg-rose-500/20 text-rose-100 border border-rose-400/40",
+        bullet: "text-rose-300",
+      }
+      : {
+        panel: "border-slate-700 bg-slate-900/80",
+        badge: "bg-slate-500/20 text-slate-100 border border-slate-400/30",
+        bullet: "text-slate-300",
+      };
 
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-sm">
+    <section className={`rounded-3xl border p-6 shadow-sm transition-colors ${palette.panel}`}>
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-3">
-          <div className={`inline-flex w-max items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+          <div className={`inline-flex w-max items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${palette.badge}`}>
             <span className="h-2 w-2 rounded-full bg-current" />
             {summary.title}
           </div>
@@ -23,7 +35,7 @@ export function ActionSummaryPanel({ summary }: ActionSummaryProps) {
           <ul className="flex flex-col gap-1 text-sm text-slate-200">
             {summary.narrative.map((line, index) => (
               <li key={index} className="flex items-center gap-2">
-                <span className="text-slate-500">•</span>
+                <span className={palette.bullet}>•</span>
                 <span>{line}</span>
               </li>
             ))}
