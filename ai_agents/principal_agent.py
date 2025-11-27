@@ -407,6 +407,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
 
         raw_text = _extract_output_text(response)
         logger.info("Principal raw_text for %s: %s", symbol, raw_text[:800])
+        print("Principal raw_text for %s: %s", symbol, raw_text[:800])
         parsed_summary = self._parse_json_from_text(raw_text)
         if parsed_summary is None:
             logger.debug("Principal agent returned unstructured summary for %s: %s", symbol, raw_text[:250])
