@@ -369,8 +369,6 @@ async def action_center_page(
     symbol_display_map[primary_symbol_sanitized] = requested_display_symbol or primary_symbol_sanitized
 
     strategy_key = STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
-    raw_report = _fetch_latest_action_report(primary_symbol_sanitized)
-
     dashboards: List[Dict[str, Any]] = []
     price_overrides: Dict[str, Dict[str, Any]] = {}
 
@@ -411,8 +409,36 @@ async def action_center_page(
             "intent": intent_slug,
         }
 
+    candidate_symbols: List[str] = []
+    candidate_symbols.append(primary_symbol_sanitized)
+    for fav_symbol in favorite_union:
+        if fav_symbol not in candidate_symbols:
+            candidate_symbols.append(fav_symbol)
+
+    raw_report = _fetch_latest_action_report(primary_symbol_sanitized)
+
+    if not raw_symbol:
+        has_principal_plan = bool(
+            raw_report
+            and _prepare_principal_plan(raw_report, price_override=None)
+        )
+        if not has_principal_plan:
+            for candidate_symbol in candidate_symbols:
+                if candidate_symbol == primary_symbol_sanitized:
+                    continue
+                candidate_report = _fetch_latest_action_report(candidate_symbol)
+                if not candidate_report:
+                    continue
+                candidate_plan = _prepare_principal_plan(candidate_report, price_override=None)
+                if candidate_plan:
+                    primary_symbol_sanitized = candidate_symbol
+                    primary_symbol_canonical = canonicalize_symbol(candidate_symbol) or primary_symbol_canonical
+                    raw_report = candidate_report
+                    symbol_display_map.setdefault(primary_symbol_sanitized, candidate_symbol)
+                    break
+
     if favorite_union:
-        symbol_order: List[str] = [primary_symbol_sanitized] + [sym for sym in favorite_union if sym != primary_symbol_sanitized]
+        symbol_order: List[str] = [primary_symbol_sanitized] + [sym for sym in candidate_symbols if sym != primary_symbol_sanitized]
     else:
         symbol_order = [primary_symbol_sanitized]
 
