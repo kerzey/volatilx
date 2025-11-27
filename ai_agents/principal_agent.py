@@ -68,7 +68,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
         openai_model: str = "gpt-5",
         reasoning_effort: str = "low",
         text_verbosity: str = "medium",
-        max_output_tokens: int = 1400,
+        max_output_tokens: int = 2000,
         expert_registry: Optional[Dict[str, UIBackedExpertAgent]] = None,
         technical_agent: Optional[TechnicalAnalysisSummaryAgent] = None,
         price_action_agent: Optional[PriceActionSummaryAgent] = None,
@@ -246,12 +246,25 @@ class PrincipalAgent(OpenAIResponsesMixin):
         )
         strategies, supplemental = self._normalise_strategy_summary(summary_payload)
 
+        required_keys = ("day_trading", "swing_trading", "longterm_trading")
         if not strategies:
             logger.warning(
                 "Principal agent produced no structured strategies for %s; falling back to heuristic summary",
                 symbol,
             )
             strategies = self._fallback_strategies_from_experts(expert_outputs)
+        else:
+            missing = [key for key in required_keys if key not in strategies]
+            if missing:
+                logger.debug(
+                    "Principal agent missing strategies %s for %s; supplementing with fallback",
+                    missing,
+                    symbol,
+                )
+                fallback = self._fallback_strategies_from_experts(expert_outputs)
+                for key in missing:
+                    if key in fallback:
+                        strategies[key] = fallback[key]
 
         generated_time = datetime.utcnow()
         total_tokens = usage.get("total_tokens") if usage else None
@@ -821,6 +834,42 @@ class PrincipalAgent(OpenAIResponsesMixin):
                     if not stack and start is not None:
                         return value[start : index + 1]
             return None
+
+        def _extract_named_block(source: str, field: str) -> Optional[str]:
+            needle = f'"{field}"'
+            search_index = 0
+            while True:
+                key_index = source.find(needle, search_index)
+                if key_index == -1:
+                    return None
+                colon_index = source.find(":", key_index + len(needle))
+                if colon_index == -1:
+                    return None
+                brace_index = colon_index + 1
+                while brace_index < len(source) and source[brace_index] in " \t\r\n":
+                    brace_index += 1
+                if brace_index >= len(source):
+                    return None
+                if source[brace_index] not in "{[":
+                    search_index = key_index + len(needle)
+                    continue
+                block = _balanced_slice(source[brace_index:])
+                if block:
+                    return block
+                search_index = key_index + len(needle)
+
+        target_fields = ("day_trading", "swing_trading", "longterm_trading")
+        assembled: Dict[str, Any] = {}
+        for field in target_fields:
+            block = _extract_named_block(text, field)
+            if not block:
+                continue
+            try:
+                assembled[field] = json.loads(block)
+            except json.JSONDecodeError:
+                continue
+        if assembled:
+            return assembled
 
         candidates: List[str] = []
         seen: Set[str] = set()
