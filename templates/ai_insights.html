@@ -753,6 +753,9 @@
             }
 
             const strategies = plan.strategies || {};
+            if (window.console && console.debug) {
+                console.debug('Principal plan strategies', strategies);
+            }
             const strategyOrder = [
                 { key: 'day_trading', label: 'Day Trading' },
                 { key: 'swing_trading', label: 'Swing Trading' },
@@ -790,6 +793,9 @@
                     <div class="plan-section__content">${fieldsHtml}</div>
                 </div>`;
             });
+            if (window.console && console.debug) {
+                console.debug('Rendered principal strategy HTML', strategyHtml);
+            }
 
             const usage = plan.usage;
             const generatedAt = formatDateTime(plan.generated_at);
