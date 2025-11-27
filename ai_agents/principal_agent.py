@@ -239,10 +239,18 @@ class PrincipalAgent(OpenAIResponsesMixin):
         raw_inputs = state.get("raw_inputs", {})
         include_raw = state.get("include_raw_results", True)
         print("include raw result", include_raw)
-        summary_payload, usage = self._summarise_for_client(symbol, expert_outputs, raw_inputs)
+        summary_payload, usage, raw_principal_text = self._summarise_for_client(
+            symbol,
+            expert_outputs,
+            raw_inputs,
+        )
         strategies, supplemental = self._normalise_strategy_summary(summary_payload)
 
         if not strategies:
+            logger.warning(
+                "Principal agent produced no structured strategies for %s; falling back to heuristic summary",
+                symbol,
+            )
             strategies = self._fallback_strategies_from_experts(expert_outputs)
 
         generated_time = datetime.utcnow()
@@ -274,6 +282,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
             plan["expert_outputs"] = expert_outputs
             plan["raw_inputs"] = raw_inputs
             plan["trading_agent_outputs"] = expert_outputs
+            plan["principal_raw_text"] = raw_principal_text
 
         return {"principal_result": plan}
 
@@ -285,7 +294,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
         symbol: str,
         expert_outputs: Dict[str, Any],
         raw_inputs: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
         payload = {
             "symbol": symbol,
             "timestamp": datetime.utcnow().isoformat(),
@@ -407,18 +416,28 @@ class PrincipalAgent(OpenAIResponsesMixin):
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(f"Principal agent failed to summarise strategies: {exc}") from exc
 
-        raw_text = _extract_output_text(response)
-        logger.info("Principal raw_text for %s: %s", symbol, raw_text[:800])
-        print("Principal raw_text for %s: %s", symbol, raw_text)
-        print(raw_text)
+        raw_text = _extract_output_text(response) or ""
+        logger.info(
+            "Principal raw_text length for %s: %s", symbol, len(raw_text),
+        )
+        logger.debug("Principal raw_text payload for %s:\n%s", symbol, raw_text)
         parsed_summary = self._parse_json_from_text(raw_text)
         if parsed_summary is None:
-            logger.debug("Principal agent returned unstructured summary for %s: %s", symbol, raw_text[:250])
+            logger.warning(
+                "Principal agent returned unstructured summary for %s; storing raw text for inspection",
+                symbol,
+            )
             parsed_summary = {"raw_text": raw_text}
+        else:
+            logger.debug(
+                "Principal parsed keys for %s: %s",
+                symbol,
+                list(parsed_summary.keys()),
+            )
 
         usage = _extract_usage_details(response)
 
-        return parsed_summary, usage
+        return parsed_summary, usage, raw_text
 
     # ------------------------------------------------------------------
     # Output formatting utilities

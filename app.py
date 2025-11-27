@@ -107,6 +107,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
+logging.basicConfig(
+    level=logging.INFO,  # bump to DEBUG if you want everything noisy
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+
+logging.getLogger("ai_agents.principal_agent").setLevel(logging.DEBUG)
+
 
 logger = logging.getLogger(__name__)
 
