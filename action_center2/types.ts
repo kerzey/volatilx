@@ -47,7 +47,7 @@ export type PrincipalPlan = {
 
 export type StrategyKey = keyof Strategies;
 
-export type TradeIntent = "buy" | "sell";
+export type TradeIntent = "buy" | "sell" | "both";
 
 export type PrincipalPlanOption = {
   symbol: string;

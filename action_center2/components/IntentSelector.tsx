@@ -8,6 +8,7 @@ export type IntentSelectorProps = {
 const OPTIONS: Array<{ value: TradeIntent; label: string }> = [
   { value: "buy", label: "Buy Intent" },
   { value: "sell", label: "Sell Intent" },
+  { value: "both", label: "Trade Both" },
 ];
 
 export function IntentSelector({ selected, onSelect }: IntentSelectorProps) {
