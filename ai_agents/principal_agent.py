@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, Optional, Set, Tuple, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 from openai import APIError, OpenAI
 
+from core.numeric_utils import safe_float
 from .expert_agent import (
     OpenAIResponsesMixin,
     PriceActionSummaryAgent,
@@ -236,7 +238,7 @@ class PrincipalAgent(OpenAIResponsesMixin):
         expert_outputs = state.get("expert_outputs", {})
         raw_inputs = state.get("raw_inputs", {})
         include_raw = state.get("include_raw_results", True)
-
+        print("include raw result", include_raw)
         summary_payload, usage = self._summarise_for_client(symbol, expert_outputs, raw_inputs)
         strategies, supplemental = self._normalise_strategy_summary(summary_payload)
 
@@ -746,30 +748,76 @@ class PrincipalAgent(OpenAIResponsesMixin):
             return None
 
         if text.startswith("```"):
-            lines = [line for line in text.splitlines() if not line.startswith("```")]
-            text = "\n".join(lines).strip()
+            text = "\n".join(line for line in text.splitlines() if not line.startswith("```"))
+            text = text.strip()
 
-        candidates: List[str] = []
+        timestamp_prefix = re.compile(r"^\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\s*")
+        # Strip streaming timestamp prefixes injected by the Responses API logs.
+        cleaned_lines: List[str] = []
+        for line in text.splitlines():
+            cleaned = timestamp_prefix.sub("", line).rstrip()
+            if cleaned:
+                cleaned_lines.append(cleaned)
 
-        def _first_json_object(value: str) -> Optional[str]:
-            start = value.find("{")
-            if start == -1:
-                return None
-            depth = 0
-            for index in range(start, len(value)):
-                char = value[index]
-                if char == "{":
-                    depth += 1
-                elif char == "}":
-                    depth -= 1
-                    if depth == 0:
+        text = "\n".join(cleaned_lines).strip()
+        if not text:
+            return None
+
+        first_positions = [idx for idx in (text.find("{"), text.find("[")) if idx != -1]
+        if first_positions:
+            text = text[min(first_positions) :].strip()
+        if not text:
+            return None
+
+        def _balanced_slice(value: str) -> Optional[str]:
+            # Walk the substring while tracking braces and quoted strings.
+            stack: List[str] = []
+            in_string = False
+            escape = False
+            start: Optional[int] = None
+            for index, char in enumerate(value):
+                if in_string:
+                    if escape:
+                        escape = False
+                    elif char == "\\":
+                        escape = True
+                    elif char == '"':
+                        in_string = False
+                    continue
+
+                if char == '"':
+                    in_string = True
+                    continue
+
+                if char in "{[":
+                    if not stack:
+                        start = index
+                    stack.append(char)
+                elif char in "}]":
+                    if not stack:
+                        return None
+                    opener = stack.pop()
+                    if (opener, char) not in (("{", "}"), ("[", "]")):
+                        return None
+                    if not stack and start is not None:
                         return value[start : index + 1]
             return None
 
-        slice_candidate = _first_json_object(text)
-        if slice_candidate:
-            candidates.append(slice_candidate)
-        candidates.append(text)
+        candidates: List[str] = []
+        seen: Set[str] = set()
+        for idx, char in enumerate(text):
+            if char not in "{[":
+                continue
+            candidate = _balanced_slice(text[idx:])
+            if not candidate:
+                continue
+            candidate = candidate.strip()
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                candidates.append(candidate)
+
+        if text and text not in seen:
+            candidates.append(text)
 
         for candidate in candidates:
             try:
