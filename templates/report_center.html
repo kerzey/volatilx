@@ -63,12 +63,13 @@
         <section class="dashboard-grid">
             {% for report in reports %}
             <article class="dashboard-card">
-                {% set symbol_name = report.symbol if report.symbol else '' %}
-                {% set symbol_upper = symbol_name.upper() %}
-                {% set is_favorite = symbol_upper in (favorite_symbols or []) %}
+                {% set display_symbol = report.symbol_display or report.symbol or '' %}
+                {% set symbol_canonical = report.symbol_canonical or '' %}
+                {% set canonical_favorites = favorite_symbols_canonical or [] %}
+                {% set is_favorite = symbol_canonical in canonical_favorites %}
                 <header class="dashboard-card-header">
                     <div>
-                        <h2>{{ report.symbol }}</h2>
+                        <h2>{{ display_symbol }}</h2>
                         {% if report.generated_display %}
                         <p class="timestamp">Generated {{ report.generated_display }}</p>
                         {% endif %}
@@ -77,7 +78,7 @@
                         {% if report.consensus and report.consensus.recommendation %}
                         <span class="badge consensus-{{ report.consensus.recommendation|lower|replace(' ', '-') }}">{{ report.consensus.recommendation }}</span>
                         {% endif %}
-                        <button type="button" class="favorite-toggle{% if is_favorite %} favorite-toggle--active{% endif %}" data-favorite-toggle data-favorite-symbol="{{ symbol_upper }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}" title="{% if is_favorite %}Remove from favorites{% else %}Add to favorites{% endif %}">
+                        <button type="button" class="favorite-toggle{% if is_favorite %} favorite-toggle--active{% endif %}" data-favorite-toggle data-favorite-symbol="{{ display_symbol }}" data-favorite-canonical="{{ symbol_canonical }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}" title="{% if is_favorite %}Remove from favorites{% else %}Add to favorites{% endif %}">
                             <span class="favorite-toggle__icon" data-favorite-icon aria-hidden="true">{% if is_favorite %}&#9733;{% else %}&#9734;{% endif %}</span>
                             <span class="favorite-toggle__label" data-favorite-label>{% if is_favorite %}Favorited{% else %}Favorite{% endif %}</span>
                         </button>
@@ -261,18 +262,28 @@
         const favoriteSource = document.getElementById('reportCenterFavorites');
         let favoriteSymbols = new Set();
 
+        const normalizeSymbol = (value) => (value == null ? '' : String(value)).trim().toUpperCase();
+        const canonicalizeSymbol = (value) => {
+            const normalized = normalizeSymbol(value);
+            if (!normalized) {
+                return '';
+            }
+            return normalized.replace(/[^A-Z0-9]/g, '');
+        };
+
         if (favoriteSource) {
             try {
                 const parsed = JSON.parse(favoriteSource.textContent || '[]');
                 if (Array.isArray(parsed)) {
-                    favoriteSymbols = new Set(parsed.map((value) => (value || '').toString().trim().toUpperCase()).filter(Boolean));
+                    const canonicalValues = parsed
+                        .map((value) => canonicalizeSymbol(value))
+                        .filter(Boolean);
+                    favoriteSymbols = new Set(canonicalValues);
                 }
             } catch (error) {
                 console.warn('Unable to parse favorites payload', error);
             }
         }
-
-        const normalizeSymbol = (value) => (value == null ? '' : String(value)).trim().toUpperCase();
 
         function setButtonState(button, active) {
             button.classList.toggle('favorite-toggle--active', active);
@@ -290,8 +301,11 @@
         }
 
         async function toggleFavorite(button) {
-            const symbol = normalizeSymbol(button.dataset.favoriteSymbol);
-            if (!symbol) {
+            const symbolDisplay = button.dataset.favoriteSymbol;
+            const normalizedSymbol = normalizeSymbol(symbolDisplay);
+            const canonicalSymbol = canonicalizeSymbol(normalizedSymbol);
+
+            if (!canonicalSymbol) {
                 return;
             }
 
@@ -305,7 +319,7 @@
                         'Content-Type': 'application/json',
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ symbol, follow }),
+                    body: JSON.stringify({ symbol: normalizedSymbol, follow }),
                 });
 
                 if (!response.ok) {
@@ -314,9 +328,9 @@
 
                 setButtonState(button, follow);
                 if (follow) {
-                    favoriteSymbols.add(symbol);
+                    favoriteSymbols.add(canonicalSymbol);
                 } else {
-                    favoriteSymbols.delete(symbol);
+                    favoriteSymbols.delete(canonicalSymbol);
                 }
             } catch (error) {
                 console.warn('Unable to update favorite', error);
@@ -334,7 +348,9 @@
 
         toggleButtons.forEach((button) => {
             const symbol = normalizeSymbol(button.dataset.favoriteSymbol);
-            setButtonState(button, symbol && favoriteSymbols.has(symbol));
+            const canonicalSymbol = canonicalizeSymbol(symbol);
+            button.dataset.favoriteCanonical = canonicalSymbol;
+            setButtonState(button, canonicalSymbol && favoriteSymbols.has(canonicalSymbol));
             button.addEventListener('click', () => {
                 toggleFavorite(button);
             });

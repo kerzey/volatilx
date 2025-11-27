@@ -30,7 +30,7 @@
                 <p>Your AI-powered trading cockpit &mdash; real-time signals, levels, and actions.</p>
                 {% if primary_dashboard %}
                 {% set primary_payload = primary_dashboard.action_data %}
-                {% set primary_symbol = primary_payload.symbol if primary_payload and primary_payload.symbol else primary_dashboard.symbol %}
+                {% set primary_symbol = primary_payload.symbol if primary_payload and primary_payload.symbol else (primary_dashboard.symbol_display if primary_dashboard and primary_dashboard.symbol_display else primary_dashboard.symbol) %}
                 <p class="action-center__meta" data-header-meta hidden></p>
                 {% endif %}
             </div>
@@ -67,6 +67,7 @@
             {% set tags = payload.tags if payload and payload.tags else [] %}
             {% set dashboard_timeframe = dashboard.timeframe if dashboard.timeframe else timeframe %}
             {% set dashboard_intent = dashboard.intent if dashboard.intent else intent %}
+            {% set display_symbol = dashboard.symbol_display if dashboard.symbol_display else dashboard.symbol %}
             <article class="action-dashboard" data-dashboard data-dashboard-symbol="{{ dashboard.symbol }}" data-expanded="false">
                 <div class="action-dashboard__summary">
                     <div class="action-dashboard__summary-shell">
@@ -74,13 +75,13 @@
                             <div class="action-dashboard__summary-head-col action-dashboard__summary-head-col--identity">
                                 <div class="action-dashboard__summary-symbol-row">
                                     <span class="traffic-light traffic-light--{{ payload.traffic_light if payload and payload.traffic_light else 'wait' }} traffic-light--mini action-dashboard__summary-traffic" data-dashboard-traffic role="img" aria-label="{{ (payload.traffic_light if payload and payload.traffic_light else 'wait')|title }} signal"></span>
-                                    <span class="action-dashboard__summary-symbol">{{ dashboard.symbol }}</span>
+                                    <span class="action-dashboard__summary-symbol">{{ display_symbol }}</span>
                                 </div>
                                 <span class="action-dashboard__summary-strategy" data-summary-strategy>{{ dashboard_timeframe|title }} Trading &middot; {{ dashboard_intent|title }}</span>
                                 <div class="action-dashboard__summary-controls" data-dashboard-config>
                                     <label class="summary-control">
                                         <span>Time Frame</span>
-                                        <select data-dashboard-timeframe aria-label="Select timeframe for {{ dashboard.symbol }}">
+                                        <select data-dashboard-timeframe aria-label="Select timeframe for {{ display_symbol }}">
                                             <option value="day"{% if dashboard_timeframe == 'day' %} selected{% endif %}>Day</option>
                                             <option value="swing"{% if dashboard_timeframe == 'swing' %} selected{% endif %}>Swing</option>
                                             <option value="long"{% if dashboard_timeframe == 'long' %} selected{% endif %}>Long</option>
@@ -88,7 +89,7 @@
                                     </label>
                                     <label class="summary-control">
                                         <span>Intent</span>
-                                        <select data-dashboard-intent aria-label="Select intent for {{ dashboard.symbol }}">
+                                        <select data-dashboard-intent aria-label="Select intent for {{ display_symbol }}">
                                             <option value="buy"{% if dashboard_intent == 'buy' %} selected{% endif %}>Buy</option>
                                             <option value="sell"{% if dashboard_intent == 'sell' %} selected{% endif %}>Sell</option>
                                         </select>
@@ -111,7 +112,7 @@
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="action-dashboard__summary-toggle" data-dashboard-toggle aria-expanded="false" aria-label="Expand {{ dashboard.symbol }} dashboard">
+                    <button type="button" class="action-dashboard__summary-toggle" data-dashboard-toggle aria-expanded="false" aria-label="Expand {{ display_symbol }} dashboard">
                         <span class="action-dashboard__toggle-indicator" aria-hidden="true"></span>
                     </button>
                 </div>
