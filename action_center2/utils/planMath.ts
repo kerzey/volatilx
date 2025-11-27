@@ -410,23 +410,6 @@ function classifyPriceZone({
   return { zone: "NEUTRAL" };
 }
 
-function describeTradeState(tradeState: TradeState, focus: "long" | "short" | "neutral"): string | null {
-  switch (tradeState) {
-    case "BUY_TRIGGERING":
-      return focus === "long" ? "Momentum is arming the long trigger." : null;
-    case "SELL_TRIGGERING":
-      return focus === "short" ? "Momentum is arming the short trigger." : null;
-    case "BUY_ACTIVE":
-      return focus === "long" ? "Long setup is active — manage position sizing." : null;
-    case "SELL_ACTIVE":
-      return focus === "short" ? "Short setup is active — expect pressure." : null;
-    case "NO_TRADE":
-      return focus === "neutral" ? "Respect the neutral range until price exits decisively." : null;
-    default:
-      return null;
-  }
-}
-
 function formatRange(lower?: number, upper?: number): string | null {
   if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
     return null;
@@ -441,9 +424,7 @@ function resolveBuySummary(context: SummaryContext): ZoneResponse {
     longStop,
     longTargets,
     shortEntry,
-    shortTargets,
     neutralBands,
-    tradeState,
   } = context;
 
   const firstLongTarget = longTargets[0];
@@ -452,123 +433,155 @@ function resolveBuySummary(context: SummaryContext): ZoneResponse {
   const highestShort = shortTargets[0];
   const primaryNeutral = neutralBands[0];
   const ladderBounds = classification.ladderBounds;
+    shortTargets,
+    neutralBands,
+  } = context;
+
+  const lowestShort = shortTargets[shortTargets.length - 1];
+  const highestShort = shortTargets[0];
+  const firstLongTarget = longTargets[0];
+  const secondLongTarget = longTargets[1];
+  const finalLongTarget = longTargets[longTargets.length - 1];
+  const primaryNeutral = neutralBands[0];
+  const ladderBounds = classification.ladderBounds;
+
+  const longEntryLabel = Number.isFinite(longEntry) ? formatPrice(longEntry) : null;
+  const longStopLabel = Number.isFinite(longStop) ? formatPrice(longStop) : null;
+  const shortEntryLabel = Number.isFinite(shortEntry) ? formatPrice(shortEntry) : null;
+  const lowestShortLabel = Number.isFinite(lowestShort) ? formatPrice(lowestShort) : null;
+  const highestShortLabel = Number.isFinite(highestShort) ? formatPrice(highestShort) : null;
+  const targetOneLabel = Number.isFinite(firstLongTarget) ? formatPrice(firstLongTarget) : null;
+  const targetTwoLabel = Number.isFinite(secondLongTarget) ? formatPrice(secondLongTarget) : null;
+  const finalLongTargetLabel = Number.isFinite(finalLongTarget) ? formatPrice(finalLongTarget) : null;
+  const neutralRangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+  const ladderRangeLabel = ladderBounds ? formatRange(ladderBounds.lower, ladderBounds.upper) : null;
 
   switch (classification.zone) {
     case "LONG_INVALIDATED":
       return {
-        title: "Long thesis invalidated",
-        subtitle: `Price slipped below ${formatPrice(longStop)}`,
+        title: "Long plan broken",
+        subtitle: longStopLabel
+          ? `Price has moved below the long stop (${longStopLabel}).`
+          : "Price has moved below the long stop.",
         bullets: [
-          "Abort long entries until a fresh analysis rebuilds the plan.",
-          "Wait for volatility to settle before re-engaging.",
+          "Close or avoid long positions.",
+          "Allow volatility to cool and wait for a fresh setup from the new analysis.",
         ],
-        status: "neutral",
+        status: "bearish",
       };
     case "SHORT_INVALIDATED":
       return {
         title: "Short setup failed",
-        subtitle: `Momentum is squeezing above ${formatPrice(shortEntry)}`,
+        subtitle: shortEntryLabel
+          ? `Price is squeezing above the bearish level (${shortEntryLabel}).`
+          : "Price is squeezing above the bearish level.",
         bullets: [
-          "Prepare to execute the long plan — sellers are capitulating.",
-          `Expect acceleration if ${formatPrice(shortEntry)} now holds as support.`,
+          "Bias shifts more positive for longs.",
+          "Expect acceleration if price holds above that level and prepare a revised long plan.",
         ],
         status: "bullish",
       };
     case "BREAKDOWN":
       return {
         title: "Stand aside",
-        subtitle: "Selling pressure dominates the tape.",
+        subtitle: "Strong downward move in progress.",
         bullets: [
-          lowestShort
-            ? `Wait for price to reclaim ${formatPrice(lowestShort)} before planning longs.`
-            : "Stay patient until price stabilises above the last short target.",
-          "Monitor momentum for a higher low before deploying capital.",
+          "Wait until price stops making new lows.",
+          lowestShortLabel
+            ? `Look for a clear bounce back above the lowest short target (${lowestShortLabel}) before considering longs.`
+            : "Look for a clear bounce back above the lowest short target before considering longs.",
         ],
         status: "bearish",
       };
     case "SHORT_LADDER":
       return {
-        title: "Let shorts exhaust",
-        subtitle: "Price is still working through downside targets.",
+        title: "Let sellers finish their move",
+        subtitle: "Price is still moving through downside targets.",
         bullets: [
-          ladderBounds
-            ? `Watch reactions between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.`
-            : "Track short targets for signs of exhaustion.",
-          "Only prepare longs once momentum slows and a higher low forms.",
+          ladderRangeLabel
+            ? `Watch how price reacts between ${ladderRangeLabel}.`
+            : "Watch how price reacts near each short target.",
+          "Only prepare long ideas once the drops start getting smaller and momentum slows.",
         ],
         status: "bearish",
       };
     case "PRE_SHORT":
       return {
-        title: "Still below bearish pivot",
-        subtitle: "Long setup needs price back above resistance.",
+        title: "Still below key resistance",
+        subtitle: "Long setup needs price back above the bearish pivot.",
         bullets: [
-          `Set an alert at ${formatPrice(shortEntry)} to know when selling pressure fades.`,
-          highestShort ? `Watch ${formatPrice(highestShort)} for basing attempts.` : "Wait for the first higher low before committing capital.",
+          shortEntryLabel
+            ? `Set an alert at the short trigger level (${shortEntryLabel}).`
+            : "Set an alert at the short trigger level.",
+          "Stay patient until price can reclaim resistance and hold.",
         ],
         status: "neutral",
       };
-    case "NEUTRAL": {
-      const rangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+    case "NEUTRAL":
       return {
         title: "Inside neutral band",
-        subtitle: "No directional edge yet.",
+        subtitle: "No clear edge for new longs yet.",
         bullets: [
-          rangeLabel ? `Sit out until price exits ${rangeLabel}.` : "Stand aside until price leaves the neutral range.",
-          `Long bias requires a breakout above ${formatPrice(longEntry)}.`,
+          neutralRangeLabel
+            ? `Avoid forcing trades while price is stuck in the range (${neutralRangeLabel}).`
+            : "Avoid forcing trades while price is stuck in the range.",
+          longEntryLabel
+            ? `Wait for a clean break above the band and toward the long entry (${longEntryLabel}).`
+            : "Wait for a clean break above the band and toward the long entry.",
         ],
         status: "neutral",
       };
-    }
-    case "PRE_LONG": {
-      const tradeCue = describeTradeState(tradeState, "long");
+    case "PRE_LONG":
       return {
-        title: "Prep the long trigger",
-        subtitle: `Price is approaching ${formatPrice(longEntry)}.`,
+        title: "Prepare the long setup",
+        subtitle: "Price is moving toward your long entry.",
         bullets: [
-          `Queue entry orders near ${formatPrice(longEntry)} with stop at ${formatPrice(longStop)}.`,
-          tradeCue || "Let the breakout confirm before deploying full size.",
+          longStopLabel
+            ? `Plan order size and risk using the long stop (${longStopLabel}).`
+            : "Plan order size and risk using the long stop.",
+          longEntryLabel
+            ? `If momentum looks weak, let the candle close above ${longEntryLabel} before acting.`
+            : "If momentum looks weak, let the candle close above the long entry before acting.",
         ],
         status: "bullish",
       };
-    }
-    case "LONG_TRIGGER": {
-      const tradeCue = describeTradeState(tradeState, "long");
+    case "LONG_TRIGGER":
       return {
-        title: "Execute starter long",
-        subtitle: "Trigger level is engaging.",
+        title: "Starter long becomes valid",
+        subtitle: "Long trigger level is now in play.",
         bullets: [
-          `Enter near ${formatPrice(longEntry)} and honour ${formatPrice(longStop)} as the fail level.`,
-          firstLongTarget
-            ? `Map first scale-out at ${formatPrice(firstLongTarget)}.`
-            : "Use trail stops to protect gains while price confirms.",
-          tradeCue || "Manage size responsibly as volatility lifts.",
+          longEntryLabel && longStopLabel
+            ? `Open an initial long near ${longEntryLabel} with a stop at ${longStopLabel}.`
+            : "Open an initial long near the entry with a stop at the long stop.",
+          targetOneLabel && targetTwoLabel
+            ? `Plan to take first profits at ${targetOneLabel} and reassess toward ${targetTwoLabel}.`
+            : targetOneLabel
+              ? `Plan to take first profits at ${targetOneLabel} and reassess toward the next target.`
+              : "Plan to take first profits at Target 1 and reassess toward Target 2.",
         ],
         status: "bullish",
       };
-    }
-    case "LONG_LADDER": {
-      const tradeCue = describeTradeState(tradeState, "long");
+    case "LONG_LADDER":
       return {
-        title: "Manage the long ladder",
-        subtitle: "Price is advancing through profit targets.",
+        title: "Manage the winning long",
+        subtitle: "Price is moving through your profit targets.",
         bullets: [
-          ladderBounds
-            ? `Scale partial profits between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.`
-            : `Respect the profit ladder above ${formatPrice(longEntry)}.`,
-          `Trail stops to the prior rung to protect gains.`,
-          tradeCue || "Stay alert for momentum shifts near targets.",
+          ladderRangeLabel
+            ? `Take partial profits as each target is reached between ${ladderRangeLabel}.`
+            : "Take partial profits as each target is reached.",
+          "Trail your stop up toward the previous target to lock in gains.",
         ],
         status: "bullish",
       };
-    }
     case "BREAKOUT":
       return {
-        title: "Momentum breakout",
-        subtitle: "Price is extending beyond planned upside targets.",
+        title: "Upside extension",
+        subtitle: "Price is running beyond planned targets.",
         bullets: [
-          finalLongTarget ? `Use ${formatPrice(finalLongTarget)} as the new risk pivot.` : "Define a fresh risk pivot for continuation trades.",
-          "Either add with tight stops or wait for a pullback before adding size.",
+          finalLongTargetLabel
+            ? `Only add with very tight stops or wait for a pullback into the last target zone near ${finalLongTargetLabel}.`
+            : "Only add with very tight stops or wait for a pullback into the last target zone.",
+          "Consider re-running analysis to update upside levels.",
         ],
         status: "bullish",
       };
@@ -577,7 +590,9 @@ function resolveBuySummary(context: SummaryContext): ZoneResponse {
         title: "Long setup on watch",
         subtitle: "Follow the plan as levels evolve.",
         bullets: [
-          `Entry ${formatPrice(longEntry)} · Stop ${formatPrice(longStop)} · Target ${formatPrice(firstLongTarget)}`,
+          highestShortLabel && longEntryLabel
+            ? `Respect the path from ${highestShortLabel} to ${longEntryLabel} before leaning long.`
+            : "Stay patient while the plan develops.",
         ],
         status: "neutral",
       };
@@ -591,124 +606,142 @@ function resolveSellSummary(context: SummaryContext): ZoneResponse {
     longStop,
     longTargets,
     shortEntry,
-    shortTargets,
-    tradeState,
+    neutralBands,
   } = context;
 
   const firstLongTarget = longTargets[0];
   const finalLongTarget = longTargets[longTargets.length - 1];
-  const lowestShort = shortTargets[shortTargets.length - 1];
+  const primaryNeutral = neutralBands ? neutralBands[0] : undefined;
   const ladderBounds = classification.ladderBounds;
+
+  const longEntryLabel = Number.isFinite(longEntry) ? formatPrice(longEntry) : null;
+  const longStopLabel = Number.isFinite(longStop) ? formatPrice(longStop) : null;
+  const shortEntryLabel = Number.isFinite(shortEntry) ? formatPrice(shortEntry) : null;
+  const targetOneLabel = Number.isFinite(firstLongTarget) ? formatPrice(firstLongTarget) : null;
+  const finalLongTargetLabel = Number.isFinite(finalLongTarget) ? formatPrice(finalLongTarget) : null;
+  const neutralRangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+  const ladderRangeLabel = ladderBounds ? formatRange(ladderBounds.lower, ladderBounds.upper) : null;
 
   switch (classification.zone) {
     case "LONG_INVALIDATED":
       return {
-        title: "Exit the long",
-        subtitle: `Stop level ${formatPrice(longStop)} just broke.`,
+        title: "Exit the long idea",
+        subtitle: longStopLabel
+          ? `Price has broken the long stop level (${longStopLabel}).`
+          : "Price has broken the long stop level.",
         bullets: [
-          "Flatten remaining shares immediately to protect capital.",
-          "Review the trade and wait for a new plan before re-entering.",
+          "Close remaining long exposure if not already flat.",
+          "Review the trade and risk management before re-entering.",
         ],
         status: "bearish",
       };
     case "SHORT_INVALIDATED":
       return {
-        title: "Relief rally in progress",
-        subtitle: `Short stop near ${formatPrice(shortEntry)} triggered.`,
+        title: "Relief rally underway",
+        subtitle: shortEntryLabel
+          ? `Short stop above the bearish level (${shortEntryLabel}) has triggered.`
+          : "Short stop above the bearish level has triggered.",
         bullets: [
-          "Use the squeeze to scale out remaining size into strength.",
-          `Consider re-running analysis if you plan to flip long above ${formatPrice(shortEntry)}.`,
+          "Use the bounce to exit any remaining longs on your terms.",
+          "Run a new analysis if you are considering flipping to a fresh long setup.",
         ],
         status: "bullish",
       };
     case "BREAKDOWN":
       return {
-        title: "Emergency exit",
-        subtitle: "Long thesis failed — sellers are in control.",
+        title: "Emergency exit zone",
+        subtitle: "Long idea has failed; sellers are in control.",
         bullets: [
-          lowestShort
-            ? `Close remaining exposure before ${formatPrice(lowestShort)} fails.`
-            : "Prioritise capital preservation over targets.",
-          "Re-assess once price stabilises.",
+          "Close remaining long exposure as price breaks down.",
+          "Reassess the chart once price stops making new lows.",
         ],
         status: "bearish",
       };
     case "SHORT_LADDER":
       return {
-        title: "Sell into bounces",
-        subtitle: "Price is marching through short targets.",
+        title: "Sell into strength",
+        subtitle: "Price is moving through short-side targets.",
         bullets: [
-          ladderBounds
-            ? `Trim into pops toward ${formatPrice(ladderBounds.upper)}.`
-            : "Fade strength while the short ladder is in control.",
-          "Tighten trailing stops above recent micro highs.",
+          ladderRangeLabel
+            ? `Use intraday bounces to reduce or close long size between ${ladderRangeLabel}.`
+            : "Use intraday bounces to reduce or close long size.",
+          "Tighten a trailing stop above recent minor highs.",
         ],
         status: "bearish",
       };
     case "PRE_SHORT":
       return {
-        title: "Risk is rising",
-        subtitle: "Below the bearish pivot.",
+        title: "Risk is increasing",
+        subtitle: "Price is trading under the bearish pivot.",
         bullets: [
-          `If ${formatPrice(shortEntry)} breaks, trim more size immediately.`,
-          "Prepare contingency orders for a full breakdown.",
+          shortEntryLabel
+            ? `Trim longs if price cannot reclaim the short trigger (${shortEntryLabel}).`
+            : "Trim longs if price cannot reclaim the short trigger.",
+          "Have a plan ready in case a full breakdown starts.",
         ],
         status: "bearish",
       };
     case "NEUTRAL":
       return {
-        title: "Hold steady",
-        subtitle: "Price is back inside the neutral range.",
+        title: "Hold steady in the range",
+        subtitle: "Price is back inside the neutral band.",
         bullets: [
-          "Avoid panic selling mid-range; let levels dictate the next move.",
-          `Stage exits near ${formatPrice(longEntry)} or the upper band.`,
+          neutralRangeLabel
+            ? `Avoid panic selling in the middle of the range (${neutralRangeLabel}).`
+            : "Avoid panic selling in the middle of the range.",
+          longEntryLabel
+            ? `Plan staggered exits closer to resistance or your long entry area near ${longEntryLabel}.`
+            : "Plan staggered exits closer to resistance or your long entry area.",
         ],
         status: "neutral",
       };
     case "PRE_LONG":
       return {
         title: "Strength rebuilding",
-        subtitle: `Price approaching ${formatPrice(longEntry)} trigger.`,
+        subtitle: "Price is moving back toward the long trigger.",
         bullets: [
-          `Keep remaining shares with stop tightened under ${formatPrice(longStop)}.`,
-          "Trim weak hands into strength if conviction is low.",
+          longStopLabel
+            ? `Tighten your stop below key support or the long stop area (${longStopLabel}).`
+            : "Tighten your stop below key support or the long stop area.",
+          "Consider taking partial profits if conviction is low.",
         ],
         status: "bullish",
       };
     case "LONG_TRIGGER":
       return {
-        title: "Stay long with conviction",
-        subtitle: "Trigger level is engaging.",
+        title: "Stay confidently long",
+        subtitle: "Support is forming around the trigger level.",
         bullets: [
-          `Hold core while ${formatPrice(longEntry)} acts as support.`,
-          firstLongTarget
-            ? `Book partial profits into ${formatPrice(firstLongTarget)}.`
-            : "Use a trailing stop to lock in progress.",
-          describeTradeState(tradeState, "long") || "Let the plan dictate scale-out points.",
+          longEntryLabel
+            ? `Keep a core position while ${longEntryLabel} acts as support.`
+            : "Keep a core position while entry acts as support.",
+          targetOneLabel
+            ? `Take partial profits at Target 1 (${targetOneLabel}) and follow the trade-state cue for further scaling.`
+            : "Take partial profits at Target 1 and follow the trade-state cue for further scaling.",
         ],
         status: "bullish",
       };
     case "LONG_LADDER":
       return {
-        title: "Scale profits",
-        subtitle: "Price working through upside targets.",
+        title: "Scale out of the winner",
+        subtitle: "Price is moving through upside targets.",
         bullets: [
-          ladderBounds
-            ? `Sell into strength between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.`
-            : `Use the target ladder to guide remaining exits above ${formatPrice(longEntry)}.`,
-          "Trail stops tighter with each rung cleared.",
+          ladderRangeLabel
+            ? `Sell portions of your position into strength between ${ladderRangeLabel}.`
+            : "Sell portions of your position into strength at each target.",
+          "Move stops higher to protect open profits.",
         ],
         status: "bullish",
       };
     case "BREAKOUT":
       return {
-        title: "Parabolic push",
-        subtitle: "Use the final spike to exit gracefully.",
+        title: "Final push higher",
+        subtitle: "Use the strong spike to exit well.",
         bullets: [
-          finalLongTarget
-            ? `Finish scaling out into strength beyond ${formatPrice(finalLongTarget)}.`
-            : "Close remaining size as momentum extends.",
-          "Keep only a token runner with a very tight stop.",
+          finalLongTargetLabel
+            ? `Finish taking profits beyond the last target (${finalLongTargetLabel}).`
+            : "Finish taking profits beyond the last target.",
+          "Keep only a small runner with a very tight stop if you want extra upside optionality.",
         ],
         status: "neutral",
       };
@@ -717,7 +750,9 @@ function resolveSellSummary(context: SummaryContext): ZoneResponse {
         title: "Manage long exposure",
         subtitle: "Follow the exit plan level by level.",
         bullets: [
-          `Stop ${formatPrice(longStop)} · Next trim ${formatPrice(firstLongTarget)}.`,
+          longStopLabel && targetOneLabel
+            ? `Stop ${longStopLabel} · Next trim ${targetOneLabel}.`
+            : "Stay systematic with stops and trims.",
         ],
         status: "neutral",
       };
@@ -732,125 +767,150 @@ function resolveBothSummary(context: SummaryContext): ZoneResponse {
     longTargets,
     shortEntry,
     shortTargets,
-    tradeState,
+    neutralBands,
   } = context;
 
   const firstLongTarget = longTargets[0];
   const finalLongTarget = longTargets[longTargets.length - 1];
   const lowestShort = shortTargets[shortTargets.length - 1];
   const highestShort = shortTargets[0];
+  const primaryNeutral = neutralBands ? neutralBands[0] : undefined;
   const ladderBounds = classification.ladderBounds;
+
+  const longEntryLabel = Number.isFinite(longEntry) ? formatPrice(longEntry) : null;
+  const longStopLabel = Number.isFinite(longStop) ? formatPrice(longStop) : null;
+  const shortEntryLabel = Number.isFinite(shortEntry) ? formatPrice(shortEntry) : null;
+  const lowestShortLabel = Number.isFinite(lowestShort) ? formatPrice(lowestShort) : null;
+  const highestShortLabel = Number.isFinite(highestShort) ? formatPrice(highestShort) : null;
+  const targetOneLabel = Number.isFinite(firstLongTarget) ? formatPrice(firstLongTarget) : null;
+  const finalLongTargetLabel = Number.isFinite(finalLongTarget) ? formatPrice(finalLongTarget) : null;
+  const neutralRangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+  const ladderRangeLabel = ladderBounds ? formatRange(ladderBounds.lower, ladderBounds.upper) : null;
 
   switch (classification.zone) {
     case "LONG_INVALIDATED":
       return {
-        title: "Flip short bias",
-        subtitle: `Long stop at ${formatPrice(longStop)} just failed.`,
+        title: "Bias turns short",
+        subtitle: longStopLabel
+          ? `Long stop has broken (${longStopLabel}).`
+          : "Long stop has broken.",
         bullets: [
-          "Look for short entries on weak retests of the broken level.",
-          "Rebuild the plan once volatility cools.",
+          "Look for fresh short entries on any retest of the broken support.",
+          "Rebuild the plan once the volatility spike settles.",
         ],
         status: "bearish",
       };
     case "SHORT_INVALIDATED":
       return {
-        title: "Favour longs",
-        subtitle: `Short invalidation above ${formatPrice(shortEntry)} triggered.`,
+        title: "Bias turns long",
+        subtitle: shortEntryLabel
+          ? `Short idea failed above the bearish level (${shortEntryLabel}).`
+          : "Short idea failed above the bearish level.",
         bullets: [
-          "Shift focus to the long ladder while the squeeze runs.",
-          "Set tight stops in case the move reverses.",
+          "Shift focus to the long setup and upside targets.",
+          "If entering new longs, use tighter stops due to recent volatility.",
         ],
         status: "bullish",
       };
     case "BREAKDOWN":
       return {
-        title: "Short continuation",
-        subtitle: "Momentum is breaking supports.",
+        title: "Short continuation zone",
+        subtitle: "Momentum is breaking through supports.",
         bullets: [
-          lowestShort
-            ? `Press shorts toward ${formatPrice(lowestShort)} with stop above the prior rung.`
-            : "Lean short but trail stops aggressively.",
-          "Mark the extreme for potential bounce opportunities.",
+          lowestShortLabel
+            ? `Favor short trades toward the lowest short target (${lowestShortLabel}) with defined stops.`
+            : "Favor short trades toward the lowest short target with defined stops.",
+          "Mark this area as an extreme level to watch for a later bounce.",
         ],
         status: "bearish",
       };
     case "SHORT_LADDER":
       return {
-        title: "Trade the short ladder",
-        subtitle: "Price stepping through downside targets.",
+        title: "Trade the short path",
+        subtitle: "Price is stepping through downside targets.",
         bullets: [
-          ladderBounds
-            ? `Take profits between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.`
-            : "Respect each short target for profit taking.",
-          describeTradeState(tradeState, "short") || "Watch for reversal triggers as targets complete.",
+          ladderRangeLabel
+            ? `Take profits on shorts between ${ladderRangeLabel}.`
+            : "Take profits on shorts between the ladder bounds.",
+          "Follow the trade-state cue for when to reduce size or look for reversal signs.",
         ],
         status: "bearish",
       };
     case "PRE_SHORT":
       return {
         title: "Guard the short trigger",
-        subtitle: "Price is testing the bearish pivot.",
+        subtitle: "Price is testing the bearish pivot area.",
         bullets: [
-          `Initiate shorts on a breakdown below ${formatPrice(shortEntry)}.`,
-          highestShort ? `Fade into ${formatPrice(highestShort)} if momentum rolls over.` : "Keep long scalps small until buyers prove control.",
+          shortEntryLabel
+            ? `Open or add to shorts only once price is clearly below the short trigger (${shortEntryLabel}).`
+            : "Open or add to shorts only once price is clearly below the short trigger.",
+          highestShortLabel
+            ? `Aggressive traders may try a small position near the highest short target (${highestShortLabel}) with tight risk.`
+            : "Aggressive traders may try a small position near the highest short target with tight risk.",
         ],
         status: "neutral",
       };
     case "NEUTRAL":
       return {
-        title: "Low conviction zone",
-        subtitle: "Keep position sizes light.",
+        title: "Low-conviction zone",
+        subtitle: "Keep risk small or stay flat.",
         bullets: [
-          "Stay flat or scalp the edges of the neutral band.",
-          `Arm alerts above ${formatPrice(longEntry)} and below ${formatPrice(shortEntry)}.`,
+          neutralRangeLabel
+            ? `Avoid heavy positioning while price is inside the neutral band (${neutralRangeLabel}).`
+            : "Avoid heavy positioning while price is inside the neutral band.",
+          longEntryLabel && shortEntryLabel
+            ? `Use alerts at the top and bottom of the band to catch the next directional move (${longEntryLabel} / ${shortEntryLabel}).`
+            : "Use alerts at the top and bottom of the band to catch the next directional move.",
         ],
         status: "neutral",
       };
     case "PRE_LONG":
       return {
-        title: "Long trigger loading",
-        subtitle: `Price approaching ${formatPrice(longEntry)}.`,
+        title: "Long trigger setting up",
+        subtitle: "Price is approaching the long entry.",
         bullets: [
-          `Stalk the breakout for long entries with stop at ${formatPrice(longStop)}.`,
-          describeTradeState(tradeState, "long") || "Keep short risk tight while buyers test the level.",
+          longEntryLabel && longStopLabel
+            ? `Prepare for a breakout long with stop at the long stop (${longStopLabel}).`
+            : "Prepare for a breakout long with stop at the long stop.",
+          "If you are still short, consider reducing risk as price nears the long trigger.",
         ],
         status: "bullish",
       };
     case "LONG_TRIGGER":
       return {
-        title: "Execute the long plan",
-        subtitle: "Trigger level is firing.",
+        title: "Run the long playbook",
+        subtitle: "Long trigger level is firing.",
         bullets: [
-          `Go long near ${formatPrice(longEntry)} with stop ${formatPrice(longStop)}.`,
-          firstLongTarget
-            ? `Scale out at ${formatPrice(firstLongTarget)} while monitoring for reversal to re-enter short.`
-            : "Trail stops quickly; reassess if momentum stalls.",
+          longEntryLabel && longStopLabel
+            ? `Enter long with stop at the long stop (${longStopLabel}).`
+            : "Enter long with stop at the long stop.",
+          targetOneLabel
+            ? `Scale at Target 1 (${targetOneLabel}) or tighten stops quickly if volatility is high.`
+            : "Scale at Target 1 or tighten stops quickly if volatility is high.",
         ],
         status: "bullish",
       };
     case "LONG_LADDER":
       return {
-        title: "Manage both sides",
+        title: "Manage longs, watch for turn",
         subtitle: "Price is moving through upside targets.",
         bullets: [
-          ladderBounds
-            ? `Trail longs and look for exhaustion near ${formatPrice(ladderBounds.upper)} for potential fades.`
-            : `Use the ladder above ${formatPrice(longEntry)} for both profit taking and fade setups.`,
-          describeTradeState(tradeState, "long") || "Stay nimble — trend traders hold, mean-reverters wait for signals.",
+          ladderRangeLabel
+            ? `Trail long profits as targets are reached between ${ladderRangeLabel}.`
+            : "Trail long profits as targets are reached.",
+          "Watch for exhaustion near the upper targets if you plan to look for a new short later.",
         ],
         status: "bullish",
       };
     case "BREAKOUT":
       return {
-        title: "Choose continuation or fade",
+        title: "Decide: ride or fade",
         subtitle: "Price is stretching above planned targets.",
         bullets: [
-          finalLongTarget
-            ? `Continuation: ride longs while ${formatPrice(finalLongTarget)} holds.`
-            : "Continuation: only chase with tight risk.",
-          lowestShort
-            ? `Mean reversion: scout fades back toward ${formatPrice(lowestShort)} once momentum cracks.`
-            : "Mean reversion: wait for a failed high before leaning short.",
+          "Either continue with the trend using tight risk.",
+          finalLongTargetLabel
+            ? `Or wait for a controlled pullback to look for a new short near the final long target (${finalLongTargetLabel}) and previous resistance.`
+            : "Or wait for a controlled pullback to look for a new short near the final long target and previous resistance.",
         ],
         status: "neutral",
       };
@@ -859,7 +919,9 @@ function resolveBothSummary(context: SummaryContext): ZoneResponse {
         title: "Follow the dominant setup",
         subtitle: "Let price dictate the side to trade.",
         bullets: [
-          `Key levels — Long ${formatPrice(longEntry)} | Short ${formatPrice(shortEntry)}.`,
+          longEntryLabel && shortEntryLabel
+            ? `Key levels — Long ${longEntryLabel} | Short ${shortEntryLabel}.`
+            : "Keep both plans in view and react to price.",
         ],
         status: "neutral",
       };
@@ -877,7 +939,7 @@ function buildStopNotes({
   shortStop: PriceLike;
   intent: TradeIntent;
 }): string[] {
-  const notes: string[] = [];
+  const notes = new Set<string>();
   const price = safeNumber(latestPrice);
   const longStopValue = safeNumber(longStop);
   const shortStopValue = safeNumber(shortStop);
@@ -890,22 +952,19 @@ function buildStopNotes({
     && Math.abs(price - shortStopValue) / Math.abs(shortStopValue) <= STOP_PROXIMITY_TOLERANCE;
 
   if (nearLongStop) {
-    if (intent === "buy" || intent === "sell" || intent === "both") {
-      notes.push("Long stop is under pressure — tighten risk or exit immediately.");
-    }
+    notes.add("Price is very close to the stop level — expect fast moves.");
+    notes.add("If this level breaks, the setup is no longer valid.");
   }
 
-  if (nearShortStop && Number.isFinite(shortStopValue)) {
-    if (intent === "buy") {
-      notes.push("Short crowd is close to invalidation — expect a squeeze higher.");
-    } else if (intent === "sell") {
-      notes.push("Short stop is in play — use the bounce to finish scaling out.");
-    } else {
-      notes.push("Short stop nearly triggered — be ready to flip long on confirmation.");
+  if (nearShortStop) {
+    notes.add("Price is very close to the stop level — expect fast moves.");
+    if (intent === "both") {
+      notes.add("If this level breaks, the setup is no longer valid.");
     }
+    notes.add("The opposing idea is about to fail; a sharp squeeze is possible if this level breaks.");
   }
 
-  return notes;
+  return Array.from(notes);
 }
 
 function buildExtremeNotes({
@@ -919,37 +978,37 @@ function buildExtremeNotes({
   longTargets: number[];
   shortTargets: number[];
 }): string[] {
-  const notes: string[] = [];
+  const notes = new Set<string>();
   const price = safeNumber(latestPrice);
 
   const lowestShort = shortTargets[shortTargets.length - 1];
-  if (
-    classification.zone === "BREAKDOWN"
-    && Number.isFinite(price)
-    && Number.isFinite(lowestShort)
-    && price <= (lowestShort as number) * 0.99
-  ) {
-    notes.push("Price broke beyond the last downside target — run a fresh analysis for new support.");
-  }
-
   const highestLong = longTargets[longTargets.length - 1];
+  const extremeMessage = "Price has moved well beyond the planned range. Run a fresh analysis to update targets and risk.";
+
   if (
-    classification.zone === "BREAKOUT"
-    && Number.isFinite(price)
+    Number.isFinite(price)
     && Number.isFinite(highestLong)
     && price >= (highestLong as number) * 1.01
   ) {
-    notes.push("Price is extending more than 1% beyond the final upside target — refresh the plan.");
+    notes.add(extremeMessage);
   }
 
-  if (classification.zone === "LONG_INVALIDATED") {
-    notes.push("Plan invalidated — schedule another analysis once conditions reset.");
-  }
-  if (classification.zone === "SHORT_INVALIDATED") {
-    notes.push("Short playbook failed — rerun analysis for updated upside levels.");
+  if (
+    Number.isFinite(price)
+    && Number.isFinite(lowestShort)
+    && price <= (lowestShort as number) * 0.99
+  ) {
+    notes.add(extremeMessage);
   }
 
-  return notes;
+  if (
+    classification.zone === "LONG_INVALIDATED"
+    || classification.zone === "SHORT_INVALIDATED"
+  ) {
+    notes.add("This plan is now outdated. Wait for a new analysis before building a fresh position.");
+  }
+
+  return Array.from(notes);
 }
 
 function buildPlanSnapshot({
@@ -971,37 +1030,34 @@ function buildPlanSnapshot({
 }): string[] {
   const snapshots: string[] = [];
 
-  const longSummary = [
-    `Entry ${formatPrice(longEntry)}`,
+  const longTargetsLabel = longTargets.length
+    ? longTargets.map((value) => formatPrice(value)).join(" / ")
+    : null;
+  const shortTargetsLabel = shortTargets.length
+    ? shortTargets.map((value) => formatPrice(value)).join(" / ")
+    : null;
+
+  const longSnapshotParts = [
+    `Long plan: Entry ${formatPrice(longEntry)}`,
     `Stop ${formatPrice(longStop)}`,
-    longTargets.length ? `Targets ${longTargets.map((value) => formatPrice(value)).join(" · ")}` : null,
-  ]
-    .filter(Boolean)
-    .join(" | ");
+    longTargetsLabel ? `Targets ${longTargetsLabel}` : null,
+  ].filter(Boolean) as string[];
 
-  const shortSummary = [
-    `Entry ${formatPrice(shortEntry)}`,
+  const shortSnapshotParts = [
+    `Short plan: Entry ${formatPrice(shortEntry)}`,
     `Stop ${formatPrice(shortStop)}`,
-    shortTargets.length ? `Targets ${shortTargets.map((value) => formatPrice(value)).join(" · ")}` : null,
-  ]
-    .filter(Boolean)
-    .join(" | ");
+    shortTargetsLabel ? `Targets ${shortTargetsLabel}` : null,
+  ].filter(Boolean) as string[];
 
-  if (intent === "buy") {
-    if (longSummary) {
-      snapshots.push(`Long plan — ${longSummary}`);
-    }
-  } else if (intent === "sell") {
-    if (longSummary) {
-      snapshots.push(`Exit map — ${longSummary}`);
-    }
-  } else {
-    if (longSummary) {
-      snapshots.push(`Long plan — ${longSummary}`);
-    }
-    if (shortSummary) {
-      snapshots.push(`Short plan — ${shortSummary}`);
-    }
+  const longSnapshot = longSnapshotParts.join(" • ");
+  const shortSnapshot = shortSnapshotParts.join(" • ");
+
+  if ((intent === "buy" || intent === "sell" || intent === "both") && longSnapshotParts.length) {
+    snapshots.push(longSnapshot);
+  }
+
+  if (intent === "both" && shortSnapshotParts.length) {
+    snapshots.push(shortSnapshot);
   }
 
   return snapshots;
@@ -1078,7 +1134,7 @@ export function deriveActionSummary({
   ].filter(Boolean);
 
   if (strategy.rewardRisk && Number.isFinite(strategy.rewardRisk)) {
-    narrative.push(`Reward/Risk ${strategy.rewardRisk.toFixed(2)}`);
+    narrative.push(`Reward/Risk: ${strategy.rewardRisk.toFixed(2)} (potential gain vs planned loss).`);
   }
 
   const { label: confidenceLabel, score: confidenceScore } = computeConfidence(strategy.conviction);
