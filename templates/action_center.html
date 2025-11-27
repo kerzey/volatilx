@@ -6,7 +6,7 @@
     <title>VolatilX - Action Center</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="action-center-page" data-live-price="{{ 'true' if live_price_enabled else 'false' }}" data-timeframe="{{ timeframe }}" data-intent="{{ intent }}">
+<body class="action-center-page{% if principal_plan_json %} action-center-page--react{% endif %}" data-live-price="{{ 'true' if live_price_enabled else 'false' }}" data-timeframe="{{ timeframe }}" data-intent="{{ intent }}">
     <div class="header">
         <a class="logo" href="/analyze">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
@@ -25,6 +25,7 @@
 
     <main class="action-center">
         <div id="action-center2-root" data-react-root></div>
+        <div data-legacy-action-center>
         <header class="action-center__header action-center__header--sticky" data-sticky-header>
             <div>
                 <h1>Action Center</h1>
@@ -370,14 +371,30 @@
             <p>No tracked symbols available for the Action Center. Follow a symbol or run an analysis to get started.</p>
         </div>
         {% endif %}
+        </div>
     </main>
 
-    {% if dashboards_json %}
-    <script id="actionCenterDashboards" type="application/json">{{ dashboards_json | safe }}</script>
-    {% endif %}
     {% if principal_plan_json %}
     <script id="actionCenterPrincipalPlan" type="application/json">{{ principal_plan_json | safe }}</script>
+    <script>
+    (function () {
+        const planSource = document.getElementById('actionCenterPrincipalPlan');
+        if (!planSource) {
+            return;
+        }
+        try {
+            const planPayload = JSON.parse(planSource.textContent || '{}');
+            window.__ACTION_CENTER_PRINCIPAL_PLAN__ = planPayload;
+        } catch (error) {
+            console.warn('Failed to parse Action Center principal plan payload', error);
+        }
+    }());
+    </script>
     {% endif %}
+    {% if not principal_plan_json and dashboards_json %}
+    <script id="actionCenterDashboards" type="application/json">{{ dashboards_json | safe }}</script>
+    {% endif %}
+    {% if not principal_plan_json %}
     <script>
     (function () {
         const planSource = document.getElementById('actionCenterPrincipalPlan');
@@ -1507,6 +1524,7 @@
         }
     }());
     </script>
+    {% endif %}
     <script type="module" src="/static/js/action-center2.js"></script>
 </body>
 </html>

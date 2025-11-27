@@ -13,6 +13,14 @@ body {
   min-height: 100vh;
 }
 
+.action-center-page--react [data-legacy-action-center] {
+  display: none;
+}
+
+body:not(.action-center-page--react) #action-center2-root {
+  display: none;
+}
+
 /* SUBSCRIPTION & SETTINGS LAYOUT ------------------------------------------ */
 .subscription-body {
   background: linear-gradient(180deg, #f5f7ff 0%, #ffffff 60%);
