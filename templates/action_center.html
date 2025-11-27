@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Action Center</title>
+    {% if principal_plan_json or principal_plan_map_json %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.13/dist/tailwind.min.css">
+    {% endif %}
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="action-center-page{% if principal_plan_json %} action-center-page--react{% endif %}" data-live-price="{{ 'true' if live_price_enabled else 'false' }}" data-timeframe="{{ timeframe }}" data-intent="{{ intent }}">
