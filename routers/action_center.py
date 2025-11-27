@@ -371,14 +371,18 @@ async def action_center_page(
     strategy_key = STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
     dashboards: List[Dict[str, Any]] = []
     price_overrides: Dict[str, Dict[str, Any]] = {}
+    principal_plan_map: Dict[str, Dict[str, Any]] = {}
+    principal_plan_order: List[str] = []
 
     def _build_dashboard(symbol_key: str, report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        nonlocal principal_plan_map, principal_plan_order
         resolved_report = report or _fetch_latest_action_report(symbol_key)
         symbol_display = symbol_display_map.get(symbol_key, symbol_key)
         symbol_canonical = canonicalize_symbol(symbol_key)
         dashboard_payload: Optional[Dict[str, Any]] = None
         dashboard_summary: Optional[str] = None
         error_message: Optional[str] = None
+        plan_payload: Optional[Dict[str, Any]] = None
 
         if resolved_report:
             price_override = price_overrides.get(symbol_key)
@@ -393,6 +397,18 @@ async def action_center_page(
             strategies = principal_data.get("strategies") or {}
             active_strategy = strategies.get(strategy_key) or {}
             dashboard_summary = active_strategy.get("summary")
+            plan_payload = _prepare_principal_plan(
+                resolved_report,
+                price_override=price_override,
+            )
+            if plan_payload:
+                plan_payload["symbol_display"] = symbol_display
+                plan_payload["is_favorited"] = bool(
+                    symbol_canonical and symbol_canonical in favorite_canonical_set
+                )
+                if symbol_key not in principal_plan_map:
+                    principal_plan_map[symbol_key] = plan_payload
+                    principal_plan_order.append(symbol_key)
         else:
             error_message = "No recent AI analysis found for this symbol. Try running a new multi-agent analysis first."
 
@@ -483,15 +499,22 @@ async def action_center_page(
         separators=(",", ":"),
     )
 
-    principal_plan_payload = None
-    principal_plan_json = None
-    if raw_report:
-        principal_plan_payload = _prepare_principal_plan(
-            raw_report,
-            price_override=price_overrides.get(primary_symbol_sanitized),
-        )
-        if principal_plan_payload is not None:
-            principal_plan_json = json.dumps(principal_plan_payload, separators=(",", ":"))
+    principal_plan_payload = principal_plan_map.get(primary_symbol_sanitized)
+    principal_plan_json = (
+        json.dumps(principal_plan_payload, separators=(",", ":"))
+        if principal_plan_payload is not None
+        else None
+    )
+    principal_plan_map_json = (
+        json.dumps(principal_plan_map, separators=(",", ":"))
+        if principal_plan_map
+        else None
+    )
+    principal_plan_order_json = (
+        json.dumps(principal_plan_order, separators=(",", ":"))
+        if principal_plan_order
+        else None
+    )
 
     context = {
         "request": request,
@@ -516,6 +539,8 @@ async def action_center_page(
         "rest_price_overrides": price_overrides,
         "principal_plan": principal_plan_payload,
         "principal_plan_json": principal_plan_json,
+        "principal_plan_map_json": principal_plan_map_json,
+        "principal_plan_order_json": principal_plan_order_json,
     }
 
     return templates.TemplateResponse("action_center.html", context)

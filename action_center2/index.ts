@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 
 import { ActionCenterPage } from "./components/ActionCenterPage";
 import type { ActionCenterProps } from "./components/ActionCenterPage";
-import type { PrincipalPlan, StrategyKey } from "./types";
+import type { PrincipalPlan, PrincipalPlanOption, StrategyKey } from "./types";
 
 export { ActionCenterPage };
 export type { ActionCenterProps, PrincipalPlan };
@@ -23,6 +23,7 @@ type BootstrapOptions = {
 declare global {
 	interface Window {
 		__ACTION_CENTER_PRINCIPAL_PLAN__?: PrincipalPlan | null;
+		__ACTION_CENTER_PRINCIPAL_PLAN_OPTIONS__?: PrincipalPlanOption[] | null;
 		bootstrapActionCenterPage?: (options?: BootstrapOptions) => Root | null;
 	}
 }
@@ -57,6 +58,13 @@ export function bootstrapActionCenterPage(options: BootstrapOptions = {}): Root 
 	}
 
 	const resolvedPlan = plan ?? window.__ACTION_CENTER_PRINCIPAL_PLAN__ ?? null;
+	const availablePlans = (() => {
+		const raw = window.__ACTION_CENTER_PRINCIPAL_PLAN_OPTIONS__;
+		if (!Array.isArray(raw)) {
+			return undefined;
+		}
+		return raw.filter((entry): entry is PrincipalPlanOption => Boolean(entry && entry.plan && entry.plan.symbol));
+	})();
 	if (!resolvedPlan) {
 		console.warn("[ActionCenter] Principal plan payload missing; rendering aborted.");
 		return null;
@@ -72,6 +80,7 @@ export function bootstrapActionCenterPage(options: BootstrapOptions = {}): Root 
 		React.createElement(ActionCenterPage, {
 			plan: resolvedPlan,
 			initialStrategy: strategy,
+			planOptions: availablePlans,
 		}),
 	);
 	return root;

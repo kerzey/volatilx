@@ -37,6 +37,8 @@ export type TechnicalConsensus = {
 
 export type PrincipalPlan = {
   symbol: string;
+  symbol_display?: string;
+  is_favorited?: boolean;
   generated_display: string;
   latest_price: number;
   strategies: Strategies;
@@ -44,6 +46,13 @@ export type PrincipalPlan = {
 };
 
 export type StrategyKey = keyof Strategies;
+
+export type PrincipalPlanOption = {
+  symbol: string;
+  symbolDisplay: string;
+  isFavorite: boolean;
+  plan: PrincipalPlan;
+};
 
 export type TradeState =
   | "NO_TRADE"

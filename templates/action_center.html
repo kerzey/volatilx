@@ -376,25 +376,104 @@
 
     {% if principal_plan_json %}
     <script id="actionCenterPrincipalPlan" type="application/json">{{ principal_plan_json | safe }}</script>
+    {% endif %}
+    {% if principal_plan_map_json %}
+    <script id="actionCenterPrincipalPlanMap" type="application/json">{{ principal_plan_map_json | safe }}</script>
+    {% endif %}
+    {% if principal_plan_order_json %}
+    <script id="actionCenterPrincipalPlanOrder" type="application/json">{{ principal_plan_order_json | safe }}</script>
+    {% endif %}
+    {% if principal_plan_json or principal_plan_map_json %}
     <script>
     (function () {
-        const planSource = document.getElementById('actionCenterPrincipalPlan');
-        if (!planSource) {
-            return;
+        var planPayload = null;
+        var planSource = document.getElementById('actionCenterPrincipalPlan');
+        if (planSource) {
+            try {
+                planPayload = JSON.parse(planSource.textContent || '{}');
+            } catch (error) {
+                console.warn('Failed to parse Action Center principal plan payload', error);
+                planPayload = null;
+            }
         }
-        try {
-            const planPayload = JSON.parse(planSource.textContent || '{}');
+
+        var planMap = {};
+        var mapSource = document.getElementById('actionCenterPrincipalPlanMap');
+        if (mapSource) {
+            try {
+                planMap = JSON.parse(mapSource.textContent || '{}');
+            } catch (error) {
+                console.warn('Failed to parse Action Center plan map payload', error);
+                planMap = {};
+            }
+        }
+
+        var planOrder = [];
+        var orderSource = document.getElementById('actionCenterPrincipalPlanOrder');
+        if (orderSource) {
+            try {
+                planOrder = JSON.parse(orderSource.textContent || '[]');
+            } catch (error) {
+                console.warn('Failed to parse Action Center plan order payload', error);
+                planOrder = [];
+            }
+        }
+
+        var planOptions = [];
+        var seenSymbols = new Set();
+
+        function pushOption(symbol, plan) {
+            if (!symbol || !plan || seenSymbols.has(symbol)) {
+                return;
+            }
+            seenSymbols.add(symbol);
+            planOptions.push({
+                symbol: symbol,
+                symbolDisplay: plan.symbol_display || symbol,
+                isFavorite: Boolean(plan.is_favorited),
+                plan: plan,
+            });
+        }
+
+        if (Array.isArray(planOrder) && planOrder.length) {
+            planOrder.forEach(function (symbol) {
+                var plan = planMap && Object.prototype.hasOwnProperty.call(planMap, symbol)
+                    ? planMap[symbol]
+                    : undefined;
+                if (plan) {
+                    pushOption(symbol, plan);
+                }
+            });
+        }
+
+        if (planMap && typeof planMap === 'object') {
+            Object.keys(planMap).forEach(function (key) {
+                if (planMap[key]) {
+                    pushOption(key, planMap[key]);
+                }
+            });
+        }
+
+        if (planPayload && planPayload.symbol && !seenSymbols.has(planPayload.symbol)) {
+            pushOption(planPayload.symbol, planPayload);
+        }
+
+        if (!planPayload && planOptions.length) {
+            planPayload = planOptions[0].plan;
+        }
+
+        if (planPayload) {
             window.__ACTION_CENTER_PRINCIPAL_PLAN__ = planPayload;
-        } catch (error) {
-            console.warn('Failed to parse Action Center principal plan payload', error);
         }
+
+        window.__ACTION_CENTER_PRINCIPAL_PLAN_OPTIONS__ = planOptions;
     }());
     </script>
     {% endif %}
-    {% if not principal_plan_json and dashboards_json %}
+    {% if not principal_plan_json and not principal_plan_map_json and dashboards_json %}
     <script id="actionCenterDashboards" type="application/json">{{ dashboards_json | safe }}</script>
     {% endif %}
-    {% if not principal_plan_json %}
+    {% if not principal_plan_json and not principal_plan_map_json %}
     <script>
     (function () {
         const planSource = document.getElementById('actionCenterPrincipalPlan');
