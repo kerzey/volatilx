@@ -16,7 +16,6 @@ export function PlanSwitcher({ options, activeSymbol, onSelect }: PlanSwitcherPr
       <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
         <span className="text-xs uppercase tracking-widest text-slate-500">Tracked Symbols</span>
         {options.map((option) => {
-          const isActive = option.symbol === activeSymbol;
           const baseClasses = "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition";
           const stateClasses = option.symbol === activeSymbol
             ? " border-sky-500/60 bg-sky-500/10 text-sky-100"

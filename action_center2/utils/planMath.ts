@@ -1,4 +1,11 @@
-import { NoTradeZone, StrategyPlan, TradeState, TradeSetup } from "../types";
+import {
+  ActionSummary,
+  NoTradeZone,
+  StrategyPlan,
+  TradeIntent,
+  TradeState,
+  TradeSetup,
+} from "../types";
 
 type PriceLike = number | null | undefined;
 
@@ -178,4 +185,133 @@ export function clampToRange(value: number, min = 0, max = 100): number {
     return min;
   }
   return Math.min(Math.max(value, min), max);
+}
+
+function computeConfidence(score: number | undefined): { label: string; score: number } {
+  if (!Number.isFinite(score)) {
+    return { label: "Medium", score: 50 };
+  }
+
+  const normalized = score <= 1 ? score * 100 : score;
+  const clamped = clampToRange(normalized, 0, 100);
+  if (clamped >= 70) {
+    return { label: "High", score: clamped };
+  }
+  if (clamped >= 45) {
+    return { label: "Medium", score: clamped };
+  }
+  return { label: "Low", score: clamped };
+}
+
+function formatDelta(current: number | undefined, reference: number | undefined): string | null {
+  const currentVal = safeNumber(current);
+  const refVal = safeNumber(reference);
+  if (!Number.isFinite(currentVal) || !Number.isFinite(refVal) || refVal === 0) {
+    return null;
+  }
+  const changePct = ((currentVal - refVal) / Math.abs(refVal)) * 100;
+  const direction = changePct >= 0 ? "above" : "below";
+  return `${formatPrice(currentVal)} (${formatPercent(changePct)} ${direction} entry)`;
+}
+
+export type ActionSummaryInput = {
+  strategy: StrategyPlan;
+  tradeState: TradeState;
+  latestPrice: number;
+  intent: TradeIntent;
+};
+
+export function deriveActionSummary({
+  strategy,
+  tradeState,
+  latestPrice,
+  intent,
+}: ActionSummaryInput): ActionSummary {
+  const setup = intent === "sell" ? strategy.sell_setup : strategy.buy_setup;
+  const opposingSetup = intent === "sell" ? strategy.buy_setup : strategy.sell_setup;
+
+  const entry = safeNumber(setup?.entry);
+  const stop = safeNumber(setup?.stop);
+  const targets = Array.isArray(setup?.targets) ? setup.targets.map((target) => safeNumber(target)).filter(Number.isFinite) : [];
+
+  const riskLabel = strategy.rewardRisk && Number.isFinite(strategy.rewardRisk)
+    ? `Reward/Risk ${strategy.rewardRisk.toFixed(2)}`
+    : null;
+
+  const deltaLabel = formatDelta(latestPrice, entry);
+
+  const narrative: string[] = [];
+  if (Number.isFinite(entry)) {
+    narrative.push(`Entry ${formatPrice(entry)}`);
+  }
+  if (Number.isFinite(stop)) {
+    narrative.push(`Stop ${formatPrice(stop)}`);
+  }
+  if (targets.length) {
+    const formattedTargets = targets.map((value) => formatPrice(value)).join(" · ");
+    narrative.push(`Targets ${formattedTargets}`);
+  }
+  if (riskLabel) {
+    narrative.push(riskLabel);
+  }
+  if (deltaLabel) {
+    narrative.push(deltaLabel);
+  }
+
+  const { label: confidenceLabel, score: confidenceScore } = computeConfidence(strategy.conviction);
+
+  const isBuyIntent = intent === "buy";
+  let title = isBuyIntent ? "Bullish setup standing by" : "Bearish setup standing by";
+  let subtitle = isBuyIntent
+    ? "Price is nearing the long trigger."
+    : "Price is nearing the short trigger.";
+  let status: ActionSummary["status"] = isBuyIntent ? "bullish" : "bearish";
+
+  if (tradeState === "NO_TRADE") {
+    title = "Inside no-trade zone";
+    subtitle = "Respect the neutral range until price exits decisively.";
+    status = "neutral";
+  } else if (tradeState === "WAIT") {
+    subtitle = isBuyIntent
+      ? "Let price confirm above the entry level before leaning long."
+      : "Let price break under the entry level before leaning short.";
+  } else if (tradeState === "BUY_TRIGGERING" && isBuyIntent) {
+    title = "Long trigger arming";
+    subtitle = "Momentum is challenging resistance — prep the long plan.";
+  } else if (tradeState === "SELL_TRIGGERING" && !isBuyIntent) {
+    title = "Short trigger arming";
+    subtitle = "Momentum is testing support — prep the short plan.";
+  } else if (tradeState === "BUY_ACTIVE") {
+    if (isBuyIntent) {
+      title = "Long setup active";
+      subtitle = "Price is engaged with the long trigger — manage risk around stops.";
+    } else {
+      title = "Long bias dominating";
+      subtitle = "Opposing long momentum is in control; avoid aggressive shorts.";
+      status = "neutral";
+    }
+  } else if (tradeState === "SELL_ACTIVE") {
+    if (!isBuyIntent) {
+      title = "Short setup active";
+      subtitle = "Price is following through under resistance — manage short risk.";
+    } else {
+      title = "Short momentum dominant";
+      subtitle = "Opposing short pressure in play; wait for strength before buying.";
+      status = "neutral";
+    }
+  }
+
+  if (opposingSetup && Number.isFinite(safeNumber(opposingSetup.entry))) {
+    const opposingLabel = isBuyIntent ? "short" : "long";
+    narrative.push(`Opposing ${opposingLabel} entry ${formatPrice(opposingSetup.entry)}`);
+  }
+
+  return {
+    title,
+    subtitle,
+    narrative,
+    status,
+    confidenceLabel,
+    confidenceScore,
+  };
 }

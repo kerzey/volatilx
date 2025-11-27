@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { PrincipalPlan, PrincipalPlanOption, StrategyKey, StrategyPlan } from "../types";
-import { deriveTradeState, buildAlertSuggestions } from "../utils/planMath";
+import { PrincipalPlan, PrincipalPlanOption, StrategyKey, StrategyPlan, TradeIntent } from "../types";
+import { deriveTradeState, buildAlertSuggestions, deriveActionSummary } from "../utils/planMath";
 import { TradeStateHeader } from "./TradeStateHeader";
 import { StrategySelector } from "./StrategySelector";
 import { PriceGauge } from "./PriceGauge";
@@ -9,6 +9,8 @@ import { PnLPreview } from "./PnLPreview";
 import { AlertsList } from "./AlertsList";
 import { TrendHeatmap } from "./TrendHeatmap";
 import { PlanSwitcher } from "./PlanSwitcher";
+import { ActionSummaryPanel } from "./ActionSummary";
+import { IntentSelector } from "./IntentSelector";
 
 export type ActionCenterProps = {
   plan: PrincipalPlan;
@@ -74,12 +76,17 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
   const activePlan = activeOption?.plan ?? plan;
 
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyKey>(initialStrategy ?? DEFAULT_STRATEGY);
+  const [selectedIntent, setSelectedIntent] = useState<TradeIntent>("buy");
 
   useEffect(() => {
     if (!activePlan.strategies[selectedStrategy]) {
       setSelectedStrategy(DEFAULT_STRATEGY);
     }
   }, [activePlan, selectedStrategy]);
+
+  useEffect(() => {
+    setSelectedIntent("buy");
+  }, [activePlan.symbol]);
 
   const strategyPlan: StrategyPlan = activePlan.strategies[selectedStrategy] ?? activePlan.strategies[DEFAULT_STRATEGY];
 
@@ -95,6 +102,17 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
   const alertSuggestions = useMemo(
     () => buildAlertSuggestions(activePlan.latest_price, strategyPlan),
     [activePlan.latest_price, strategyPlan],
+  );
+
+  const actionSummary = useMemo(
+    () =>
+      deriveActionSummary({
+        strategy: strategyPlan,
+        tradeState,
+        latestPrice: activePlan.latest_price,
+        intent: selectedIntent,
+      }),
+    [activePlan.latest_price, selectedIntent, strategyPlan, tradeState],
   );
 
   return (
@@ -115,7 +133,9 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
         />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <StrategySelector selected={selectedStrategy} onSelect={setSelectedStrategy} />
+          <IntentSelector selected={selectedIntent} onSelect={setSelectedIntent} />
         </div>
+        <ActionSummaryPanel summary={actionSummary} />
         <PriceGauge
           latestPrice={activePlan.latest_price}
           buySetup={strategyPlan.buy_setup}

@@ -47,6 +47,8 @@ export type PrincipalPlan = {
 
 export type StrategyKey = keyof Strategies;
 
+export type TradeIntent = "buy" | "sell";
+
 export type PrincipalPlanOption = {
   symbol: string;
   symbolDisplay: string;
@@ -93,4 +95,13 @@ export type GaugeModel = {
   max: number;
   points: GaugePoint[];
   noTradeBands: GaugeBand[];
+};
+
+export type ActionSummary = {
+  title: string;
+  subtitle: string;
+  narrative: string[];
+  status: "bullish" | "bearish" | "neutral";
+  confidenceLabel: string;
+  confidenceScore: number;
 };
