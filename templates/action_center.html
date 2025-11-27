@@ -59,10 +59,12 @@
             {% set gauge_max_label = r2.value if r2 and r2.value else (r1.value if r1 and r1.value else price_value) %}
             {% set scenarios = payload.scenarios if payload and payload.scenarios else [] %}
             {% set trade_plan = payload.trade_plan if payload and payload.trade_plan else None %}
-            {% set trade_entries = trade_plan.entry if trade_plan and trade_plan.entry else {} %}
-            {% set trade_targets = trade_plan.targets if trade_plan and trade_plan.targets else [] %}
-            {% set trade_stops = trade_plan.stops if trade_plan and trade_plan.stops else [] %}
+            {% set buy_plan = trade_plan.buy if trade_plan and trade_plan.buy else None %}
+            {% set sell_plan = trade_plan.sell if trade_plan and trade_plan.sell else None %}
+            {% set no_trade_zones = trade_plan.no_trade_zones if trade_plan and trade_plan.no_trade_zones else [] %}
             {% set risk_notes = trade_plan.risk_notes if trade_plan and trade_plan.risk_notes else [] %}
+            {% set position_size = trade_plan.position_size if trade_plan and trade_plan.position_size else 'N/A' %}
+            {% set trade_summary = dashboard.strategy_summary if dashboard.strategy_summary else (trade_plan.summary if trade_plan and trade_plan.summary else None) %}
             {% set alerts = payload.alerts if payload and payload.alerts else [] %}
             {% set tags = payload.tags if payload and payload.tags else [] %}
             {% set dashboard_timeframe = dashboard.timeframe if dashboard.timeframe else timeframe %}
@@ -222,56 +224,100 @@
                         <section class="trade-plan">
                             <header>
                                 <h2>Auto-generated trade plan</h2>
-                                {% if dashboard.strategy_summary %}
-                                <p data-strategy-summary>{{ dashboard.strategy_summary }}</p>
+                                {% if trade_summary %}
+                                <p data-strategy-summary>{{ trade_summary }}</p>
+                                {% else %}
+                                <p data-strategy-summary hidden></p>
                                 {% endif %}
                             </header>
                             <div class="trade-plan__grid">
-                                <div>
-                                    <h3>Entries</h3>
-                                    <ul data-plan-entries>
-                                        <li><span>Initial</span><strong data-entry-field="primary">{{ trade_entries.primary if trade_entries and trade_entries.primary else 'N/A' }}</strong></li>
-                                        <li><span>Scale</span><strong data-entry-field="scale">{{ trade_entries.scale if trade_entries and trade_entries.scale else 'N/A' }}</strong></li>
-                                        <li><span>Breakout</span><strong data-entry-field="breakout">{{ trade_entries.breakout if trade_entries and trade_entries.breakout else 'N/A' }}</strong></li>
-                                    </ul>
+                                <div class="plan-subsection plan-subsection--buy" data-plan-buy>
+                                    <div class="plan-subsection__title">Buy Setup</div>
+                                    <div class="plan-subsection__content">
+                                        <div class="plan-field">
+                                            <strong>Entry</strong>
+                                            <span data-plan-buy-entry>{{ buy_plan.entry if buy_plan and buy_plan.entry else 'N/A' }}</span>
+                                        </div>
+                                        <div class="plan-field">
+                                            <strong>Stop</strong>
+                                            <span data-plan-buy-stop>{{ buy_plan.stop if buy_plan and buy_plan.stop else 'N/A' }}</span>
+                                        </div>
+                                        <div class="plan-field">
+                                            <strong>Targets</strong>
+                                            <ul class="plan-list" data-plan-buy-targets>
+                                                {% if buy_plan and buy_plan.targets %}
+                                                {% for target in buy_plan.targets %}
+                                                <li>{{ target }}</li>
+                                                {% endfor %}
+                                                {% else %}
+                                                <li>N/A</li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3>Targets</h3>
-                                    <ul data-plan-targets>
-                                        {% if trade_targets %}
-                                        {% for target in trade_targets %}
-                                        <li><strong>{{ target }}</strong></li>
-                                        {% endfor %}
-                                        {% else %}
-                                        <li><strong>N/A</strong></li>
-                                        {% endif %}
-                                    </ul>
+                                <div class="plan-subsection plan-subsection--sell" data-plan-sell>
+                                    <div class="plan-subsection__title">Sell Setup</div>
+                                    <div class="plan-subsection__content">
+                                        <div class="plan-field">
+                                            <strong>Entry</strong>
+                                            <span data-plan-sell-entry>{{ sell_plan.entry if sell_plan and sell_plan.entry else 'N/A' }}</span>
+                                        </div>
+                                        <div class="plan-field">
+                                            <strong>Stop</strong>
+                                            <span data-plan-sell-stop>{{ sell_plan.stop if sell_plan and sell_plan.stop else 'N/A' }}</span>
+                                        </div>
+                                        <div class="plan-field">
+                                            <strong>Targets</strong>
+                                            <ul class="plan-list" data-plan-sell-targets>
+                                                {% if sell_plan and sell_plan.targets %}
+                                                {% for target in sell_plan.targets %}
+                                                <li>{{ target }}</li>
+                                                {% endfor %}
+                                                {% else %}
+                                                <li>N/A</li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3>Stops</h3>
-                                    <ul data-plan-stops>
-                                        {% if trade_stops %}
-                                        {% for stop in trade_stops %}
-                                        <li><strong>{{ stop }}</strong></li>
-                                        {% endfor %}
-                                        {% else %}
-                                        <li><strong>N/A</strong></li>
-                                        {% endif %}
-                                    </ul>
+                                <div class="plan-subsection plan-subsection--neutral" data-plan-no-trade>
+                                    <div class="plan-subsection__title">No-Trade Zones</div>
+                                    <div class="plan-subsection__content">
+                                        <div class="plan-field">
+                                            <strong>Zones</strong>
+                                            <ul class="plan-list" data-plan-no-trade>
+                                                {% if no_trade_zones %}
+                                                {% for zone in no_trade_zones %}
+                                                <li>{{ zone.label if zone and zone.label else ((zone.min or 'N/A') ~ ' – ' ~ (zone.max or 'N/A')) }}</li>
+                                                {% endfor %}
+                                                {% else %}
+                                                <li>No restricted ranges.</li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3>Position Size</h3>
-                                    <p class="trade-plan__size" data-plan-size>{{ trade_plan.position_size if trade_plan and trade_plan.position_size else 'N/A' }}</p>
-                                    <h3>Risk Notes</h3>
-                                    <ul data-plan-risk>
-                                        {% if risk_notes %}
-                                        {% for note in risk_notes %}
-                                        <li>{{ note }}</li>
-                                        {% endfor %}
-                                        {% else %}
-                                        <li>No additional risk notes.</li>
-                                        {% endif %}
-                                    </ul>
+                                <div class="plan-subsection plan-subsection--meta">
+                                    <div class="plan-subsection__title">Position &amp; Risk</div>
+                                    <div class="plan-subsection__content">
+                                        <div class="plan-field">
+                                            <strong>Position Size</strong>
+                                            <span data-plan-size>{{ position_size }}</span>
+                                        </div>
+                                        <div class="plan-field">
+                                            <strong>Risk Notes</strong>
+                                            <ul class="plan-list" data-plan-risk>
+                                                {% if risk_notes %}
+                                                {% for note in risk_notes %}
+                                                <li>{{ note }}</li>
+                                                {% endfor %}
+                                                {% else %}
+                                                <li>No additional risk notes.</li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -906,11 +952,12 @@
         function renderList(container, items, createContent) {
             if (!container) return;
             container.innerHTML = '';
-            if (!items || !items.length) {
+            const list = Array.isArray(items) ? items : [];
+            if (!list.length) {
                 createContent(container, null, true);
                 return;
             }
-            items.forEach((item) => {
+            list.forEach((item) => {
                 createContent(container, item, false);
             });
         }
@@ -958,12 +1005,19 @@
 
             updateGaugeDisplay(node, payload);
 
+            const tradePlan = (payload && payload.trade_plan) || null;
+
             const summaryNode = node.querySelector('[data-strategy-summary]');
             if (summaryNode) {
-                const summaryText = (meta && meta.strategy_summary) || '';
+                const summaryText = (meta && meta.strategy_summary)
+                    || (tradePlan && tradePlan.summary)
+                    || '';
                 if (summaryText) {
                     summaryNode.textContent = summaryText;
                     summaryNode.hidden = false;
+                    if (meta) {
+                        meta.strategy_summary = summaryText;
+                    }
                 } else {
                     summaryNode.hidden = true;
                 }
@@ -1070,38 +1124,74 @@
                 }
             }
 
-            if (payload.trade_plan && payload.trade_plan.entry) {
-                node.querySelectorAll('[data-entry-field]').forEach((entryNode) => {
-                    const field = entryNode.getAttribute('data-entry-field');
-                    entryNode.textContent = payload.trade_plan.entry[field] || 'N/A';
-                });
+            const buyPlan = (tradePlan && tradePlan.buy) || null;
+            const sellPlan = (tradePlan && tradePlan.sell) || null;
+            const zones = (tradePlan && Array.isArray(tradePlan.no_trade_zones)) ? tradePlan.no_trade_zones : [];
+
+            const buySection = node.querySelector('[data-plan-buy]');
+            if (buySection) {
+                buySection.dataset.hasSetup = buyPlan ? 'true' : 'false';
+            }
+            const sellSection = node.querySelector('[data-plan-sell]');
+            if (sellSection) {
+                sellSection.dataset.hasSetup = sellPlan ? 'true' : 'false';
+            }
+            const zoneSection = node.querySelector('[data-plan-no-trade]');
+            if (zoneSection) {
+                zoneSection.dataset.hasSetup = zones.length ? 'true' : 'false';
             }
 
-            const targetsList = node.querySelector('[data-plan-targets]');
-            renderList(targetsList, (payload.trade_plan && payload.trade_plan.targets) || [], (container, item, empty) => {
+            const buyEntryNode = node.querySelector('[data-plan-buy-entry]');
+            if (buyEntryNode) {
+                buyEntryNode.textContent = (buyPlan && buyPlan.entry) || 'N/A';
+            }
+            const buyStopNode = node.querySelector('[data-plan-buy-stop]');
+            if (buyStopNode) {
+                buyStopNode.textContent = (buyPlan && buyPlan.stop) || 'N/A';
+            }
+            const buyTargetsList = node.querySelector('[data-plan-buy-targets]');
+            renderList(buyTargetsList, (buyPlan && buyPlan.targets) || [], (container, item, empty) => {
                 const li = document.createElement('li');
-                const strong = document.createElement('strong');
-                strong.textContent = empty ? 'N/A' : item;
-                li.appendChild(strong);
+                li.textContent = empty ? 'N/A' : item;
                 container.appendChild(li);
             });
 
-            const stopsList = node.querySelector('[data-plan-stops]');
-            renderList(stopsList, (payload.trade_plan && payload.trade_plan.stops) || [], (container, item, empty) => {
+            const sellEntryNode = node.querySelector('[data-plan-sell-entry]');
+            if (sellEntryNode) {
+                sellEntryNode.textContent = (sellPlan && sellPlan.entry) || 'N/A';
+            }
+            const sellStopNode = node.querySelector('[data-plan-sell-stop]');
+            if (sellStopNode) {
+                sellStopNode.textContent = (sellPlan && sellPlan.stop) || 'N/A';
+            }
+            const sellTargetsList = node.querySelector('[data-plan-sell-targets]');
+            renderList(sellTargetsList, (sellPlan && sellPlan.targets) || [], (container, item, empty) => {
                 const li = document.createElement('li');
-                const strong = document.createElement('strong');
-                strong.textContent = empty ? 'N/A' : item;
-                li.appendChild(strong);
+                li.textContent = empty ? 'N/A' : item;
+                container.appendChild(li);
+            });
+
+            const noTradeList = node.querySelector('[data-plan-no-trade]');
+            renderList(noTradeList, zones, (container, item, empty) => {
+                const li = document.createElement('li');
+                if (empty) {
+                    li.textContent = 'No restricted ranges.';
+                } else {
+                    const label = item && item.label;
+                    const min = item && item.min;
+                    const max = item && item.max;
+                    li.textContent = label || `${min || 'N/A'} – ${max || 'N/A'}`;
+                }
                 container.appendChild(li);
             });
 
             const planSize = node.querySelector('[data-plan-size]');
             if (planSize) {
-                planSize.textContent = (payload.trade_plan && payload.trade_plan.position_size) || 'N/A';
+                planSize.textContent = (tradePlan && tradePlan.position_size) || 'N/A';
             }
 
             const riskList = node.querySelector('[data-plan-risk]');
-            renderList(riskList, (payload.trade_plan && payload.trade_plan.risk_notes) || [], (container, item, empty) => {
+            renderList(riskList, (tradePlan && tradePlan.risk_notes) || [], (container, item, empty) => {
                 const li = document.createElement('li');
                 li.textContent = empty ? 'No additional risk notes.' : item;
                 container.appendChild(li);

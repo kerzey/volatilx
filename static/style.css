@@ -1493,6 +1493,30 @@ ul {
   gap: 0.5rem;
 }
 
+.plan-subsection--buy {
+  background: #ecfdf5;
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.18);
+}
+
+.plan-subsection--sell {
+  background: #fef2f2;
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.2);
+}
+
+.plan-subsection--neutral {
+  background: #eef2ff;
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.18);
+}
+
+.plan-subsection--meta {
+  background: #fdf6ee;
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.18);
+}
+
+.plan-subsection[data-has-setup="false"] {
+  opacity: 0.65;
+}
+
 .plan-subsection__title {
   font-size: 0.9rem;
   font-weight: 600;

@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Awaitable, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import (
@@ -502,6 +502,80 @@ def _token_is_numerical_noise(chunk: str, token: Dict[str, Any]) -> bool:
     return False
 
 
+def _extract_structured_strategy_levels(
+    strategy: Dict[str, Any],
+    *,
+    strategy_label: str,
+    latest_price: Optional[float],
+) -> Dict[str, List[Dict[str, Any]]]:
+    supports: List[Dict[str, Any]] = []
+    resistances: List[Dict[str, Any]] = []
+    support_seen: Set[float] = set()
+    resistance_seen: Set[float] = set()
+
+    def _add_price(value: Any, label: str, default_kind: str) -> None:
+        price_val = _safe_float(value)
+        if price_val is None:
+            return
+        kind = default_kind
+        if isinstance(latest_price, (int, float)):
+            if price_val <= latest_price:
+                kind = "support"
+            elif price_val > latest_price:
+                kind = "resistance"
+        seen = support_seen if kind == "support" else resistance_seen
+        key = round(price_val, 4)
+        if key in seen:
+            return
+        target = supports if kind == "support" else resistances
+        target.append(
+            {
+                "price": float(price_val),
+                "distance_pct": None,
+                "timeframe": strategy_label,
+                "source": "strategy-structured",
+                "context": label,
+            }
+        )
+        seen.add(key)
+
+    buy_setup = strategy.get("buy_setup") or {}
+    if isinstance(buy_setup, Mapping):
+        _add_price(buy_setup.get("entry"), "Buy entry", "support")
+        _add_price(buy_setup.get("stop"), "Buy stop", "support")
+        targets = buy_setup.get("targets") or []
+        if isinstance(targets, (list, tuple)):
+            for idx, target in enumerate(targets, start=1):
+                _add_price(target, f"Buy target {idx}", "resistance")
+
+    sell_setup = strategy.get("sell_setup") or {}
+    if isinstance(sell_setup, Mapping):
+        _add_price(sell_setup.get("entry"), "Sell entry", "resistance")
+        _add_price(sell_setup.get("stop"), "Sell stop", "resistance")
+        targets = sell_setup.get("targets") or []
+        if isinstance(targets, (list, tuple)):
+            for idx, target in enumerate(targets, start=1):
+                _add_price(target, f"Sell target {idx}", "support")
+
+    no_trade_zones = strategy.get("no_trade_zone") or []
+    if isinstance(no_trade_zones, (list, tuple)):
+        for idx, zone in enumerate(no_trade_zones, start=1):
+            if not isinstance(zone, Mapping):
+                continue
+            min_value = zone.get("min") if zone.get("min") is not None else zone.get("low")
+            max_value = zone.get("max") if zone.get("max") is not None else zone.get("high")
+            _add_price(min_value, f"No-trade min {idx}", "support")
+            _add_price(max_value, f"No-trade max {idx}", "resistance")
+
+    supports.sort(key=lambda entry: entry["price"])  # ascending for downstream selection
+    resistances.sort(key=lambda entry: entry["price"])  # ascending for downstream selection
+
+    return {
+        "supports": supports,
+        "resistances": resistances,
+    }
+
+
 def _extract_strategy_levels(
     strategy: Dict[str, Any],
     *,
@@ -509,6 +583,13 @@ def _extract_strategy_levels(
     strategy_label: str,
     latest_price: Optional[float],
 ) -> Dict[str, List[Dict[str, Any]]]:
+    structured_levels = _extract_structured_strategy_levels(
+        strategy,
+        strategy_label=strategy_label,
+        latest_price=latest_price,
+    )
+    if structured_levels["supports"] or structured_levels["resistances"]:
+        return structured_levels
     supports: List[Dict[str, Any]] = []
     resistances: List[Dict[str, Any]] = []
     support_seen: Set[float] = set()
@@ -2467,13 +2548,11 @@ def _derive_action_center_view(
             },
         )
 
-    primary_entry = s1_price or latest_price
-    add_entry = _safe_float((radar_levels.get("s2") or {}).get("price")) or primary_entry
-    breakout_entry = r1_price
-
-    target_prices = [lvl for lvl in (radar_levels.get("r1"), radar_levels.get("r2")) if isinstance(lvl, dict)]
-    target_values = [f"{_safe_float(lvl.get('price')):,.2f}" for lvl in target_prices if _safe_float(lvl.get("price"))]
-    stop_price = _safe_float((radar_levels.get("s2") or {}).get("price")) or primary_entry
+    def _fmt(value: Any) -> Optional[str]:
+        numeric_value = _safe_float(value)
+        if numeric_value is None:
+            return None
+        return f"{numeric_value:,.2f}"
 
     sizing_ranges = {
         "HIGH": "40–60%",
@@ -2490,25 +2569,108 @@ def _derive_action_center_view(
         if tip and tip not in risk_notes:
             risk_notes.append(str(tip))
 
-    def _fmt(value: Optional[float]) -> Optional[str]:
-        if value is None:
+    def _build_trade_setup(setup: Any, label: str) -> Optional[Dict[str, Any]]:
+        if not isinstance(setup, Mapping):
             return None
-        return f"{value:,.2f}"
+        entry_val = _safe_float(setup.get("entry"))
+        stop_val = _safe_float(setup.get("stop"))
+        targets_raw = setup.get("targets") or []
+        target_values: List[float] = []
+        target_labels: List[str] = []
+        if isinstance(targets_raw, (list, tuple)):
+            for target in targets_raw:
+                target_val = _safe_float(target)
+                if target_val is None:
+                    continue
+                target_values.append(target_val)
+                formatted = _fmt(target_val)
+                if formatted:
+                    target_labels.append(formatted)
+        if entry_val is None and stop_val is None and not target_values:
+            return None
+        return {
+            "label": label,
+            "entry": _fmt(entry_val),
+            "entry_value": entry_val,
+            "stop": _fmt(stop_val),
+            "stop_value": stop_val,
+            "targets": target_labels,
+            "target_values": target_values,
+        }
+
+    def _build_no_trade_zones(zones: Any) -> List[Dict[str, Any]]:
+        results: List[Dict[str, Any]] = []
+        if not isinstance(zones, (list, tuple)):
+            return results
+        for zone in zones:
+            if not isinstance(zone, Mapping):
+                continue
+            raw_min = zone.get("min") if zone.get("min") is not None else zone.get("low")
+            raw_max = zone.get("max") if zone.get("max") is not None else zone.get("high")
+            min_val = _safe_float(raw_min)
+            max_val = _safe_float(raw_max)
+            if min_val is None and max_val is None:
+                continue
+            if min_val is not None and max_val is not None and min_val > max_val:
+                min_val, max_val = max_val, min_val
+            min_display = _fmt(min_val)
+            max_display = _fmt(max_val)
+            results.append(
+                {
+                    "min": min_display,
+                    "max": max_display,
+                    "min_value": min_val,
+                    "max_value": max_val,
+                    "label": f"{min_display or 'N/A'} – {max_display or 'N/A'}",
+                }
+            )
+        return results
+
+    buy_plan = _build_trade_setup(strategy.get("buy_setup"), "Buy Setup")
+    sell_plan = _build_trade_setup(strategy.get("sell_setup"), "Sell Setup")
+    no_trade_zones = _build_no_trade_zones(strategy.get("no_trade_zone"))
 
     alerts: List[str] = []
+    alerts_seen: Set[str] = set()
+
+    def _push_alert(message: Optional[str]) -> None:
+        if not message:
+            return
+        if message in alerts_seen:
+            return
+        alerts.append(message)
+        alerts_seen.add(message)
+
+    if buy_plan and buy_plan.get("entry"):
+        _push_alert(f"Alert me if price triggers BUY entry {buy_plan['entry']}")
+    if buy_plan and buy_plan.get("stop"):
+        _push_alert(f"Alert me if price hits BUY stop {buy_plan['stop']}")
+    if buy_plan and buy_plan.get("targets"):
+        _push_alert(f"Alert me if price tags BUY target {buy_plan['targets'][0]}")
+
+    if sell_plan and sell_plan.get("entry"):
+        _push_alert(f"Alert me if price breaks SELL entry {sell_plan['entry']}")
+    if sell_plan and sell_plan.get("stop"):
+        _push_alert(f"Alert me if price reclaims SELL stop {sell_plan['stop']}")
+    if sell_plan and sell_plan.get("targets"):
+        _push_alert(f"Alert me if price tags SELL target {sell_plan['targets'][0]}")
+
+    for zone in no_trade_zones:
+        _push_alert(f"Alert me if price enters no-trade zone {zone['label']}")
+
     if r1_price:
-        alerts.append(f"Alert me if price breaks ABOVE {_fmt(r1_price)}")
+        _push_alert(f"Alert me if price breaks ABOVE {_fmt(r1_price)}")
     if s1_price:
-        alerts.append(f"Alert me if price falls BELOW {_fmt(s1_price)}")
+        _push_alert(f"Alert me if price falls BELOW {_fmt(s1_price)}")
+
     raw_zone = decision.get("raw_zone")
     if raw_zone == "buy":
-        alerts.append("Alert me if price enters BUY zone")
+        _push_alert("Alert me if price enters BUY zone")
     elif raw_zone == "sell":
-        alerts.append("Alert me if price enters SELL zone")
-    if target_values:
-        alerts.append(f"Alert me if price hits target {target_values[0]}")
+        _push_alert("Alert me if price enters SELL zone")
+
     if decision.get("needs_reanalysis"):
-        alerts.append("Run a fresh multi-agent analysis to confirm the next level.")
+        _push_alert("Run a fresh multi-agent analysis to confirm the next level.")
 
     chart_range_min = _safe_float((radar_levels.get("s2") or {}).get("price")) or s1_price or latest_price or 0
     chart_range_max = _safe_float((radar_levels.get("r2") or {}).get("price")) or r1_price or latest_price or chart_range_min
@@ -2531,6 +2693,12 @@ def _derive_action_center_view(
         first_note = _first_sentence(str(candlestick_note))
         if first_note:
             tags.append(first_note)
+    if buy_plan and buy_plan.get("entry"):
+        tags.append(f"Buy entry: {buy_plan['entry']}")
+    if sell_plan and sell_plan.get("entry"):
+        tags.append(f"Sell entry: {sell_plan['entry']}")
+    if no_trade_zones:
+        tags.append(f"No-trade: {no_trade_zones[0]['label']}")
 
     decision_title = zone_title_map.get(validated_zone, validated_zone.upper())
     tags.insert(0, f"Decision: {decision_title}")
@@ -2539,6 +2707,15 @@ def _derive_action_center_view(
         tags.append(f"Partial: {partial_recommendation}")
     if decision.get("needs_reanalysis"):
         tags.append("Reanalysis recommended")
+
+    trade_plan_payload = {
+        "summary": summary_text or None,
+        "buy": buy_plan,
+        "sell": sell_plan,
+        "no_trade_zones": no_trade_zones,
+        "position_size": position_size,
+        "risk_notes": risk_notes,
+    }
 
     decision_reason = decision.get("reason") or "Proximity baseline applied."
     decision_message = decision.get("message") or zone_subtitle_map.get(validated_zone, "No-Trade Zone")
@@ -2634,17 +2811,7 @@ def _derive_action_center_view(
         },
         "traffic_light": traffic_light_state,
         "scenarios": [scenarios["bullish"], scenarios["bearish"], scenarios["range"]],
-        "trade_plan": {
-            "entry": {
-                "primary": _fmt(primary_entry),
-                "scale": _fmt(add_entry),
-                "breakout": _fmt(breakout_entry),
-            },
-            "targets": target_values[:2],
-            "stops": [_fmt(stop_price)],
-            "position_size": position_size,
-            "risk_notes": risk_notes,
-        },
+        "trade_plan": trade_plan_payload,
         "alerts": alerts,
         "chart": {
             "min": _fmt(chart_range_min),
