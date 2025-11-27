@@ -6,7 +6,7 @@
     <title>VolatilX - Action Center</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="action-center-page" data-live-price="{{ 'true' if live_price_enabled else 'false' }}">
+<body class="action-center-page" data-live-price="{{ 'true' if live_price_enabled else 'false' }}" data-timeframe="{{ timeframe }}" data-intent="{{ intent }}">
     <div class="header">
         <a class="logo" href="/analyze">
             <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
@@ -24,6 +24,7 @@
     </div>
 
     <main class="action-center">
+        <div id="action-center2-root" data-react-root></div>
         <header class="action-center__header action-center__header--sticky" data-sticky-header>
             <div>
                 <h1>Action Center</h1>
@@ -374,8 +375,21 @@
     {% if dashboards_json %}
     <script id="actionCenterDashboards" type="application/json">{{ dashboards_json | safe }}</script>
     {% endif %}
+    {% if principal_plan_json %}
+    <script id="actionCenterPrincipalPlan" type="application/json">{{ principal_plan_json | safe }}</script>
+    {% endif %}
     <script>
     (function () {
+        const planSource = document.getElementById('actionCenterPrincipalPlan');
+        if (planSource) {
+            try {
+                const planPayload = JSON.parse(planSource.textContent || '{}');
+                window.__ACTION_CENTER_PRINCIPAL_PLAN__ = planPayload;
+            } catch (error) {
+                console.warn('Failed to parse Action Center principal plan payload', error);
+            }
+        }
+
         const dataSource = document.getElementById('actionCenterDashboards');
         if (!dataSource) {
             return;

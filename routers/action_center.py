@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import urllib.parse
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Mapping, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -15,6 +15,8 @@ from models import UserFavoriteSymbol
 from db import SessionLocal
 
 from action_center import STRATEGY_KEY_BY_TIMEFRAME, normalize_intent, normalize_timeframe
+from core.datetime_utils import parse_iso_datetime
+from core.numeric_utils import safe_float
 from app import (
     DEFAULT_ACTION_CENTER_SYMBOL,
     _check_report_center_access,
@@ -31,6 +33,261 @@ from services.favorites import favorite_symbols, is_symbol_favorited
 from utils.symbols import canonicalize_symbol, filter_symbols_for_market, sanitize_symbol
 
 router = APIRouter()
+
+
+def _coerce_trade_setup(setup: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(setup, Mapping):
+        return None
+
+    entry_val = safe_float(setup.get("entry"))
+    stop_val = safe_float(setup.get("stop"))
+
+    targets: List[float] = []
+    raw_targets = setup.get("targets")
+    if isinstance(raw_targets, (list, tuple, set)):
+        for target in raw_targets:
+            target_val = safe_float(target)
+            if target_val is not None:
+                targets.append(target_val)
+
+    if entry_val is None and stop_val is None and not targets:
+        return None
+
+    return {
+        "entry": entry_val if entry_val is not None else 0.0,
+        "stop": stop_val if stop_val is not None else 0.0,
+        "targets": targets,
+    }
+
+
+def _coerce_no_trade_zones(zones: Any) -> List[Dict[str, float]]:
+    prepared: List[Dict[str, float]] = []
+    if not isinstance(zones, (list, tuple, set)):
+        return prepared
+
+    for zone in zones:
+        if not isinstance(zone, Mapping):
+            continue
+        low_raw = zone.get("min") if zone.get("min") is not None else zone.get("low")
+        high_raw = zone.get("max") if zone.get("max") is not None else zone.get("high")
+        low_val = safe_float(low_raw)
+        high_val = safe_float(high_raw)
+        if low_val is None or high_val is None:
+            continue
+        if low_val > high_val:
+            low_val, high_val = high_val, low_val
+        prepared.append({"min": low_val, "max": high_val})
+
+    return prepared
+
+
+def _resolve_generated_display(plan_data: Mapping[str, Any], report: Mapping[str, Any]) -> Optional[str]:
+    label = plan_data.get("generated_display")
+    if isinstance(label, str) and label.strip():
+        return label.strip()
+
+    timestamp = (
+        plan_data.get("generated")
+        or plan_data.get("generated_at")
+        or report.get("stored_at")
+        or report.get("_blob_last_modified")
+    )
+
+    if not isinstance(timestamp, str):
+        return None
+
+    parsed = parse_iso_datetime(timestamp)
+    if not parsed:
+        return None
+
+    return parsed.strftime("%b %d, %Y %H:%M UTC")
+
+
+def _normalise_confidence_label(raw_confidence: Optional[str]) -> str:
+    if not raw_confidence:
+        return "MEDIUM"
+    normalized = str(raw_confidence).strip().upper()
+    mapping = {
+        "LOW": "LOW",
+        "MEDIUM": "MEDIUM",
+        "MID": "MEDIUM",
+        "MODERATE": "MEDIUM",
+        "HIGH": "HIGH",
+        "STRONG": "HIGH",
+    }
+    return mapping.get(normalized, "MEDIUM")
+
+
+def _normalise_recommendation(raw_recommendation: Optional[str]) -> str:
+    if not raw_recommendation:
+        return "HOLD"
+    normalized = str(raw_recommendation).strip().upper()
+    mapping = {
+        "BUY": "BUY",
+        "STRONG BUY": "BUY",
+        "SELL": "SELL",
+        "STRONG SELL": "SELL",
+        "HOLD": "HOLD",
+        "NEUTRAL": "HOLD",
+    }
+    return mapping.get(normalized, "HOLD")
+
+
+def _extract_technical_consensus(report: Mapping[str, Any], symbol: str) -> Optional[Dict[str, Any]]:
+    snapshot_map = report.get("technical_snapshot")
+    if not isinstance(snapshot_map, Mapping):
+        return None
+
+    snapshot = None
+    for candidate in (symbol, symbol.upper(), symbol.lower()):
+        candidate_snapshot = snapshot_map.get(candidate)
+        if isinstance(candidate_snapshot, Mapping):
+            snapshot = candidate_snapshot
+            break
+
+    if not isinstance(snapshot, Mapping):
+        return None
+
+    consensus = snapshot.get("consensus")
+    if not isinstance(consensus, Mapping):
+        return None
+
+    recommendation = _normalise_recommendation(consensus.get("overall_recommendation"))
+    confidence = _normalise_confidence_label(consensus.get("confidence"))
+    strength = safe_float(consensus.get("strength"))
+
+    payload: Dict[str, Any] = {
+        "overall_recommendation": recommendation,
+        "confidence": confidence,
+    }
+    if strength is not None:
+        payload["strength"] = strength
+
+    return payload
+
+
+def _coerce_bias(bias: Any) -> Optional[Dict[str, float]]:
+    if not isinstance(bias, Mapping):
+        return None
+
+    low_val = safe_float(bias.get("low"))
+    high_val = safe_float(bias.get("high"))
+    invalid_val = safe_float(bias.get("invalid"))
+
+    if None in (low_val, high_val, invalid_val):
+        return None
+
+    return {
+        "low": low_val,
+        "high": high_val,
+        "invalid": invalid_val,
+    }
+
+
+def _prepare_strategy(strategy: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(strategy, Mapping):
+        return None
+
+    summary = str(strategy.get("summary") or "").strip()
+    buy_setup = _coerce_trade_setup(strategy.get("buy_setup"))
+    sell_setup = _coerce_trade_setup(strategy.get("sell_setup"))
+    no_trade_zone = _coerce_no_trade_zones(strategy.get("no_trade_zone"))
+
+    if buy_setup is None:
+        buy_setup = {"entry": 0.0, "stop": 0.0, "targets": []}
+    if sell_setup is None:
+        sell_setup = {"entry": 0.0, "stop": 0.0, "targets": []}
+
+    payload: Dict[str, Any] = {
+        "summary": summary,
+        "buy_setup": buy_setup,
+        "sell_setup": sell_setup,
+        "no_trade_zone": no_trade_zone,
+    }
+
+    bias_payload = _coerce_bias(strategy.get("bias"))
+    if bias_payload:
+        payload["bias"] = bias_payload
+
+    reward_risk = safe_float(
+        strategy.get("rewardRisk")
+        or strategy.get("reward_risk")
+        or strategy.get("reward_to_risk")
+        or strategy.get("reward_to_risk_ratio")
+        or strategy.get("risk_reward_ratio")
+    )
+    if reward_risk is not None:
+        payload["rewardRisk"] = reward_risk
+
+    conviction = safe_float(
+        strategy.get("conviction")
+        or strategy.get("confidence_score")
+        or strategy.get("confidence")
+        or strategy.get("strength")
+    )
+    if conviction is not None:
+        payload["conviction"] = conviction
+
+    return payload
+
+
+def _prepare_principal_plan(
+    report: Mapping[str, Any],
+    *,
+    price_override: Optional[Mapping[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    plan_wrapper = report.get("principal_plan")
+    if not isinstance(plan_wrapper, Mapping):
+        return None
+
+    plan_data = plan_wrapper.get("data")
+    if not isinstance(plan_data, Mapping):
+        return None
+
+    symbol_value = plan_data.get("symbol") or report.get("symbol")
+    if not symbol_value:
+        return None
+
+    symbol_clean = str(symbol_value).strip().upper()
+
+    generated_display = _resolve_generated_display(plan_data, report) or ""
+
+    override_price = safe_float((price_override or {}).get("price"))
+    plan_price = safe_float(plan_data.get("latest_price"))
+    report_price = safe_float(report.get("latest_price"))
+
+    latest_price = override_price
+    if latest_price is None:
+        latest_price = plan_price if plan_price is not None else report_price
+    if latest_price is None:
+        latest_price = 0.0
+
+    strategies_raw = plan_data.get("strategies")
+    if not isinstance(strategies_raw, Mapping):
+        return None
+
+    prepared_strategies: Dict[str, Dict[str, Any]] = {}
+    for key in ("day_trading", "swing_trading", "longterm_trading"):
+        prepared = _prepare_strategy(strategies_raw.get(key))
+        if prepared:
+            prepared_strategies[key] = prepared
+
+    if not prepared_strategies:
+        return None
+
+    consensus_payload = _extract_technical_consensus(report, symbol_clean)
+
+    plan_payload: Dict[str, Any] = {
+        "symbol": symbol_clean,
+        "generated_display": generated_display,
+        "latest_price": latest_price,
+        "strategies": prepared_strategies,
+    }
+
+    if consensus_payload:
+        plan_payload["technical_consensus"] = consensus_payload
+
+    return plan_payload
 
 
 @router.get("/action-center", response_class=HTMLResponse)
@@ -194,6 +451,16 @@ async def action_center_page(
         separators=(",", ":"),
     )
 
+    principal_plan_payload = None
+    principal_plan_json = None
+    if raw_report:
+        principal_plan_payload = _prepare_principal_plan(
+            raw_report,
+            price_override=price_overrides.get(primary_symbol_sanitized),
+        )
+        if principal_plan_payload is not None:
+            principal_plan_json = json.dumps(principal_plan_payload, separators=(",", ":"))
+
     context = {
         "request": request,
         "user": user,
@@ -215,6 +482,8 @@ async def action_center_page(
         "favorite_crypto_symbols": favorite_crypto_symbols,
         "live_price_enabled": live_price_available,
         "rest_price_overrides": price_overrides,
+        "principal_plan": principal_plan_payload,
+        "principal_plan_json": principal_plan_json,
     }
 
     return templates.TemplateResponse("action_center.html", context)
@@ -263,6 +532,11 @@ async def action_center_api(
     with SessionLocal() as session:
         is_favorited = is_symbol_favorited(session, user.id, sanitized_symbol)
     payload["favorite"] = is_favorited
+
+    principal_plan_payload = _prepare_principal_plan(
+        report,
+        price_override=price_overrides.get(sanitized_symbol),
+    )
     return JSONResponse(
         content={
             "symbol": sanitized_symbol,
@@ -273,6 +547,7 @@ async def action_center_api(
             "action": payload,
             "source_blob": report.get("_blob_name"),
             "favorite": is_favorited,
+            "principal_plan": principal_plan_payload,
         }
     )
 
