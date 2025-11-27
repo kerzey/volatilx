@@ -767,9 +767,19 @@
                 }
 
                 const summaryHtml = formatPlanField('Summary', strategy.summary || 'No summary provided.');
+                const buySetupHtml = renderTradeSetup('Buy Setup', strategy.buy_setup);
+                const sellSetupHtml = renderTradeSetup('Sell Setup', strategy.sell_setup);
+                const noTradeHtml = renderNoTradeZones(strategy.no_trade_zone);
                 const keyLevelsHtml = formatPlanField('Key Levels', strategy.key_levels);
                 const nextActionsHtml = formatPlanField('Next Actions', strategy.next_actions);
-                const fieldsHtml = [summaryHtml, keyLevelsHtml, nextActionsHtml].filter(Boolean).join('');
+                const fieldsHtml = [
+                    summaryHtml,
+                    buySetupHtml,
+                    sellSetupHtml,
+                    noTradeHtml,
+                    keyLevelsHtml,
+                    nextActionsHtml,
+                ].filter(Boolean).join('');
 
                 if (!fieldsHtml) {
                     return;
@@ -1224,6 +1234,54 @@
             const rendered = renderPlanValue(value, label);
             if (!rendered) return '';
             return `<div class="plan-field"><strong>${escapeHtml(label)}:</strong> ${rendered}</div>`;
+        }
+
+        function renderTradeSetup(title, setup) {
+            if (!setup || typeof setup !== 'object') {
+                return '';
+            }
+
+            const entryHtml = formatPlanField('Entry', setup.entry);
+            const stopHtml = formatPlanField('Stop', setup.stop);
+            const targetsHtml = formatPlanField('Targets', setup.targets);
+            const content = [entryHtml, stopHtml, targetsHtml].filter(Boolean).join('');
+            if (!content) {
+                return '';
+            }
+
+            return `<div class="plan-subsection">
+                <div class="plan-subsection__title">${escapeHtml(title)}</div>
+                <div class="plan-subsection__content">${content}</div>
+            </div>`;
+        }
+
+        function renderNoTradeZones(zones) {
+            if (!Array.isArray(zones) || zones.length === 0) {
+                return '';
+            }
+
+            const items = zones
+                .map(zone => {
+                    if (!zone || typeof zone !== 'object') {
+                        return '';
+                    }
+                    const minHtml = renderPlanValue(zone.min, 'no_trade_zone');
+                    const maxHtml = renderPlanValue(zone.max, 'no_trade_zone');
+                    if (!minHtml && !maxHtml) {
+                        return '';
+                    }
+                    return `<li>${minHtml || 'N/A'} – ${maxHtml || 'N/A'}</li>`;
+                })
+                .filter(Boolean);
+
+            if (!items.length) {
+                return '';
+            }
+
+            return `<div class="plan-subsection">
+                <div class="plan-subsection__title">No-Trade Zone</div>
+                <div class="plan-subsection__content"><ul class="plan-list">${items.join('')}</ul></div>
+            </div>`;
         }
 
         function renderPlanValue(value, contextKey = '') {
