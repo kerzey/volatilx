@@ -10,3 +10,5 @@ venv/
 testenv/
 testenv/*
 dev.db
+node_modules/
+static/js/*.map

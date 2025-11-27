@@ -1,0 +1,16 @@
+{
+  "name": "volatilx-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build:action-center2": "node scripts/build-action-center2.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0",
+    "typescript": "^5.6.3"
+  }
+}
