@@ -317,6 +317,29 @@ _STRATEGY_RANGE_HINTS = (
     "balanced",
 )
 
+_NUMERIC_TEMPORAL_HINTS = (
+    "minute",
+    "minutes",
+    "hour",
+    "hours",
+    "day",
+    "days",
+    "week",
+    "weeks",
+    "session",
+    "sessions",
+)
+
+_NUMERIC_NOISE_HINTS = (
+    "risk/reward",
+    "risk reward",
+    "risk-reward",
+    "reward/risk",
+    "rr",
+    "ratio",
+    "atr",
+)
+
 _PRICE_NUMBER_PATTERN = r"\d+(?:,\d{3})*(?:\.\d+)?"
 _PRICE_RANGE_PATTERN = re.compile(
     rf"(?P<first>{_PRICE_NUMBER_PATTERN})\s*(?:–|-|to)\s*(?P<second>{_PRICE_NUMBER_PATTERN})",
@@ -437,6 +460,41 @@ def _classify_price_context(
     return ""
 
 
+def _token_is_numerical_noise(chunk: str, token: Dict[str, Any]) -> bool:
+    """Heuristically flag numeric tokens that represent time, ratios, or percentages."""
+
+    if not chunk or not isinstance(token, dict):
+        return False
+
+    start = token.get("start")
+    end = token.get("end")
+    if not isinstance(start, int) or not isinstance(end, int):
+        # Without positional context, fall back to value-based filtering later.
+        window = chunk.lower()
+    else:
+        start = max(0, start)
+        end = min(len(chunk), max(start, end))
+        window_start = max(0, start - 8)
+        window_end = min(len(chunk), end + 12)
+        window = chunk[window_start:window_end].lower()
+
+    trailing = chunk[end : min(len(chunk), end + 4)].lower() if isinstance(end, int) else ""
+    leading = chunk[max(0, start - 4) : start].lower() if isinstance(start, int) else ""
+
+    if "%" in window or "percent" in window:
+        return True
+    if any(hint in window for hint in _NUMERIC_NOISE_HINTS):
+        return True
+    if any(hint in window for hint in _NUMERIC_TEMPORAL_HINTS):
+        return True
+    if trailing.startswith(("m", "min", "mins", "hr", "hrs", "h", "d", "w")):
+        return True
+    if leading.endswith(("m", "min", "mins", "hr", "hrs", "h", "d", "w")):
+        return True
+
+    return False
+
+
 def _extract_strategy_levels(
     strategy: Dict[str, Any],
     *,
@@ -487,15 +545,15 @@ def _extract_strategy_levels(
     for chunk in text_chunks:
         if not chunk:
             continue
-        tokens = _extract_price_tokens(chunk)
+        tokens = [token for token in _extract_price_tokens(chunk) if not _token_is_numerical_noise(chunk, token)]
         if not tokens:
             continue
         chunk_lower = chunk.lower()
-        handled_indices: Set[int] = set()
+        handled_tokens: Set[int] = set()
         if any(word in chunk_lower for word in _STRATEGY_RANGE_HINTS) and len(tokens) >= 2:
-            ordered = sorted(enumerate(tokens), key=lambda item: item[1].get("price", 0.0))
-            min_index, min_token = ordered[0]
-            max_index, max_token = ordered[-1]
+            ordered = sorted(tokens, key=lambda item: item.get("price", 0.0))
+            min_token = ordered[0]
+            max_token = ordered[-1]
             _register(
                 supports,
                 support_seen,
@@ -510,9 +568,9 @@ def _extract_strategy_levels(
                 chunk,
                 source="strategy-text",
             )
-            handled_indices.update({min_index, max_index})
-        for idx, token in enumerate(tokens):
-            if idx in handled_indices:
+            handled_tokens.update({id(min_token), id(max_token)})
+        for token in tokens:
+            if id(token) in handled_tokens:
                 continue
             price = token.get("price")
             if price is None:
@@ -533,7 +591,17 @@ def _extract_strategy_levels(
         for key, value in raw_levels.items():
             context = f"{key}: {value}"
             classification_hint = "support" if isinstance(key, str) and "support" in key.lower() else "resistance" if isinstance(key, str) and "resist" in key.lower() else ""
-            prices = _extract_price_tokens(str(value)) or [{"price": _parse_price_value(value), "start": 0, "end": 0, "raw": value}]
+            prices = [
+                token
+                for token in (_extract_price_tokens(str(value)) or [])
+                if not _token_is_numerical_noise(str(value), token)
+            ]
+            if not prices:
+                parsed = _parse_price_value(value)
+                if parsed is not None:
+                    prices = [{"price": parsed, "start": 0, "end": 0, "raw": value}]
+            if not prices:
+                continue
             for token in prices:
                 price = token.get("price")
                 if price is None:
