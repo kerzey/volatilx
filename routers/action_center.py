@@ -350,14 +350,20 @@ async def action_center_page(
         symbol_display_map.setdefault(favorite_clean, favorite_clean)
 
     matching_favorite = next(
-        (fav for fav in favorite_union if canonicalize_symbol(fav) == primary_symbol_canonical),
+        (
+            fav
+            for fav in favorite_union
+            if canonicalize_symbol(fav) == primary_symbol_canonical
+        ),
         None,
     )
 
     if matching_favorite:
         primary_symbol_sanitized = matching_favorite
-    elif favorite_union:
+    elif not raw_symbol and favorite_union:
         primary_symbol_sanitized = favorite_union[0]
+
+    primary_symbol_canonical = canonicalize_symbol(primary_symbol_sanitized)
 
     primary_is_favorite = primary_symbol_canonical in favorite_canonical_set
     symbol_display_map[primary_symbol_sanitized] = requested_display_symbol or primary_symbol_sanitized

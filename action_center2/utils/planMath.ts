@@ -1,5 +1,7 @@
 import { NoTradeZone, StrategyPlan, TradeState, TradeSetup } from "../types";
 
+type PriceLike = number | null | undefined;
+
 const NEAR_TOLERANCE = 0.002; // 0.2%
 
 export type TradeStateInput = {
@@ -63,7 +65,7 @@ function isBuyActive(price: number, setup?: TradeSetup): boolean {
   if (!setup) return false;
   const entry = safeNumber(setup.entry);
   const stop = safeNumber(setup.stop);
-  if (!isFinite(entry) || !isFinite(stop)) {
+  if (!Number.isFinite(entry) || !Number.isFinite(stop)) {
     return false;
   }
   return price >= entry && price > stop;
@@ -73,13 +75,13 @@ function isSellActive(price: number, setup?: TradeSetup): boolean {
   if (!setup) return false;
   const entry = safeNumber(setup.entry);
   const stop = safeNumber(setup.stop);
-  if (!isFinite(entry) || !isFinite(stop)) {
+  if (!Number.isFinite(entry) || !Number.isFinite(stop)) {
     return false;
   }
   return price <= entry && price < stop;
 }
 
-function near(value: number, target: number | undefined): boolean {
+function near(value: number, target: PriceLike): boolean {
   const numericTarget = safeNumber(target);
   if (!Number.isFinite(value) || !Number.isFinite(numericTarget) || numericTarget === 0) {
     return false;
@@ -87,7 +89,7 @@ function near(value: number, target: number | undefined): boolean {
   return Math.abs(value - numericTarget) / Math.abs(numericTarget) <= NEAR_TOLERANCE;
 }
 
-function safeNumber(value: unknown): number {
+function safeNumber(value: PriceLike): number {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : NaN;
 }
