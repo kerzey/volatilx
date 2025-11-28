@@ -8,53 +8,94 @@ export type PriceGaugeProps = {
   noTradeZones: NoTradeZone[];
 };
 
-type Segment = {
-  key: ZoneKey;
-  label: string;
-  value: string;
-  className: string;
-  labelClassName: string;
-  valueClassName: string;
-  dividerClassName: string;
-  pointerLineClassName: string;
-  pointerChipClassName: string;
-  pointerTextClassName: string;
-  start: number;
-  end: number;
-  width: number;
-};
-
 type LevelKey =
   | "shortTarget2"
   | "shortTarget1"
+  | "shortTarget"
   | "shortEntry"
   | "neutralLower"
   | "neutralUpper"
   | "longEntry"
   | "longTarget1"
-  | "longTarget2";
-
-type ZoneKey =
-  | "belowPlan"
-  | "shortTarget2"
-  | "shortTarget1"
-  | "shortEntry"
-  | "neutral"
-  | "longEntry"
-  | "longTarget1"
   | "longTarget2"
-  | "abovePlan";
+  | "longTarget";
 
-type BoundKey = LevelKey | "belowBound" | "aboveBound";
+type MarkerTone = "short" | "neutral" | "long";
+
+type Marker = {
+  key: LevelKey;
+  label: string;
+  value: number;
+  tone: MarkerTone;
+  align: "top" | "bottom";
+};
+
+type MarkerGroup = {
+  value: number;
+  percent: number;
+  markers: Marker[];
+};
+
+const toneStyles: Record<MarkerTone, { chipBg: string; chipBorder: string; chipText: string; dot: string; line: string }> = {
+  short: {
+    chipBg: "bg-rose-500/10",
+    chipBorder: "border border-rose-500/40",
+    chipText: "text-rose-100",
+    dot: "bg-rose-400 shadow-[0_0_0_3px_rgba(244,63,94,0.35)]",
+    line: "bg-rose-400/70",
+  },
+  neutral: {
+    chipBg: "bg-amber-400/10",
+    chipBorder: "border border-amber-300/40",
+    chipText: "text-amber-100",
+    dot: "bg-amber-300 shadow-[0_0_0_3px_rgba(252,211,77,0.35)]",
+    line: "bg-amber-300/70",
+  },
+  long: {
+    chipBg: "bg-emerald-500/10",
+    chipBorder: "border border-emerald-400/40",
+    chipText: "text-emerald-100",
+    dot: "bg-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.35)]",
+    line: "bg-emerald-400/70",
+  },
+};
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const toNumber = (value: number | string | null | undefined): number => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : NaN;
+};
+
+const buildMarkerGroups = (markers: Marker[], minBound: number, maxBound: number): MarkerGroup[] => {
+  if (!markers.length) {
+    return [];
+  }
+
+  const totalSpan = Math.max(maxBound - minBound, 1e-6);
+  const percentForValue = (value: number) => clamp(((value - minBound) / totalSpan) * 100, 0, 100);
+  const tolerance = Math.max(totalSpan * 0.0025, 0.01);
+
+  const ordered = [...markers].sort((a, b) => a.value - b.value);
+  const groups: MarkerGroup[] = [];
+
+  ordered.forEach((marker) => {
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && Math.abs(lastGroup.value - marker.value) <= tolerance) {
+      lastGroup.markers.push(marker);
+    } else {
+      groups.push({
+        value: marker.value,
+        percent: percentForValue(marker.value),
+        markers: [marker],
+      });
+    }
+  });
+
+  return groups;
+};
 
 export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
-  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
-  const toNumber = (value: number | string | null | undefined): number => {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : NaN;
-  };
-
   const normalizedSellTargets = Array.isArray(sellSetup?.targets)
     ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
     : [];
@@ -62,224 +103,268 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     ? [...buySetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
     : [];
 
-  const uniqueShortTargets = Array.from(new Set(normalizedSellTargets));
-  const uniqueLongTargets = Array.from(new Set(normalizedBuyTargets));
-
   const shortEntry = toNumber(sellSetup?.entry);
   const longEntry = toNumber(buySetup?.entry);
 
-  const shortTargetFar = uniqueShortTargets.length ? uniqueShortTargets[0] : NaN;
-  const shortTargetNear = uniqueShortTargets.length ? uniqueShortTargets[uniqueShortTargets.length - 1] : NaN;
-
-  const longTargetNear = uniqueLongTargets.length ? uniqueLongTargets[0] : NaN;
-  const longTargetFar = uniqueLongTargets.length ? uniqueLongTargets[uniqueLongTargets.length - 1] : NaN;
+  const uniqueShortTargets = Array.from(new Set(normalizedSellTargets));
+  const uniqueLongTargets = Array.from(new Set(normalizedBuyTargets));
 
   const normalizedZones = Array.isArray(noTradeZones)
     ? noTradeZones
-      .map((zone) => {
-        const lower = toNumber(zone?.min);
-        const upper = toNumber(zone?.max);
-        if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
-          return null;
-        }
-        return {
-          lower: Math.min(lower, upper),
-          upper: Math.max(lower, upper),
-        };
-      })
-      .filter((value): value is { lower: number; upper: number } => Boolean(value))
+        .map((zone) => {
+          const lower = toNumber(zone?.min);
+          const upper = toNumber(zone?.max);
+          if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+            return null;
+          }
+          return {
+            lower: Math.min(lower, upper),
+            upper: Math.max(lower, upper),
+          };
+        })
+        .filter((value): value is { lower: number; upper: number } => Boolean(value))
     : [];
 
   const neutralLower = normalizedZones.length ? Math.min(...normalizedZones.map((zone) => zone.lower)) : NaN;
   const neutralUpper = normalizedZones.length ? Math.max(...normalizedZones.map((zone) => zone.upper)) : NaN;
 
-  const candidateValues = [
-    ...uniqueShortTargets,
-    shortEntry,
-    neutralLower,
-    neutralUpper,
-    longEntry,
-    ...uniqueLongTargets,
-    latestPrice,
-  ].filter((value): value is number => Number.isFinite(value));
+  const markers: Marker[] = [];
 
-  const levelOrder = [
-    "shortTarget2",
-    "shortTarget1",
-    "shortEntry",
-    "neutralLower",
-    "neutralUpper",
-    "longEntry",
-    "longTarget1",
-    "longTarget2",
-  ] as const;
-
-  const originalLevels: Record<(typeof levelOrder)[number], number | undefined> = {
-    shortTarget2: Number.isFinite(shortTargetFar) ? shortTargetFar : undefined,
-    shortTarget1: Number.isFinite(shortTargetNear) ? shortTargetNear : undefined,
-    shortEntry: Number.isFinite(shortEntry) ? shortEntry : undefined,
-    neutralLower: Number.isFinite(neutralLower) ? neutralLower : undefined,
-    neutralUpper: Number.isFinite(neutralUpper) ? neutralUpper : undefined,
-    longEntry: Number.isFinite(longEntry) ? longEntry : undefined,
-    longTarget1: Number.isFinite(longTargetNear) ? longTargetNear : undefined,
-    longTarget2: Number.isFinite(longTargetFar) ? longTargetFar : undefined,
-  };
-
-  const finiteLevelValues = levelOrder
-    .map((key) => originalLevels[key])
-    .filter((value): value is number => Number.isFinite(value));
-
-  const derivedRange = finiteLevelValues.length >= 2 ? Math.max(...finiteLevelValues) - Math.min(...finiteLevelValues) : 0;
-  let fallbackSpacing = derivedRange > 0 ? derivedRange / (levelOrder.length + 1) : 0;
-  if (!Number.isFinite(fallbackSpacing) || fallbackSpacing <= 0) {
-    const basis = candidateValues.length >= 2 ? Math.max(...candidateValues) - Math.min(...candidateValues) : Math.abs(latestPrice) * 0.05;
-    fallbackSpacing = Math.max(basis, 1);
+  if (uniqueShortTargets.length === 1) {
+    const value = uniqueShortTargets[0];
+    markers.push({
+      key: "shortTarget",
+      label: "Short Target",
+      value,
+      tone: "short",
+      align: "top",
+    });
+  } else if (uniqueShortTargets.length > 1) {
+    const farTarget = uniqueShortTargets[0];
+    const nearTarget = uniqueShortTargets[uniqueShortTargets.length - 1];
+    if (Number.isFinite(farTarget)) {
+      markers.push({
+        key: "shortTarget2",
+        label: "Short Target 2",
+        value: farTarget,
+        tone: "short",
+        align: "top",
+      });
+    }
+    if (Number.isFinite(nearTarget) && Math.abs(nearTarget - farTarget) > 0) {
+      markers.push({
+        key: "shortTarget1",
+        label: "Short Target 1",
+        value: nearTarget,
+        tone: "short",
+        align: "top",
+      });
+    }
   }
 
-  const firstLevel = originalLevels[levelOrder[0]];
-  let minBound = Number.isFinite(firstLevel)
-    ? (firstLevel as number) - fallbackSpacing
-    : finiteLevelValues.length
-      ? Math.min(...finiteLevelValues) - fallbackSpacing
-      : latestPrice - fallbackSpacing;
+  if (Number.isFinite(shortEntry)) {
+    markers.push({
+      key: "shortEntry",
+      label: "Short Entry",
+      value: shortEntry,
+      tone: "short",
+      align: "top",
+    });
+  }
 
-  let lastValue = minBound;
-  const resolvedLevels = {} as Record<(typeof levelOrder)[number], number>;
-
-  levelOrder.forEach((key) => {
-    let value = originalLevels[key];
-    if (!Number.isFinite(value)) {
-      value = lastValue + fallbackSpacing;
+  if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralLower <= neutralUpper) {
+    markers.push({
+      key: "neutralLower",
+      label: "No-Trade Min",
+      value: neutralLower,
+      tone: "neutral",
+      align: "bottom",
+    });
+    if (Math.abs(neutralUpper - neutralLower) > 0) {
+      markers.push({
+        key: "neutralUpper",
+        label: "No-Trade Max",
+        value: neutralUpper,
+        tone: "neutral",
+        align: "top",
+      });
     }
-    const minimumIncrement = Math.max(fallbackSpacing * 0.25, 0.01);
-    if (value <= lastValue) {
-      value = lastValue + minimumIncrement;
-    }
-    resolvedLevels[key] = value as number;
-    lastValue = value as number;
-  });
+  }
 
-  const maxBound = lastValue + fallbackSpacing;
+  if (Number.isFinite(longEntry)) {
+    markers.push({
+      key: "longEntry",
+      label: "Long Entry",
+      value: longEntry,
+      tone: "long",
+      align: "bottom",
+    });
+  }
+
+  if (uniqueLongTargets.length === 1) {
+    const value = uniqueLongTargets[0];
+    markers.push({
+      key: "longTarget",
+      label: "Long Target",
+      value,
+      tone: "long",
+      align: "bottom",
+    });
+  } else if (uniqueLongTargets.length > 1) {
+    const nearTarget = uniqueLongTargets[0];
+    const farTarget = uniqueLongTargets[uniqueLongTargets.length - 1];
+    if (Number.isFinite(nearTarget)) {
+      markers.push({
+        key: "longTarget1",
+        label: "Long Target 1",
+        value: nearTarget,
+        tone: "long",
+        align: "bottom",
+      });
+    }
+    if (Number.isFinite(farTarget) && Math.abs(farTarget - nearTarget) > 0) {
+      markers.push({
+        key: "longTarget2",
+        label: "Long Target 2",
+        value: farTarget,
+        tone: "long",
+        align: "bottom",
+      });
+    }
+  }
+
+  const valuesForBounds = markers.map((marker) => marker.value).concat(Number.isFinite(latestPrice) ? [latestPrice] : []);
+
+  let minValue = valuesForBounds.length ? Math.min(...valuesForBounds) : latestPrice;
+  let maxValue = valuesForBounds.length ? Math.max(...valuesForBounds) : latestPrice;
+
+  if (!Number.isFinite(minValue)) {
+    minValue = latestPrice;
+  }
+  if (!Number.isFinite(maxValue)) {
+    maxValue = latestPrice;
+  }
+
+  let baseRange = maxValue - minValue;
+  if (!Number.isFinite(baseRange) || baseRange <= 0) {
+    baseRange = Math.max(Math.abs(latestPrice) * 0.1, 1);
+  }
+
+  const padding = Math.max(baseRange * 0.12, baseRange === 0 ? 1 : 0);
+  const minBound = minValue - padding;
+  const maxBound = maxValue + padding;
   const totalSpan = Math.max(maxBound - minBound, 1e-6);
 
-  const zoneMeta: Record<string, { label: string; className: string; value: () => string }> = {
-    belowPlan: {
-      label: "Below Plan",
-      className: "bg-slate-900/60 text-slate-300 border-r border-slate-700/40",
-      value: () => `< ${formatPrice(originalLevels.shortTarget2 ?? resolvedLevels.shortTarget2)}`,
-    },
-    shortTarget2: {
-      label: "Short Target 2",
-      className: "bg-rose-950/70 text-rose-100 border-r border-rose-900/40",
-      value: () => formatPrice(originalLevels.shortTarget2 ?? resolvedLevels.shortTarget2),
-    },
-    shortTarget1: {
-      label: "Short Target 1",
-      className: "bg-rose-900/55 text-rose-100 border-r border-rose-700/45",
-      value: () => formatPrice(originalLevels.shortTarget1 ?? resolvedLevels.shortTarget1),
-    },
-    shortEntry: {
-      label: "Short Entry",
-      className: "bg-rose-700/45 text-rose-50 border-r border-rose-500/35",
-      value: () => formatPrice(originalLevels.shortEntry ?? resolvedLevels.shortEntry),
-    },
-    neutral: {
-      label: "No-Trade",
-      className: "bg-amber-400/25 text-amber-50 border-r border-amber-300/40",
-      value: () => `${formatPrice(originalLevels.neutralLower ?? resolvedLevels.neutralLower)} – ${formatPrice(originalLevels.neutralUpper ?? resolvedLevels.neutralUpper)}`,
-    },
-    longEntry: {
-      label: "Long Entry",
-      className: "bg-emerald-700/40 text-emerald-50 border-r border-emerald-500/35",
-      value: () => formatPrice(originalLevels.longEntry ?? resolvedLevels.longEntry),
-    },
-    longTarget1: {
-      label: "Long Target 1",
-      className: "bg-emerald-800/45 text-emerald-100 border-r border-emerald-600/40",
-      value: () => formatPrice(originalLevels.longTarget1 ?? resolvedLevels.longTarget1),
-    },
-    longTarget2: {
-      label: "Long Target 2",
-      className: "bg-emerald-950/65 text-emerald-100",
-      value: () => formatPrice(originalLevels.longTarget2 ?? resolvedLevels.longTarget2),
-    },
-    abovePlan: {
-      label: "Above Plan",
-      className: "bg-slate-900/60 text-slate-300",
-      value: () => `> ${formatPrice(originalLevels.longTarget2 ?? resolvedLevels.longTarget2)}`,
-    },
-  };
+  const pointerPercent = clamp(((latestPrice - minBound) / totalSpan) * 100, 0, 100);
 
-  const metaForKey = (key: string) => zoneMeta[key] ?? zoneMeta.neutral;
+  const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
 
-  const segmentsBlueprint: Array<{ key: Segment["key"]; start: number; end: number }> = [
-    { key: "belowPlan", start: minBound, end: resolvedLevels.shortTarget2 },
-    { key: "shortTarget2", start: resolvedLevels.shortTarget2, end: resolvedLevels.shortTarget1 },
-    { key: "shortTarget1", start: resolvedLevels.shortTarget1, end: resolvedLevels.shortEntry },
-    { key: "shortEntry", start: resolvedLevels.shortEntry, end: resolvedLevels.neutralLower },
-    { key: "neutral", start: resolvedLevels.neutralLower, end: resolvedLevels.neutralUpper },
-    { key: "longEntry", start: resolvedLevels.neutralUpper, end: resolvedLevels.longEntry },
-    { key: "longTarget1", start: resolvedLevels.longEntry, end: resolvedLevels.longTarget1 },
-    { key: "longTarget2", start: resolvedLevels.longTarget1, end: resolvedLevels.longTarget2 },
-    { key: "abovePlan", start: resolvedLevels.longTarget2, end: maxBound },
-  ];
-
-  const segmentsWithWidth = segmentsBlueprint
-    .map((segment) => {
-      const span = segment.end - segment.start;
-      if (!Number.isFinite(span) || span <= 0) {
-        return null;
-      }
-      const meta = metaForKey(segment.key);
-      return {
-        key: segment.key,
-        label: meta.label,
-        value: meta.value(),
-        className: meta.className,
-        start: segment.start,
-        end: segment.end,
-        width: (span / totalSpan) * 100,
-      } as Segment;
-    })
-    .filter((segment): segment is Segment => Boolean(segment));
-
-  const pointer = clamp(((latestPrice - minBound) / totalSpan) * 100, 0, 100);
+  const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
+  const neutralStartPercent = hasNeutralZone ? clamp(((neutralLower - minBound) / totalSpan) * 100, 0, 100) : 0;
+  const neutralEndPercent = hasNeutralZone ? clamp(((neutralUpper - minBound) / totalSpan) * 100, 0, 100) : 0;
+  const neutralWidthPercent = Math.max(neutralEndPercent - neutralStartPercent, 0);
 
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm">
-      <header className="mb-6 flex items-start justify-between">
+    <section className="rounded-3xl border border-slate-800/70 bg-slate-950/80 p-8 shadow-lg shadow-indigo-500/5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-50">Price Gauge</h2>
-          <p className="text-sm text-slate-400">Visualise key regions before committing risk</p>
+          <p className="text-sm text-slate-400">Track plan levels and see where price is leaning right now.</p>
         </div>
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Last</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Last Trade</p>
           <p className="text-lg font-semibold text-slate-100">{formatPrice(latestPrice)}</p>
         </div>
       </header>
-      <div className="relative">
-        <div className="relative flex overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/80 text-[11px] font-semibold uppercase tracking-wide text-slate-200">
-          {segmentsWithWidth.map((segment, index) => (
+
+      <div className="relative mt-10">
+        <div className="relative h-3 w-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60">
+          <div className="absolute inset-0 rounded-full ring-1 ring-white/5" />
+          {hasNeutralZone && (
             <div
-              key={segment.key}
-              className={`flex flex-col items-center justify-center gap-1 p-4 text-center ${segment.className} ${index === segmentsWithWidth.length - 1 ? "border-r-0" : ""}`}
-              style={{ flexBasis: `${segment.width}%`, flexGrow: 0, flexShrink: 0 }}
-            >
-              <span>{segment.label}</span>
-              <span className="text-[10px] normal-case text-slate-300">{segment.value}</span>
-            </div>
-          ))}
+              className="absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm"
+              style={{ left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }}
+            />
+          )}
         </div>
+
+        {markerGroups.map((group) => {
+          const topMarkers = group.markers.filter((marker) => marker.align === "top");
+          const bottomMarkers = group.markers.filter((marker) => marker.align === "bottom");
+          const dominantTone = group.markers[0]?.tone ?? "neutral";
+          const tone = toneStyles[dominantTone];
+
+          return (
+            <div
+              key={`${group.value}-${dominantTone}`}
+              className="absolute top-0 z-20 flex h-full w-0 -translate-x-1/2"
+              style={{ left: `${group.percent}%` }}
+            >
+              <div className="flex flex-col items-center">
+                {topMarkers.length > 0 && (
+                  <div className="flex flex-col items-center gap-1 pb-4">
+                    {topMarkers.map((marker) => (
+                      <div
+                        key={marker.key}
+                        className={`min-w-[120px] rounded-xl px-3 py-1.5 text-center shadow-md shadow-black/10 ${tone.chipBg} ${tone.chipBorder} ${tone.chipText}`}
+                      >
+                        <p className="text-[10px] font-semibold uppercase tracking-wide">{marker.label}</p>
+                        <p className="text-xs font-semibold">{formatPrice(marker.value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-col items-center text-[10px]">
+                  <span className={`mb-2 h-6 w-px ${tone.line}`} />
+                  <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
+                  <span className={`mt-2 h-6 w-px ${tone.line}`} />
+                </div>
+
+                {bottomMarkers.length > 0 && (
+                  <div className="flex flex-col items-center gap-1 pt-4">
+                    {bottomMarkers.map((marker) => (
+                      <div
+                        key={marker.key}
+                        className={`min-w-[120px] rounded-xl px-3 py-1.5 text-center shadow-md shadow-black/10 ${tone.chipBg} ${tone.chipBorder} ${tone.chipText}`}
+                      >
+                        <p className="text-[10px] font-semibold uppercase tracking-wide">{marker.label}</p>
+                        <p className="text-xs font-semibold">{formatPrice(marker.value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
         <div
-          className="pointer-events-none absolute -top-3 flex flex-col items-center text-xs text-slate-200"
-          style={{ left: `${pointer}%`, transform: "translateX(-50%)" }}
+          className="pointer-events-none absolute -top-12 z-30 flex -translate-x-1/2 flex-col items-center gap-2 text-xs text-indigo-100 transition-all duration-500"
+          style={{ left: `${pointerPercent}%` }}
         >
-          <span className="h-3 w-[2px] rounded-full bg-indigo-400" />
-          <span className="mt-1 rounded-full bg-indigo-500/20 px-3 py-1 text-[10px] font-semibold">
+          <div className="rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30">
             {formatPrice(latestPrice)}
+          </div>
+          <span className="block h-9 w-[2px] rounded-full bg-indigo-400" />
+          <span className="h-2 w-2 rounded-full border border-indigo-200/60 bg-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]" />
+          <span className="flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide text-indigo-200">
+            Last Price
           </span>
         </div>
+
+        {!markerGroups.length && (
+          <p className="mt-6 text-center text-sm text-slate-400">
+            Plan did not publish level targets for this symbol. The gauge will activate as soon as fresh levels arrive.
+          </p>
+        )}
       </div>
+
+      {markerGroups.length > 0 && (
+        <p className="mt-6 text-xs text-slate-500">
+          Missing plan levels are hidden automatically so the gauge always reflects what the latest analysis provided.
+        </p>
+      )}
     </section>
   );
 }
