@@ -402,7 +402,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       </div>
 
       {legendItemsSorted.length > 0 && (
-        <div className="mt-30 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-300">
+        <div className="mt-35 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-300">
           {legendItemsSorted.map((item) => {
             const tone = toneStyles[item.tone];
             return (
