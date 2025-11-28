@@ -9,14 +9,43 @@ export type PriceGaugeProps = {
 };
 
 type Segment = {
-  key: string;
+  key: ZoneKey;
   label: string;
   value: string;
   className: string;
+  labelClassName: string;
+  valueClassName: string;
+  dividerClassName: string;
+  pointerLineClassName: string;
+  pointerChipClassName: string;
+  pointerTextClassName: string;
   start: number;
   end: number;
   width: number;
 };
+
+type LevelKey =
+  | "shortTarget2"
+  | "shortTarget1"
+  | "shortEntry"
+  | "neutralLower"
+  | "neutralUpper"
+  | "longEntry"
+  | "longTarget1"
+  | "longTarget2";
+
+type ZoneKey =
+  | "belowPlan"
+  | "shortTarget2"
+  | "shortTarget1"
+  | "shortEntry"
+  | "neutral"
+  | "longEntry"
+  | "longTarget1"
+  | "longTarget2"
+  | "abovePlan";
+
+type BoundKey = LevelKey | "belowBound" | "aboveBound";
 
 export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
