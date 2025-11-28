@@ -33,22 +33,20 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     ? [...buySetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
     : [];
 
+  const uniqueShortTargets = Array.from(new Set(normalizedSellTargets));
+  const uniqueLongTargets = Array.from(new Set(normalizedBuyTargets));
+
+  const hasShortTarget2 = uniqueShortTargets.length >= 2;
+  const hasLongTarget2 = uniqueLongTargets.length >= 2;
+
   const shortEntry = toNumber(sellSetup?.entry);
   const longEntry = toNumber(buySetup?.entry);
 
-  const shortTargetFar = normalizedSellTargets.length > 1
-    ? normalizedSellTargets[0]
-    : normalizedSellTargets[0];
-  const shortTargetNear = normalizedSellTargets.length
-    ? normalizedSellTargets[normalizedSellTargets.length - 1]
-    : NaN;
+  const shortTargetFar = uniqueShortTargets.length ? uniqueShortTargets[0] : NaN;
+  const shortTargetNear = uniqueShortTargets.length ? uniqueShortTargets[uniqueShortTargets.length - 1] : NaN;
 
-  const longTargetNear = normalizedBuyTargets.length
-    ? normalizedBuyTargets[0]
-    : NaN;
-  const longTargetFar = normalizedBuyTargets.length > 1
-    ? normalizedBuyTargets[normalizedBuyTargets.length - 1]
-    : normalizedBuyTargets[normalizedBuyTargets.length - 1];
+  const longTargetNear = uniqueLongTargets.length ? uniqueLongTargets[0] : NaN;
+  const longTargetFar = uniqueLongTargets.length ? uniqueLongTargets[uniqueLongTargets.length - 1] : NaN;
 
   const normalizedZones = Array.isArray(noTradeZones)
     ? noTradeZones
@@ -69,214 +67,215 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   const neutralLower = normalizedZones.length ? Math.min(...normalizedZones.map((zone) => zone.lower)) : NaN;
   const neutralUpper = normalizedZones.length ? Math.max(...normalizedZones.map((zone) => zone.upper)) : NaN;
 
-  const numericBounds = [
-    shortTargetFar,
-    shortTargetNear,
+  const candidateValues = [
+    ...uniqueShortTargets,
     shortEntry,
     neutralLower,
     neutralUpper,
     longEntry,
-    longTargetNear,
-    longTargetFar,
+    ...uniqueLongTargets,
     latestPrice,
   ].filter((value): value is number => Number.isFinite(value));
 
-  let minBound = numericBounds.length ? Math.min(...numericBounds) : latestPrice - 1;
-  let maxBound = numericBounds.length ? Math.max(...numericBounds) : latestPrice + 1;
+  const candidateMin = candidateValues.length ? Math.min(...candidateValues) : latestPrice - 1;
+  const candidateMax = candidateValues.length ? Math.max(...candidateValues) : latestPrice + 1;
+  const baseSpan = Math.max(candidateMax - candidateMin, Math.abs(latestPrice) * 0.02, 1);
+  const padding = baseSpan * 0.08;
+  const minBound = candidateMin - padding;
+  const maxBound = candidateMax + padding;
+  const totalSpan = Math.max(maxBound - minBound, 1e-6);
 
-  if (minBound === maxBound) {
-    minBound -= 1;
-    maxBound += 1;
-  }
+  const breakpointsSet = new Set<number>([minBound, maxBound]);
+  if (Number.isFinite(shortTargetFar)) breakpointsSet.add(shortTargetFar);
+  if (Number.isFinite(shortTargetNear)) breakpointsSet.add(shortTargetNear);
+  if (Number.isFinite(shortEntry)) breakpointsSet.add(shortEntry);
+  if (Number.isFinite(neutralLower)) breakpointsSet.add(neutralLower);
+  if (Number.isFinite(neutralUpper)) breakpointsSet.add(neutralUpper);
+  if (Number.isFinite(longEntry)) breakpointsSet.add(longEntry);
+  if (Number.isFinite(longTargetNear)) breakpointsSet.add(longTargetNear);
+  if (Number.isFinite(longTargetFar)) breakpointsSet.add(longTargetFar);
 
-  const segments: Segment[] = [];
+  const breakpoints = Array.from(breakpointsSet)
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
 
-  const addSegment = ({
-    key,
-    label,
-    start,
-    end,
-    value,
-    className,
-  }: {
-    key: string;
-    label: string;
-    start: number;
-    end: number;
-    value: string;
-    className: string;
-  }) => {
-    if (!Number.isFinite(start) || !Number.isFinite(end)) {
-      return;
+  const resolveZoneKey = (start: number, end: number): string => {
+    const mid = (start + end) / 2;
+
+    if (hasShortTarget2 && Number.isFinite(shortTargetFar) && mid <= shortTargetFar) {
+      return "shortTarget2";
     }
-    if (end <= start) {
-      return;
+
+    if (Number.isFinite(shortTargetNear) && mid <= shortTargetNear) {
+      return hasShortTarget2 && mid <= (shortTargetFar + shortTargetNear) / 2 ? "shortTarget2" : "shortTarget1";
     }
-    segments.push({ key, label, value, className, start, end, width: 0 });
+
+    if (Number.isFinite(shortEntry) && mid <= shortEntry) {
+      return "shortEntry";
+    }
+
+    if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && mid >= neutralLower && mid <= neutralUpper) {
+      return "neutral";
+    }
+
+    if (Number.isFinite(neutralUpper) && mid < neutralLower && Number.isFinite(shortEntry)) {
+      return "shortEntry";
+    }
+
+    if (Number.isFinite(longEntry) && mid <= longEntry) {
+      return "longEntry";
+    }
+
+    if (Number.isFinite(longTargetNear) && mid <= longTargetNear) {
+      return "longTarget1";
+    }
+
+    if (hasLongTarget2 && Number.isFinite(longTargetFar) && mid <= longTargetFar) {
+      return "longTarget2";
+    }
+
+    if (mid < shortEntry) {
+      return "belowPlan";
+    }
+
+    return "abovePlan";
   };
 
-  if (Number.isFinite(shortTargetFar)) {
-    addSegment({
-      key: "shortTarget2",
-      label: "Short Target 2",
-      start: minBound,
-      end: shortTargetFar,
-      value: formatPrice(shortTargetFar),
-      className: "bg-rose-950/60 text-rose-100 border-r border-rose-800/50",
-    });
+  const numericSegments: Array<{ key: string; start: number; end: number }> = [];
+
+  for (let index = 0; index < breakpoints.length - 1; index += 1) {
+    const start = breakpoints[index];
+    const end = breakpoints[index + 1];
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      continue;
+    }
+    const key = resolveZoneKey(start, end);
+    numericSegments.push({ key, start, end });
   }
 
-  if (Number.isFinite(shortTargetNear)) {
-    addSegment({
-      key: "shortTarget1",
-      label: "Short Target 1",
-      start: Number.isFinite(shortTargetFar) ? shortTargetFar : minBound,
-      end: shortTargetNear,
-      value: formatPrice(shortTargetNear),
-      className: "bg-rose-900/55 text-rose-100 border-r border-rose-700/45",
-    });
+  if (!numericSegments.length) {
+    numericSegments.push({ key: "neutral", start: minBound, end: maxBound });
   }
 
-  if (Number.isFinite(shortEntry)) {
-    addSegment({
-      key: "shortEntry",
-      label: "Short Entry",
-      start: Number.isFinite(shortTargetNear)
-        ? shortTargetNear
-        : Number.isFinite(shortTargetFar)
-          ? shortTargetFar
-          : minBound,
-      end: shortEntry,
-      value: formatPrice(shortEntry),
-      className: "bg-rose-700/45 text-rose-50 border-r border-rose-500/35",
-    });
-  }
-
-  if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper)) {
-    addSegment({
-      key: "neutral",
-      label: "No-Trade",
-      start: neutralLower,
-      end: neutralUpper,
-      value: `${formatPrice(neutralLower)} – ${formatPrice(neutralUpper)}`,
-      className: "bg-amber-400/25 text-amber-50 border-r border-amber-300/40",
-    });
-  }
-
-  if (Number.isFinite(longEntry)) {
-    addSegment({
-      key: "longEntry",
-      label: "Long Entry",
-      start: Number.isFinite(neutralUpper)
-        ? neutralUpper
-        : Number.isFinite(shortEntry)
-          ? shortEntry
-          : Number.isFinite(shortTargetNear)
-            ? shortTargetNear
-            : minBound,
-      end: longEntry,
-      value: formatPrice(longEntry),
-      className: "bg-emerald-700/40 text-emerald-50 border-r border-emerald-500/35",
-    });
-  }
-
-  if (Number.isFinite(longTargetNear)) {
-    addSegment({
-      key: "longTarget1",
-      label: "Long Target 1",
-      start: Number.isFinite(longEntry) ? longEntry : Number.isFinite(neutralUpper) ? neutralUpper : minBound,
-      end: longTargetNear,
-      value: formatPrice(longTargetNear),
-      className: "bg-emerald-800/45 text-emerald-100 border-r border-emerald-600/40",
-    });
-  }
-
-  if (Number.isFinite(longTargetFar) && longTargetFar !== longTargetNear) {
-    addSegment({
-      key: "longTarget2",
-      label: "Long Target 2",
-      start: Number.isFinite(longTargetNear)
-        ? longTargetNear
-        : Number.isFinite(longEntry)
-          ? longEntry
-          : Number.isFinite(neutralUpper)
-            ? neutralUpper
-            : minBound,
-      end: longTargetFar,
-      value: formatPrice(longTargetFar),
-      className: "bg-emerald-900/55 text-emerald-100",
-    });
-  }
-
-  if (!segments.length) {
-    segments.push({
-      key: "range",
-      label: "Price Range",
-      value: formatPrice(latestPrice),
-      className: "bg-slate-800/60 text-slate-200",
-      start: minBound,
-      end: maxBound,
-      width: 0,
-    });
-  }
-
-  const firstSegment = segments[0];
-  if (firstSegment && firstSegment.start > minBound) {
-    segments.unshift({
-      key: "belowPlan",
-      label: "Below Plan",
-      value: formatPrice(firstSegment.start),
-      className: "bg-slate-900/60 text-slate-300 border-r border-slate-700/40",
-      start: minBound,
-      end: firstSegment.start,
-      width: 0,
-    });
-  }
-
-  const lastSegment = segments[segments.length - 1];
-  if (lastSegment && lastSegment.end < maxBound) {
-    segments.push({
-      key: "abovePlan",
-      label: "Above Plan",
-      value: formatPrice(maxBound),
-      className: "bg-slate-900/60 text-slate-300",
-      start: lastSegment.end,
-      end: maxBound,
-      width: 0,
-    });
-  }
-
-  const segmentWidth = 100 / segments.length;
-  segments.forEach((segment) => {
-    segment.width = segmentWidth;
+  const mergedSegments: Array<{ key: string; start: number; end: number }> = [];
+  numericSegments.forEach((segment) => {
+    const last = mergedSegments[mergedSegments.length - 1];
+    if (last && last.key === segment.key) {
+      last.end = segment.end;
+    } else {
+      mergedSegments.push({ ...segment });
+    }
   });
 
-  const resolvePointer = (): number => {
-    const span = segments.length ? segmentWidth : 100;
-    let index = segments.findIndex((segment) => latestPrice >= segment.start && latestPrice <= segment.end);
-    let ratio = 0.5;
-
-    if (index === -1) {
-      if (latestPrice < segments[0].start) {
-        index = 0;
-        ratio = 0;
-      } else {
-        index = segments.length - 1;
-        ratio = 1;
-      }
-    } else {
-      const segment = segments[index];
-      const range = segment.end - segment.start;
-      ratio = Number.isFinite(range) && range > 0
-        ? clamp((latestPrice - segment.start) / range, 0, 1)
-        : 0.5;
-    }
-
-    const position = span * (index + ratio);
-    return clamp(position, 0, 100);
+  const zoneMeta: Record<string, { label: string; className: string; value: () => string }> = {
+    belowPlan: {
+      label: "Below Plan",
+      className: "bg-slate-900/60 text-slate-300 border-r border-slate-700/40",
+      value: () => `< ${formatPrice(shortTargetFar || shortEntry || minBound)}`,
+    },
+    shortTarget2: {
+      label: "Short Target 2",
+      className: "bg-rose-950/70 text-rose-100 border-r border-rose-900/40",
+      value: () => formatPrice(shortTargetFar),
+    },
+    shortTarget1: {
+      label: "Short Target 1",
+      className: "bg-rose-900/55 text-rose-100 border-r border-rose-700/45",
+      value: () => formatPrice(shortTargetNear),
+    },
+    shortEntry: {
+      label: "Short Entry",
+      className: "bg-rose-700/45 text-rose-50 border-r border-rose-500/35",
+      value: () => formatPrice(shortEntry),
+    },
+    neutral: {
+      label: "No-Trade",
+      className: "bg-amber-400/25 text-amber-50 border-r border-amber-300/40",
+      value: () => `${formatPrice(neutralLower)} – ${formatPrice(neutralUpper)}`,
+    },
+    longEntry: {
+      label: "Long Entry",
+      className: "bg-emerald-700/40 text-emerald-50 border-r border-emerald-500/35",
+      value: () => formatPrice(longEntry),
+    },
+    longTarget1: {
+      label: "Long Target 1",
+      className: "bg-emerald-800/45 text-emerald-100 border-r border-emerald-600/40",
+      value: () => formatPrice(longTargetNear),
+    },
+    longTarget2: {
+      label: "Long Target 2",
+      className: "bg-emerald-950/65 text-emerald-100",
+      value: () => formatPrice(longTargetFar),
+    },
+    abovePlan: {
+      label: "Above Plan",
+      className: "bg-slate-900/60 text-slate-300",
+      value: () => `> ${formatPrice(longTargetFar || longEntry || maxBound)}`,
+    },
   };
 
-  const pointer = resolvePointer();
+  const metaForKey = (key: string) => zoneMeta[key] ?? zoneMeta.neutral;
+
+  const decoratedSegments: Segment[] = mergedSegments.map((segment) => {
+    const meta = metaForKey(segment.key);
+    return {
+      key: segment.key,
+      label: meta.label,
+      value: meta.value(),
+      className: meta.className,
+      start: segment.start,
+      end: segment.end,
+      width: 0,
+    };
+  });
+
+  const MIN_WIDTH = 0.06;
+  const ENTRY_BONUS = 0.05;
+  const NEUTRAL_BONUS = 0.08;
+  const OUTER_TARGET_BONUS = 0.03;
+
+  let weightSum = 0;
+  const weightedSegments = decoratedSegments.map((segment) => {
+    const span = Math.max(segment.end - segment.start, 1e-6);
+    let weight = span / totalSpan;
+    if (segment.key === "shortEntry" || segment.key === "longEntry") {
+      weight += ENTRY_BONUS;
+    }
+    if (segment.key === "neutral") {
+      weight += NEUTRAL_BONUS;
+    }
+    if (segment.key === "shortTarget2" || segment.key === "longTarget2") {
+      weight += OUTER_TARGET_BONUS;
+    }
+    weight = Math.max(weight, MIN_WIDTH);
+    weightSum += weight;
+    return { ...segment, span, weight };
+  });
+
+  const segmentsWithWidth: Segment[] = weightedSegments.map((segment) => ({
+    key: segment.key,
+    label: segment.label,
+    value: segment.value,
+    className: segment.className,
+    start: segment.start,
+    end: segment.end,
+    width: (segment.weight / weightSum) * 100,
+  }));
+
+  const pointer = (() => {
+    let cumulative = 0;
+    for (const segment of segmentsWithWidth) {
+      const withinSegment = latestPrice >= segment.start && latestPrice <= segment.end;
+      if (withinSegment) {
+        const denominator = Math.max(segment.end - segment.start, 1e-6);
+        const ratio = clamp((latestPrice - segment.start) / denominator, 0, 1);
+        return clamp(cumulative + segment.width * ratio, 0, 100);
+      }
+      cumulative += segment.width;
+    }
+    return latestPrice < minBound ? 0 : 100;
+  })();
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm">
@@ -292,10 +291,10 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       </header>
       <div className="relative">
         <div className="relative flex overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/80 text-[11px] font-semibold uppercase tracking-wide text-slate-200">
-          {segments.map((segment, index) => (
+          {segmentsWithWidth.map((segment, index) => (
             <div
               key={segment.key}
-              className={`flex flex-col items-center justify-center gap-1 p-4 text-center ${segment.className} ${index === segments.length - 1 ? "border-r-0" : ""}`}
+              className={`flex flex-col items-center justify-center gap-1 p-4 text-center ${segment.className} ${index === segmentsWithWidth.length - 1 ? "border-r-0" : ""}`}
               style={{ flexBasis: `${segment.width}%`, flexGrow: 0, flexShrink: 0 }}
             >
               <span>{segment.label}</span>
