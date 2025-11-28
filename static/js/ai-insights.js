@@ -24885,10 +24885,10 @@ function AiInsightsApp({ bootstrap }) {
           "button",
           {
             type: "submit",
-            className: "inline-flex items-center justify-center gap-3 rounded-2xl bg-sky-500/30 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-sky-100 transition hover:bg-sky-500/40 disabled:cursor-not-allowed disabled:opacity-60",
+            className: "inline-flex items-center justify-center gap-3 rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/70 disabled:cursor-not-allowed disabled:opacity-60",
             disabled: disableSubmit,
             children: [
-              status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Spinner, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "inline-flex h-2 w-2 rounded-full bg-sky-300", "aria-hidden": "true" }),
+              status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Spinner, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "inline-flex h-2 w-2 rounded-full bg-white", "aria-hidden": "true" }),
               buttonLabel
             ]
           }

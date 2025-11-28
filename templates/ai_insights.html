@@ -15,7 +15,7 @@
       gtag('config', 'G-BC00YPJSRJ');
     </script>
 </head>
-<body class="ai-insights-page">
+<body class="ai-insights-page bg-slate-950 text-slate-100 font-sans antialiased">
     {% from "_header.html" import render_header %}
     {% set header_user_email = user.email if user else None %}
     {{ render_header(
@@ -26,7 +26,7 @@
         user_email=header_user_email
     ) }}
 
-    <main class="ai-insights-main">
+    <main class="ai-insights-main mx-auto max-w-7xl px-6 py-10">
         <div id="aiInsightsRoot"></div>
         <noscript>
             <p class="ai-insights-noscript">Enable JavaScript to load the interactive AI Insights console.</p>
