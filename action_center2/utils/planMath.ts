@@ -975,6 +975,19 @@ function buildExtremeNotes({
   const lowestShort = shortTargets[shortTargets.length - 1];
   const highestLong = longTargets[longTargets.length - 1];
   const extremeMessage = "Price has moved well beyond the planned range. Run a fresh analysis to update targets and risk.";
+  const outdatedMessage = "This plan is now outdated. Wait for a new analysis before building a fresh position.";
+
+  const isWithinBand = (first?: number, second?: number): boolean => {
+    if (!Number.isFinite(price) || !Number.isFinite(first) || !Number.isFinite(second)) {
+      return false;
+    }
+    const lower = Math.min(first as number, second as number);
+    const upper = Math.max(first as number, second as number);
+    return (price as number) >= lower && (price as number) <= upper;
+  };
+
+  const inLongScalingZone = isWithinBand(longTargets[0], longTargets[1]);
+  const inShortScalingZone = isWithinBand(shortTargets[0], shortTargets[1]);
 
   if (
     Number.isFinite(price)
@@ -996,7 +1009,11 @@ function buildExtremeNotes({
     classification.zone === "LONG_INVALIDATED"
     || classification.zone === "SHORT_INVALIDATED"
   ) {
-    notes.add("This plan is now outdated. Wait for a new analysis before building a fresh position.");
+    notes.add(outdatedMessage);
+  }
+
+  if (inLongScalingZone || inShortScalingZone) {
+    notes.add(outdatedMessage);
   }
 
   return Array.from(notes);
@@ -1043,28 +1060,28 @@ function buildPlanSnapshot({
   const longSnapshot = longSnapshotParts.join(" • ");
   const shortSnapshot = shortSnapshotParts.join(" • ");
 
-  if (intent === "buy") {
-    if (longSnapshotParts.length) {
-      snapshots.push(longSnapshot);
-    } else if (shortSnapshotParts.length) {
-      snapshots.push(shortSnapshot);
-    }
-  } else if (intent === "sell") {
-    if (shortSnapshotParts.length) {
-      snapshots.push(shortSnapshot);
-    } else if (longSnapshotParts.length) {
-      snapshots.push(longSnapshot);
-    }
-  } else {
-    if (longSnapshotParts.length) {
-      snapshots.push(longSnapshot);
-    }
-    if (shortSnapshotParts.length) {
-      snapshots.push(shortSnapshot);
-    }
+  const entries: Array<{ kind: "long" | "short"; text: string }> = [];
+
+  if (longSnapshotParts.length) {
+    entries.push({ kind: "long", text: longSnapshot });
+  }
+  if (shortSnapshotParts.length) {
+    entries.push({ kind: "short", text: shortSnapshot });
   }
 
-  return snapshots;
+  const priority = (entry: { kind: "long" | "short" }): number => {
+    if (intent === "buy") {
+      return entry.kind === "long" ? 0 : 1;
+    }
+    if (intent === "sell") {
+      return entry.kind === "short" ? 0 : 1;
+    }
+    return 0;
+  };
+
+  const ordered = entries.sort((a, b) => priority(a) - priority(b));
+
+  return ordered.map((entry) => entry.text);
 }
 
 export type ActionSummaryInput = {
