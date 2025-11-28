@@ -36,27 +36,42 @@ type MarkerGroup = {
   markers: Marker[];
 };
 
-const toneStyles: Record<MarkerTone, { chipBg: string; chipBorder: string; chipText: string; dot: string; line: string }> = {
+type ToneStyleMap = Record<
+  MarkerTone,
+  {
+    priceBg: string;
+    priceBorder: string;
+    priceText: string;
+    dot: string;
+    line: string;
+    legendBg: string;
+  }
+>;
+
+const toneStyles: ToneStyleMap = {
   short: {
-    chipBg: "bg-rose-500/10",
-    chipBorder: "border border-rose-500/40",
-    chipText: "text-rose-100",
+    priceBg: "bg-rose-500/10",
+    priceBorder: "border border-rose-500/40",
+    priceText: "text-rose-100",
     dot: "bg-rose-400 shadow-[0_0_0_3px_rgba(244,63,94,0.35)]",
     line: "bg-rose-400/70",
+    legendBg: "bg-gradient-to-r from-rose-500/70 to-rose-400/60",
   },
   neutral: {
-    chipBg: "bg-amber-400/10",
-    chipBorder: "border border-amber-300/40",
-    chipText: "text-amber-100",
+    priceBg: "bg-amber-400/10",
+    priceBorder: "border border-amber-300/40",
+    priceText: "text-amber-100",
     dot: "bg-amber-300 shadow-[0_0_0_3px_rgba(252,211,77,0.35)]",
     line: "bg-amber-300/70",
+    legendBg: "bg-gradient-to-r from-amber-400/70 to-amber-300/60",
   },
   long: {
-    chipBg: "bg-emerald-500/10",
-    chipBorder: "border border-emerald-400/40",
-    chipText: "text-emerald-100",
+    priceBg: "bg-emerald-500/10",
+    priceBorder: "border border-emerald-400/40",
+    priceText: "text-emerald-100",
     dot: "bg-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.35)]",
     line: "bg-emerald-400/70",
+    legendBg: "bg-gradient-to-r from-emerald-500/70 to-emerald-400/60",
   },
 };
 
@@ -137,7 +152,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       label: "Short Target",
       value,
       tone: "short",
-      align: "top",
+      align: "bottom",
     });
   } else if (uniqueShortTargets.length > 1) {
     const farTarget = uniqueShortTargets[0];
@@ -148,7 +163,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         label: "Short Target 2",
         value: farTarget,
         tone: "short",
-        align: "top",
+        align: "bottom",
       });
     }
     if (Number.isFinite(nearTarget) && Math.abs(nearTarget - farTarget) > 0) {
@@ -157,7 +172,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         label: "Short Target 1",
         value: nearTarget,
         tone: "short",
-        align: "top",
+        align: "bottom",
       });
     }
   }
@@ -168,7 +183,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       label: "Short Entry",
       value: shortEntry,
       tone: "short",
-      align: "top",
+      align: "bottom",
     });
   }
 
@@ -186,7 +201,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         label: "No-Trade Max",
         value: neutralUpper,
         tone: "neutral",
-        align: "top",
+        align: "bottom",
       });
     }
   }
@@ -259,6 +274,30 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
 
+  const legendOrder: LevelKey[] = [
+    "shortTarget2",
+    "shortTarget1",
+    "shortTarget",
+    "shortEntry",
+    "neutralLower",
+    "neutralUpper",
+    "longEntry",
+    "longTarget1",
+    "longTarget2",
+    "longTarget",
+  ];
+
+  const legendMap = new Map<LevelKey, Marker>();
+  markers.forEach((marker) => {
+    if (!legendMap.has(marker.key)) {
+      legendMap.set(marker.key, marker);
+    }
+  });
+
+  const legendItems = legendOrder
+    .map((key) => legendMap.get(key))
+    .filter((value): value is Marker => Boolean(value));
+
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp(((neutralLower - minBound) / totalSpan) * 100, 0, 100) : 0;
   const neutralEndPercent = hasNeutralZone ? clamp(((neutralUpper - minBound) / totalSpan) * 100, 0, 100) : 0;
@@ -289,7 +328,6 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         </div>
 
         {markerGroups.map((group) => {
-          const topMarkers = group.markers.filter((marker) => marker.align === "top");
           const bottomMarkers = group.markers.filter((marker) => marker.align === "bottom");
           const dominantTone = group.markers[0]?.tone ?? "neutral";
           const tone = toneStyles[dominantTone];
@@ -301,20 +339,6 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
               style={{ left: `${group.percent}%` }}
             >
               <div className="flex flex-col items-center">
-                {topMarkers.length > 0 && (
-                  <div className="flex flex-col items-center gap-1 pb-4">
-                    {topMarkers.map((marker) => (
-                      <div
-                        key={marker.key}
-                        className={`min-w-[120px] rounded-xl px-3 py-1.5 text-center shadow-md shadow-black/10 ${tone.chipBg} ${tone.chipBorder} ${tone.chipText}`}
-                      >
-                        <p className="text-[10px] font-semibold uppercase tracking-wide">{marker.label}</p>
-                        <p className="text-xs font-semibold">{formatPrice(marker.value)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 <div className="flex flex-col items-center text-[10px]">
                   <span className={`mb-2 h-6 w-px ${tone.line}`} />
                   <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
@@ -323,15 +347,11 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
                 {bottomMarkers.length > 0 && (
                   <div className="flex flex-col items-center gap-1 pt-4">
-                    {bottomMarkers.map((marker) => (
-                      <div
-                        key={marker.key}
-                        className={`min-w-[120px] rounded-xl px-3 py-1.5 text-center shadow-md shadow-black/10 ${tone.chipBg} ${tone.chipBorder} ${tone.chipText}`}
-                      >
-                        <p className="text-[10px] font-semibold uppercase tracking-wide">{marker.label}</p>
-                        <p className="text-xs font-semibold">{formatPrice(marker.value)}</p>
-                      </div>
-                    ))}
+                    <span
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${tone.priceBg} ${tone.priceBorder} ${tone.priceText}`}
+                    >
+                      {formatPrice(group.value)}
+                    </span>
                   </div>
                 )}
               </div>
@@ -348,9 +368,6 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
           </div>
           <span className="block h-9 w-[2px] rounded-full bg-indigo-400" />
           <span className="h-2 w-2 rounded-full border border-indigo-200/60 bg-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]" />
-          <span className="flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide text-indigo-200">
-            Last Price
-          </span>
         </div>
 
         {!markerGroups.length && (
@@ -360,10 +377,24 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         )}
       </div>
 
-      {markerGroups.length > 0 && (
-        <p className="mt-6 text-xs text-slate-500">
-          Missing plan levels are hidden automatically so the gauge always reflects what the latest analysis provided.
-        </p>
+      {legendItems.length > 0 && (
+        <div className="mt-8 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+          {legendItems.map((item) => {
+            const tone = toneStyles[item.tone];
+            return (
+              <div
+                key={item.key}
+                className="flex items-center gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/60 px-3 py-2"
+              >
+                <span className={`h-2 w-10 rounded-full ${tone.legendBg}`} />
+                <div className="flex flex-col gap-[2px]">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{item.label}</span>
+                  <span className={`text-sm font-semibold ${tone.priceText}`}>{formatPrice(item.value)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </section>
   );
