@@ -1975,6 +1975,60 @@ async def generate_principal_plan(request: Request, user: User = Depends(get_cur
     )
 
 
+class AlertEmailRequest(BaseModel):
+    alert_id: str = Field(..., alias="alertId")
+    label: str
+    description: str
+    symbol: Optional[str] = None
+    latest_price: Optional[float] = Field(None, alias="latestPrice")
+
+    class Config:
+        allow_population_by_field_name = True
+
+
+@app.post("/api/alerts/email")
+async def send_alert_email(
+    payload: AlertEmailRequest,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user_sync),
+):
+    if not user or not getattr(user, "email", None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User email is required to send alerts.",
+        )
+
+    if EmailClient is None or not ACS_CONNECTION_STRING:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Alert email service is unavailable.",
+        )
+
+    sender_address = ACS_EMAIL_SENDER or CONTACT_EMAIL_SENDER
+    if not sender_address:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Alert email sender configuration is missing.",
+        )
+
+    alert_payload = payload.dict(by_alias=False, exclude_none=True)
+    background_tasks.add_task(
+        _send_alert_email_to_trader,
+        alert_payload,
+        getattr(user, "id", None),
+        user.email,
+        sender_address,
+    )
+
+    logger.info(
+        "Queued alert email for user=%s alert=%s",
+        getattr(user, "id", "?"),
+        alert_payload.get("alert_id"),
+    )
+
+    return JSONResponse(content={"status": "queued"}, status_code=status.HTTP_202_ACCEPTED)
+
+
 @app.post("/api/contact")
 async def submit_contact_request(request: Request, background_tasks: BackgroundTasks):
     email_service_ready = bool(
@@ -3063,6 +3117,163 @@ def _send_contact_email(payload: Dict[str, Any]) -> bool:
     except Exception:  # noqa: BLE001 - log and surface failure gracefully
         logger.exception("Failed to send contact email via SMTP")
         return False
+
+
+def _send_alert_email_to_trader(
+    payload: Dict[str, Any],
+    user_id: Optional[int],
+    recipient_email: Optional[str],
+    sender_address: str,
+) -> bool:
+    if EmailClient is None or not ACS_CONNECTION_STRING:
+        logger.warning("Alert email requested but ACS is unavailable")
+        return False
+
+    if not sender_address:
+        logger.warning("Alert email skipped; sender address missing")
+        return False
+
+    if not recipient_email:
+        logger.warning("Alert email skipped; recipient missing for user=%s", user_id)
+        return False
+
+    alert_id = str(payload.get("alert_id") or "").strip()
+    label = str(payload.get("label") or "Trading Alert").strip() or "Trading Alert"
+    description = str(payload.get("description") or "Stay ready for this setup.").strip()
+    symbol_raw = payload.get("symbol")
+    symbol = str(symbol_raw).upper().strip() if symbol_raw else None
+    latest_price = payload.get("latest_price")
+    price_label = f"{latest_price:,.2f}" if isinstance(latest_price, (int, float)) else None
+    timestamp = datetime.now(timezone.utc)
+    timestamp_label = timestamp.strftime("%Y-%m-%d %H:%M UTC")
+
+    subject = _compose_alert_subject(alert_id, label, symbol)
+    text_body, html_body = _build_alert_email_content(
+        label=label,
+        description=description,
+        symbol=symbol,
+        price_label=price_label,
+        timestamp_label=timestamp_label,
+    )
+
+    try:
+        client = EmailClient.from_connection_string(ACS_CONNECTION_STRING)
+        email_message: Dict[str, Any] = {
+            "senderAddress": sender_address,
+            "recipients": {"to": [{"address": recipient_email}]},
+            "content": {
+                "subject": subject,
+                "plainText": text_body,
+                "html": html_body,
+            },
+        }
+
+        poller = client.begin_send(email_message)
+        result = poller.result()
+        status_value = getattr(result, "status", None)
+        if status_value and str(status_value).lower() not in {"queued", "accepted", "succeeded"}:
+            logger.warning(
+                "ACS returned non-success status=%s for alert email user=%s alert=%s",
+                status_value,
+                user_id,
+                alert_id or label,
+            )
+        else:
+            logger.info(
+                "Alert email queued via ACS for user=%s recipient=%s alert=%s",
+                user_id,
+                recipient_email,
+                alert_id or label,
+            )
+            return True
+    except Exception:  # noqa: BLE001 - operational logging
+        logger.exception(
+            "Failed to send alert email via ACS for user=%s alert=%s",
+            user_id,
+            alert_id or label,
+        )
+
+    return False
+
+
+def _compose_alert_subject(alert_id: str, label: str, symbol: Optional[str]) -> str:
+    alert_key = (alert_id or "").split("-", 1)[0].lower()
+    prefix_map = {
+        "long": "VolatilX Long Alert",
+        "short": "VolatilX Short Alert",
+        "neutral": "VolatilX Neutral Alert",
+    }
+    prefix = prefix_map.get(alert_key, "VolatilX Strategy Alert")
+    subject = f"{prefix} • {label or 'Trading Alert'}"
+    if symbol:
+        subject = f"{subject} ({symbol})"
+    return subject
+
+
+def _build_alert_email_content(
+    *,
+    label: str,
+    description: str,
+    symbol: Optional[str],
+    price_label: Optional[str],
+    timestamp_label: str,
+) -> Tuple[str, str]:
+    lines: List[str] = [
+        "You just checked a VolatilX alert to keep your playbook sharp.",
+        "",
+        f"Alert: {label}",
+    ]
+
+    if symbol:
+        lines.append(f"Symbol: {symbol}")
+    if price_label:
+        lines.append(f"Last price when requested: {price_label}")
+
+    lines.extend(
+        [
+            f"Checked at: {timestamp_label}",
+            "",
+            "Why it matters:",
+            description or "Stay focused on the key inflection levels.",
+            "",
+            "We'll keep tracking this path with you.",
+            "",
+            "VolatilX Action Center",
+        ],
+    )
+
+    text_body = "\n".join(lines)
+
+    safe_label = html.escape(label)
+    safe_description_source = description or "Stay focused on the key inflection levels."
+    safe_description = "<br />".join(html.escape(safe_description_source).splitlines())
+    safe_timestamp = html.escape(timestamp_label)
+    symbol_block = f"<p><strong>Symbol:</strong> {html.escape(symbol)}</p>" if symbol else ""
+    price_block = (
+        f"<p><strong>Last price when requested:</strong> {html.escape(price_label)}</p>"
+        if price_label
+        else ""
+    )
+
+    html_body = (
+        "<html>"
+        "<body style=\"background-color:#020617;color:#e2e8f0;font-family:Arial,Helvetica,sans-serif;\">"
+        "<div style=\"max-width:560px;margin:0 auto;padding:24px;\">"
+        "<h2 style=\"color:#38bdf8;margin:0 0 16px;\">You saved an alert touchpoint</h2>"
+        f"<p style=\"font-size:15px;line-height:1.6;\">Alert: <strong>{safe_label}</strong></p>"
+        f"{symbol_block}"
+        f"{price_block}"
+        f"<p style=\"font-size:14px;line-height:1.6;margin:12px 0;\"><strong>Checked:</strong> {safe_timestamp}</p>"
+        "<hr style=\"border:1px solid #1e293b;border-width:1px 0 0;margin:24px 0;\" />"
+        f"<p style=\"font-size:15px;line-height:1.7;margin:0;\">{safe_description}</p>"
+        "<p style=\"margin-top:24px;font-size:14px;color:#94a3b8;\">Stay ready — the VolatilX Action Center has your back.</p>"
+        "<p style=\"margin-top:8px;font-size:13px;color:#64748b;\">Trim risk, not focus.</p>"
+        "</div>"
+        "</body>"
+        "</html>"
+    )
+
+    return text_body, html_body
 
 
 def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:

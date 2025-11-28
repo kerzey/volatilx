@@ -145,7 +145,11 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
         <ScenarioCards plan={strategyPlan} />
         <PnLPreview plan={strategyPlan} latestPrice={activePlan.latest_price} />
         <div className="grid gap-6 xl:grid-cols-2">
-          <AlertsList alerts={alertSuggestions} />
+          <AlertsList
+            alerts={alertSuggestions}
+            symbol={activeOption?.symbol ?? activePlan.symbol}
+            latestPrice={activePlan.latest_price}
+          />
           <TrendHeatmap consensus={activePlan.technical_consensus} />
         </div>
       </div>
