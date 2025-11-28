@@ -177,6 +177,7 @@
     <title>Volatilx</title>
     <!-- Link to external CSS for cleaner markup -->
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/volatilx-header.css">
     <script>
         function renderResult(data) {
             const resultDiv = document.getElementById('result');
@@ -314,6 +315,16 @@
 </head>
 
 <body>
+    {% from "_header.html" import render_header %}
+    {% set header_user_email = user.email if (user is defined and user and user.email) else None %}
+    {{ render_header(
+        page='',
+        title='VolatilX',
+        subtitle='Actionable market intelligence for every session. Connect, analyze, and execute with confidence.',
+        badge='Platform Overview',
+        user_email=header_user_email,
+        cta={'href': '/signin', 'label': 'Sign In', 'variant': 'primary', 'show_dot': False} if not header_user_email else None
+    ) }}
     <div class="container">
         <h1>VolatilX <span style="font-size:0.7em;color:#1976d2;">AI - Stock Technical Analysis</span></h1>
         <div class="input-block">

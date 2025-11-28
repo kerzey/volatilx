@@ -8,23 +8,39 @@
     <link rel="stylesheet" href="/static/css/action-center2.css">
     {% endif %}
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/volatilx-header.css">
 </head>
 <body class="action-center-page{% if principal_plan_json %} action-center-page--react{% endif %}" data-live-price="{{ 'true' if live_price_enabled else 'false' }}" data-timeframe="{{ timeframe }}" data-intent="{{ intent }}">
-    <div class="header">
-        <a class="logo" href="/analyze">
-            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
-            <span>VolatilX</span>
-        </a>
-        <div class="nav-links">
-            <a href="/analyze">AI Insights</a>
-            <a href="/action-center" class="active">Action Center</a>
-            <a href="/report-center">Report Center</a>
-            <a href="/subscribe">Plans</a>
-            <a href="/settings">Settings</a>
-            <span>{{ user.email }}</span>
-            <a href="/logout">Logout</a>
-        </div>
-    </div>
+    {% from "_header.html" import render_header %}
+    {% set dashboards_count = dashboards|length if dashboards else 0 %}
+    {% set header_timeframe = timeframe %}
+    {% set header_intent = intent %}
+    {% set primary_symbol = None %}
+    {% if primary_dashboard %}
+        {% set primary_payload = primary_dashboard.action_data %}
+        {% set primary_symbol = primary_payload.symbol if primary_payload and primary_payload.symbol else (primary_dashboard.symbol_display if primary_dashboard and primary_dashboard.symbol_display else primary_dashboard.symbol) %}
+        {% if primary_dashboard.timeframe %}
+            {% set header_timeframe = primary_dashboard.timeframe %}
+        {% endif %}
+        {% if primary_dashboard.intent %}
+            {% set header_intent = primary_dashboard.intent %}
+        {% endif %}
+    {% endif %}
+    {% set header_timeframe_label = header_timeframe|title if header_timeframe else 'Not set' %}
+    {% set header_intent_label = header_intent|title if header_intent else 'Not set' %}
+    {% set header_user_email = user.email if user else None %}
+    {{ render_header(
+        page='action-center',
+        title='Action Center',
+        subtitle='Your AI-powered trading cockpit &mdash; real-time signals, levels, and actions.',
+        badge='Trading Control',
+        stats=[
+            {'label': 'Dashboards tracked', 'value': dashboards_count},
+            {'label': 'Focus symbol', 'value': primary_symbol or 'Not set'},
+            {'label': 'Default plan', 'value': header_timeframe_label ~ ' · ' ~ header_intent_label}
+        ],
+        user_email=header_user_email
+    ) }}
 
     <main class="action-center">
         <div id="action-center2-root" data-react-root></div>

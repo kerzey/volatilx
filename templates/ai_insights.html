@@ -6,6 +6,7 @@
     <title>VolatilX - AI Insights</title>
     <!-- Link to your main CSS -->
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/volatilx-header.css">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC00YPJSRJ"></script>
@@ -17,22 +18,15 @@
     </script>
 </head>
 <body>
-
-    <div class="header">
-        <a class="logo" href="/analyze">
-            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
-            <span>VolatilX</span>
-        </a>
-        <div class="nav-links">
-            <a href="/analyze" class="active">AI Insights</a>
-            <a href="/action-center">Action Center</a>
-            <a href="/report-center">Report Center</a>
-            <a href="/subscribe">Plans</a>
-            <a href="/settings">Settings</a>
-            <span>{{ user.email }}</span>
-            <a href="/logout">Logout</a>
-        </div>
-    </div>
+    {% from "_header.html" import render_header %}
+    {% set header_user_email = user.email if user else None %}
+    {{ render_header(
+        page='analyze',
+        title='AI Insights',
+        subtitle='Run principal-agent intelligence, tune signals, and surface market context in seconds.',
+        badge='Research Hub',
+        user_email=header_user_email
+    ) }}
     
     <div class="container">
         <div class="trading-panel">

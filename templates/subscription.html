@@ -5,23 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Choose Your Plan</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/volatilx-header.css">
 </head>
 <body class="subscription-body">
-    <div class="header">
-        <a class="logo" href="/analyze">
-            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
-            <span>VolatilX</span>
-        </a>
-        <div class="nav-links">
-            <a href="/analyze">AI Insights</a>
-            <a href="/action-center">Action Center</a>
-            <a href="/report-center">Report Center</a>
-            <a href="/subscribe" class="active">Plans</a>
-            <a href="/settings">Settings</a>
-            <span>{{ user.email }}</span>
-            <a href="/logout">Logout</a>
-        </div>
-    </div>
+    {% from "_header.html" import render_header %}
+    {% set header_user_email = user.email if user and user.email else None %}
+    {{ render_header(
+        page='subscribe',
+        title='Choose Your Plan',
+        subtitle='Unlock premium agent runs, concierge research, and elite trading intel tailored to your desk.',
+        badge='Plans',
+        user_email=header_user_email
+    ) }}
 
     <main class="subscription-page">
         <div class="subscription-hero">

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Settings</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/volatilx-header.css">
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC00YPJSRJ"></script>
     <script>
@@ -15,21 +16,22 @@
     </script>
 </head>
 <body class="settings-page">
-    <div class="header">
-        <a class="logo" href="/analyze">
-            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
-            <span>VolatilX</span>
-        </a>
-        <div class="nav-links">
-            <a href="/analyze">AI Insights</a>
-            <a href="/action-center">Action Center</a>
-            <a href="/report-center">Report Center</a>
-            <a href="/subscribe">Plans</a>
-            <a href="/settings" class="active">Settings</a>
-            <span>{{ user.email }}</span>
-            <a href="/logout">Logout</a>
-        </div>
-    </div>
+    {% from "_header.html" import render_header %}
+    {% set header_user_email = user.email if user and user.email else None %}
+    {% set member_since = user.created_at.strftime('%B %d, %Y') if user and user.created_at else 'N/A' %}
+    {% set auth_label = (user.oauth_provider.title() + ' OAuth') if user and user.oauth_provider else 'Email &amp; Password' %}
+    {{ render_header(
+        page='settings',
+        title='Account Settings',
+        subtitle='Fine-tune your VolatilX experience, manage subscription tiers, and keep security dialed in.',
+        badge='Control Panel',
+        stats=[
+            {'label': 'Member since', 'value': member_since},
+            {'label': 'Account status', 'value': 'Active'},
+            {'label': 'Auth method', 'value': auth_label}
+        ],
+        user_email=header_user_email
+    ) }}
 
     <div class="container">
         <div class="settings-panel">

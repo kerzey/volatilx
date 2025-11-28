@@ -1,0 +1,72 @@
+{% macro render_header(page, title, subtitle='', badge=None, stats=None, user_email=None, cta=None) %}
+    {% set nav_items = [
+        {'key': 'analyze', 'href': '/analyze', 'label': 'AI Insights'},
+        {'key': 'action-center', 'href': '/action-center', 'label': 'Action Center'},
+        {'key': 'report-center', 'href': '/report-center', 'label': 'Report Center'},
+        {'key': 'subscribe', 'href': '/subscribe', 'label': 'Plans'},
+        {'key': 'settings', 'href': '/settings', 'label': 'Settings'}
+    ] %}
+    {% if cta is none and user_email %}
+        {% set cta = {'href': '/logout', 'label': 'Logout', 'variant': 'alert', 'show_dot': True} %}
+    {% endif %}
+    {% set has_stats = stats is iterable and (stats | length) > 0 %}
+    <header class="rc-hero">
+        <div class="rc-hero__inner">
+            <nav class="rc-hero__nav" aria-label="Primary navigation">
+                <a class="rc-brand" href="/analyze">
+                    <span class="rc-brand__mark">
+                        <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
+                    </span>
+                    <span>VolatilX</span>
+                </a>
+                <div class="rc-nav">
+                    {% for item in nav_items %}
+                        <a href="{{ item.href }}" class="rc-nav__link{% if item.key == page %} rc-nav__link--active{% endif %}">{{ item.label }}</a>
+                    {% endfor %}
+                    {% if user_email %}
+                        <span class="rc-nav__user">
+                            <span class="rc-nav__dot" aria-hidden="true"></span>
+                            {{ user_email }}
+                        </span>
+                    {% endif %}
+                    {% if cta %}
+                        {% set variant = cta.variant if 'variant' in cta else 'neutral' %}
+                        {% set show_dot = cta.show_dot if 'show_dot' in cta else False %}
+                        <a href="{{ cta.href }}" class="rc-nav__cta{% if variant == 'alert' %} rc-nav__cta--alert{% elif variant == 'primary' %} rc-nav__cta--primary{% endif %}">
+                            {% if show_dot %}
+                                <span class="rc-nav__dot{% if variant == 'alert' %} rc-nav__dot--alert{% endif %}" aria-hidden="true"></span>
+                            {% endif %}
+                            {{ cta.label }}
+                        </a>
+                    {% endif %}
+                </div>
+            </nav>
+            <div class="rc-hero__body{% if has_stats %} rc-hero__body--with-stats{% endif %}">
+                <div class="rc-hero__copy">
+                    {% if badge %}
+                        <span class="rc-hero__pill">
+                            <span class="rc-hero__pill-dot" aria-hidden="true"></span>
+                            {{ badge }}
+                        </span>
+                    {% endif %}
+                    <h1 class="rc-hero__title">{{ title }}</h1>
+                    {% if subtitle %}
+                        <p class="rc-hero__description">{{ subtitle }}</p>
+                    {% endif %}
+                </div>
+                {% if has_stats %}
+                    <dl class="rc-hero__stats">
+                        {% for stat in stats %}
+                            {% if stat.label and stat.value is not none %}
+                                <div class="rc-hero__stat">
+                                    <dt>{{ stat.label }}</dt>
+                                    <dd>{{ stat.value }}</dd>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </dl>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+{% endmacro %}

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Sign In</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/volatilx-header.css">
 
 
 
@@ -19,6 +20,14 @@
 </script>
 </head>
 <body class="signin-body">
+    {% from "_header.html" import render_header %}
+    {{ render_header(
+        page='',
+        title='Sign In',
+        subtitle='Access your VolatilX cockpit securely and pick up where you left off.',
+        badge='Secure Access',
+        cta={'href': '/signup', 'label': 'Create Account', 'variant': 'primary', 'show_dot': False}
+    ) }}
     <!-- <div class="signin-container">
         <div class="branding">
             <img src="/static/volatilx_logo.png" alt="VolatilX Logo" class="logo-img">
