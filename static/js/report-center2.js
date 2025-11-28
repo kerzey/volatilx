@@ -24463,11 +24463,11 @@ var require_react_jsx_runtime_development = __commonJS({
             return jsxWithValidation(type, props, key, false);
           }
         }
-        var jsx4 = jsxWithValidationDynamic;
-        var jsxs3 = jsxWithValidationStatic;
+        var jsx5 = jsxWithValidationDynamic;
+        var jsxs4 = jsxWithValidationStatic;
         exports.Fragment = REACT_FRAGMENT_TYPE;
-        exports.jsx = jsx4;
-        exports.jsxs = jsxs3;
+        exports.jsx = jsx5;
+        exports.jsxs = jsxs4;
       })();
     }
   }
@@ -24620,18 +24620,18 @@ var TradeSetupBlock = ({
   const accent = tone === "bullish" ? BULLISH_ACCENT : BEARISH_ACCENT;
   const targets = Array.isArray(setup.targets) ? setup.targets : [];
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-slate-800/70 bg-slate-900/50 p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: `text-xs font-semibold uppercase tracking-wide ${accent}`, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: `text-xs font-semibold uppercase tracking-widest ${accent}`, children: label }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("dl", { className: "mt-3 space-y-2 text-sm text-slate-200", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between gap-3 text-slate-300", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { className: "text-slate-400", children: "Entry" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { className: "font-semibold text-slate-100", children: formatPriceValue(setup.entry) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Entry" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { className: "text-base font-semibold text-slate-100", children: formatPriceValue(setup.entry) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between gap-3 text-slate-300", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { className: "text-slate-400", children: "Stop" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { className: "font-semibold text-slate-100", children: formatPriceValue(setup.stop) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Stop" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { className: "text-base font-semibold text-slate-100", children: formatPriceValue(setup.stop) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { className: "text-slate-400", children: "Targets" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Targets" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { className: "mt-1 flex flex-wrap gap-2", children: targets.length ? targets.map((target, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
           "span",
           {
@@ -24652,32 +24652,35 @@ var TradeSetupBlock = ({
 var NoTradeZoneBlock = ({ zones }) => {
   const ranges = formatNoTradeZones(zones);
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs font-semibold uppercase tracking-wide text-amber-300", children: "No Trade Zone" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs font-semibold uppercase tracking-widest text-amber-300", children: "No-Trade Lane" }),
     ranges.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-3 space-y-2 text-sm text-amber-200", children: ranges.map((range, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: range }, `zone-${index}`)) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-3 text-sm text-amber-200/70", children: "Safe range not defined for this strategy." })
   ] });
 };
-var MarketSnapshot = ({ price }) => {
+var MarketPulse = ({ price }) => {
   if (!price) {
     return null;
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800 bg-slate-900/40 p-5", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-sm font-semibold uppercase tracking-wide text-slate-400", children: "Market Snapshot" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-3 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between gap-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Market pulse" }),
+      price.timestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: price.timestamp }) : null
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-500", children: "Timeframe" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-medium text-slate-100", children: price.timeframe ?? "\u2014" })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Timeframe" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: price.timeframe ?? "\u2014" })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-500", children: "Close" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-medium text-slate-100", children: formatPriceValue(price.close) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Close" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: formatPriceValue(price.close) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-500", children: "Change %" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-medium text-slate-100", children: formatPercent(price.change_pct) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Change" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: formatPercent(price.change_pct) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-500", children: "Volume" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-medium text-slate-100", children: formatVolume(price.volume) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Volume" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: formatVolume(price.volume) })
       ] })
     ] })
   ] });
@@ -24689,7 +24692,7 @@ var ConsensusPanel = ({ consensus }) => {
   const { recommendation, confidence, strength, reasoning, focus } = consensus;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800 bg-slate-900/40 p-5", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-start justify-between gap-4", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-sm font-semibold uppercase tracking-wide text-slate-400", children: "Technical Consensus" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Technical read" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center gap-3 text-xs uppercase tracking-wide text-slate-400", children: [
         recommendation ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rounded-full border border-slate-700 px-3 py-1 text-slate-200", children: recommendation }) : null,
         confidence ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rounded-full border border-slate-700 px-3 py-1 text-slate-200", children: [
@@ -24720,9 +24723,9 @@ var ConsensusPanel = ({ consensus }) => {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "font-medium text-slate-100", children: formatPriceValue(focus.stop_loss) })
       ] })
     ] }) : null,
-    reasoning?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-4 space-y-2 text-sm text-slate-300", children: reasoning.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
+    reasoning?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-4 space-y-2 text-sm text-slate-300", children: reasoning.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-3", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-1.5 w-1.5 rounded-full bg-slate-500", "aria-hidden": "true" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-slate-200", children: item })
     ] }, `reason-${index}`)) }) : null
   ] });
 };
@@ -24735,19 +24738,19 @@ var PriceActionPanel = ({ priceAction }) => {
     return null;
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800 bg-slate-900/40 p-5", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-sm font-semibold uppercase tracking-wide text-slate-400", children: "Price Action Notes" }),
-    trendAlignment ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-3 text-sm text-slate-300", children: trendAlignment }) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Tape color" }),
+    trendAlignment ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-3 text-sm leading-relaxed text-slate-300", children: trendAlignment }) : null,
     keyLevels?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-3", children: keyLevels.map((level, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-xl border border-slate-800/70 bg-slate-950/40 p-4", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-500", children: "Level" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-lg font-semibold text-slate-100", children: formatPriceValue(level.price) }),
-      level.distance_pct !== void 0 && level.distance_pct !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-sm text-slate-400", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Level" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-lg font-semibold text-slate-100", children: formatPriceValue(level.price) }),
+      level.distance_pct !== void 0 && level.distance_pct !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "mt-1 text-sm text-slate-400", children: [
         formatPercent(level.distance_pct),
         " away"
       ] }) : null
     ] }, `level-${index}`)) }) : null,
-    patterns?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-4 space-y-2 text-sm text-slate-300", children: patterns.map((pattern, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
+    patterns?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-4 space-y-2 text-sm text-slate-300", children: patterns.map((pattern, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-3", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-1.5 w-1.5 rounded-full bg-slate-500", "aria-hidden": "true" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: pattern })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-slate-200", children: pattern })
     ] }, `pattern-${index}`)) }) : null
   ] });
 };
@@ -24762,7 +24765,7 @@ var FavoriteButton = ({
     onClick,
     disabled: pending,
     "aria-pressed": isFavorite,
-    className: `inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300/40 focus:ring-offset-0 ${isFavorite ? "border-amber-400 bg-amber-400/10 text-amber-200 hover:border-amber-300" : "border-slate-700 bg-slate-800/80 text-slate-200 hover:border-slate-600"} ${pending ? "opacity-60" : ""}`,
+    className: `inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-slate-300/40 focus:ring-offset-0 ${isFavorite ? "border-amber-400 bg-amber-400/10 text-amber-200 hover:border-amber-300" : "border-slate-700 bg-slate-800/80 text-slate-200 hover:border-slate-600"} ${pending ? "opacity-60" : ""}`,
     children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { "aria-hidden": "true", className: isFavorite ? "text-amber-300" : "text-slate-300", children: isFavorite ? "\u2605" : "\u2606" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: isFavorite ? "Favorited" : "Favorite" })
@@ -24780,7 +24783,8 @@ var StrategySection = ({
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900/40 p-6", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3 md:flex-row md:items-start md:justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-xl font-semibold text-slate-100", children: label }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-widest text-slate-500", children: "Strategy lane" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "mt-2 text-xl font-semibold text-slate-100", children: label }),
         plan.summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-sm leading-relaxed text-slate-300", children: plan.summary }) : summary?.summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-sm leading-relaxed text-slate-300", children: summary.summary }) : null,
         summary?.next_actions?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-3 space-y-1 text-sm text-slate-300", children: summary.next_actions.map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-1.5 w-1.5 rounded-full bg-slate-500", "aria-hidden": "true" }),
@@ -24815,15 +24819,17 @@ function ReportCard({ report, isFavorite, pending, onToggleFavorite }) {
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 shadow-xl shadow-black/40 transition hover:border-slate-700", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex flex-col gap-4 border-b border-slate-800 p-6 md:flex-row md:items-center md:justify-between", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-widest text-slate-500", children: "Shared plan" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center gap-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: "text-3xl font-semibold tracking-tight text-slate-50", children: report.symbol_display ?? report.symbol }),
-          latestPrice !== void 0 && latestPrice !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-200", children: [
-            "Last Price ",
+          latestPrice !== void 0 && latestPrice !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-1.5 w-1.5 rounded-full bg-sky-400", "aria-hidden": "true" }),
+            "Last ",
             formatPriceValue(latestPrice)
           ] }) : null
         ] }),
-        report.generated_display ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "mt-2 text-sm text-slate-400", children: [
+        report.generated_display ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: [
           "Generated ",
           report.generated_display
         ] }) : null
@@ -24831,7 +24837,7 @@ function ReportCard({ report, isFavorite, pending, onToggleFavorite }) {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavoriteButton, { isFavorite, pending, onClick: handleFavoriteToggle })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-6 p-6", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MarketSnapshot, { price: report.price }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MarketPulse, { price: report.price }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConsensusPanel, { consensus: report.consensus }),
       strategies.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex flex-col gap-6", children: strategies.map(({ key, label, plan: strategyPlan, summary }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StrategySection, { label, plan: strategyPlan, summary }, key)) }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PriceActionPanel, { priceAction: report.price_action })
@@ -24849,8 +24855,38 @@ function ReportCard({ report, isFavorite, pending, onToggleFavorite }) {
   ] });
 }
 
-// report_center2/components/ReportCenterApp.tsx
+// report_center2/components/ReportPlanSwitcher.tsx
 var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+function ReportPlanSwitcher({ options, activeSymbol, onSelect }) {
+  if (!options.length) {
+    return null;
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/80 px-4 py-3 shadow-sm", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex flex-wrap items-center gap-2 text-sm text-slate-300", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "text-xs uppercase tracking-widest text-slate-500", children: "Tracked Symbols" }),
+    options.map((option) => {
+      const baseClasses = "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition";
+      const stateClasses = option.symbol === activeSymbol ? " border-sky-500/60 bg-sky-500/10 text-sky-100" : " border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600 hover:text-slate-200";
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+        "button",
+        {
+          type: "button",
+          onClick: () => onSelect(option.symbol),
+          title: option.generatedDisplay ? `Generated ${option.generatedDisplay}` : void 0,
+          className: baseClasses + stateClasses,
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: option.symbolDisplay }),
+            option.isFavorite ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { "aria-hidden": "true", className: "text-amber-300", title: "Favorited", children: "*" }) : null
+          ]
+        },
+        option.symbol
+      );
+    })
+  ] }) });
+}
+
+// report_center2/components/ReportCenterApp.tsx
+var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+var MAX_VISIBLE_REPORTS = 10;
 var normalizeSymbol = (value) => {
   if (value === null || value === void 0) {
     return "";
@@ -24863,17 +24899,6 @@ var canonicalizeSymbol = (value) => {
     return "";
   }
   return normalized.replace(/[^A-Z0-9]/g, "");
-};
-var buildSymbolHref = (symbol, meta) => {
-  const params = new URLSearchParams();
-  if (meta?.selectedDate) {
-    params.set("date", meta.selectedDate);
-  }
-  if (symbol) {
-    params.set("symbol", symbol);
-  }
-  const query = params.toString();
-  return query ? `/report-center?${query}` : "/report-center";
 };
 function ReportCenterApp({ reports, favorites, meta }) {
   const [favoriteSet, setFavoriteSet] = (0, import_react2.useState)(() => {
@@ -24898,6 +24923,62 @@ function ReportCenterApp({ reports, favorites, meta }) {
       return next;
     });
   }, [favorites]);
+  const favoritePriorityList = (0, import_react2.useMemo)(() => Array.from(favoriteSet), [favoriteSet]);
+  const { symbolMap, allOptions } = (0, import_react2.useMemo)(() => {
+    const map = /* @__PURE__ */ new Map();
+    reports.forEach((report) => {
+      const symbolKey = normalizeSymbol(report.symbol || report.symbol_display || "");
+      if (!symbolKey) {
+        return;
+      }
+      const canonical = report.symbol_canonical || canonicalizeSymbol(symbolKey);
+      let bucket = map.get(symbolKey);
+      if (!bucket) {
+        bucket = {
+          symbol: symbolKey,
+          symbolDisplay: report.symbol_display || symbolKey,
+          canonical,
+          isFavorite: canonical ? favoriteSet.has(canonical) : false,
+          reports: [],
+          latestGenerated: report.generated_display || void 0
+        };
+        map.set(symbolKey, bucket);
+      }
+      bucket.reports.push(report);
+      if (!bucket.isFavorite && canonical && favoriteSet.has(canonical)) {
+        bucket.isFavorite = true;
+      }
+      if (!bucket.latestGenerated && report.generated_display) {
+        bucket.latestGenerated = report.generated_display;
+      }
+      if (!bucket.symbolDisplay && report.symbol_display) {
+        bucket.symbolDisplay = report.symbol_display;
+      }
+    });
+    const list = Array.from(map.values()).sort((a, b) => a.symbol.localeCompare(b.symbol));
+    return { symbolMap: map, allOptions: list };
+  }, [reports, favoriteSet]);
+  const [activeSymbol, setActiveSymbol] = (0, import_react2.useState)(() => {
+    const selected = normalizeSymbol(meta?.selectedSymbol);
+    if (selected && symbolMap.has(selected)) {
+      return selected;
+    }
+    return allOptions[0]?.symbol ?? "";
+  });
+  (0, import_react2.useEffect)(() => {
+    const normalizedSelected = normalizeSymbol(meta?.selectedSymbol);
+    if (normalizedSelected && symbolMap.has(normalizedSelected)) {
+      setActiveSymbol((prev) => prev === normalizedSelected ? prev : normalizedSelected);
+      return;
+    }
+    setActiveSymbol((prev) => {
+      if (prev && symbolMap.has(prev)) {
+        return prev;
+      }
+      const fallback = allOptions[0]?.symbol ?? "";
+      return fallback === prev ? prev : fallback;
+    });
+  }, [meta?.selectedSymbol, symbolMap, allOptions]);
   const [pending, setPending] = (0, import_react2.useState)(() => /* @__PURE__ */ new Set());
   const markPending = (0, import_react2.useCallback)((key, active) => {
     setPending((prev) => {
@@ -24969,67 +25050,164 @@ function ReportCenterApp({ reports, favorites, meta }) {
     },
     [markPending]
   );
-  const summaryText = (0, import_react2.useMemo)(() => {
-    const dateLabel = meta?.selectedDateLabel || "today";
-    const focusSymbol = meta?.selectedSymbol ? meta.selectedSymbol.toUpperCase() : null;
-    const count = meta?.reportCount ?? reports.length;
-    const parts = [];
-    parts.push(`Viewing ${count} curated report${count === 1 ? "" : "s"} for ${dateLabel}`);
-    if (focusSymbol) {
-      parts.push(`focused on ${focusSymbol}`);
+  const prioritizedOptions = (0, import_react2.useMemo)(() => {
+    if (allOptions.length === 0) {
+      return [];
     }
-    parts.push(`(max ${meta?.maxReports ?? "?"})`);
-    return parts.join(" ");
-  }, [meta?.maxReports, meta?.reportCount, meta?.selectedDateLabel, meta?.selectedSymbol, reports.length]);
-  const availableSymbols = meta?.availableSymbols ?? [];
-  const activeSymbol = meta?.selectedSymbol ? meta.selectedSymbol.toUpperCase() : "";
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex flex-col gap-8", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-inner shadow-black/30", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "text-sm text-slate-300", children: summaryText }),
-      meta?.excludedReportCount ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("p", { className: "mt-3 text-sm text-amber-300", children: [
-        "Hidden ",
+    const totalReports = reports.length;
+    if (totalReports < MAX_VISIBLE_REPORTS || allOptions.length <= MAX_VISIBLE_REPORTS) {
+      return allOptions;
+    }
+    const favoriteIndex = /* @__PURE__ */ new Map();
+    favoritePriorityList.forEach((canonical, index) => {
+      favoriteIndex.set(canonical, index);
+    });
+    const favoritesOnly = allOptions.filter((option) => option.isFavorite).sort((a, b) => {
+      const aRank = favoriteIndex.has(a.canonical) ? favoriteIndex.get(a.canonical) : Number.MAX_SAFE_INTEGER;
+      const bRank = favoriteIndex.has(b.canonical) ? favoriteIndex.get(b.canonical) : Number.MAX_SAFE_INTEGER;
+      if (aRank !== bRank) {
+        return aRank - bRank;
+      }
+      return a.symbol.localeCompare(b.symbol);
+    });
+    const others = allOptions.filter((option) => !option.isFavorite).sort((a, b) => a.symbol.localeCompare(b.symbol));
+    let combined = [...favoritesOnly, ...others];
+    if (combined.length > MAX_VISIBLE_REPORTS) {
+      combined = combined.slice(0, MAX_VISIBLE_REPORTS);
+    }
+    if (activeSymbol) {
+      const hasActive = combined.some((option) => option.symbol === activeSymbol);
+      if (!hasActive) {
+        const activeOption = allOptions.find((option) => option.symbol === activeSymbol);
+        if (activeOption) {
+          combined = [activeOption, ...combined];
+        }
+      }
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const deduped = [];
+    for (const option of combined) {
+      if (seen.has(option.symbol)) {
+        continue;
+      }
+      deduped.push(option);
+      seen.add(option.symbol);
+      if (deduped.length === MAX_VISIBLE_REPORTS) {
+        break;
+      }
+    }
+    return deduped;
+  }, [activeSymbol, allOptions, favoritePriorityList, reports.length]);
+  const planOptions = (0, import_react2.useMemo)(
+    () => prioritizedOptions.map((option) => ({
+      symbol: option.symbol,
+      symbolDisplay: option.symbolDisplay || option.symbol,
+      isFavorite: option.isFavorite,
+      generatedDisplay: option.latestGenerated
+    })),
+    [prioritizedOptions]
+  );
+  const visibleReports = (0, import_react2.useMemo)(() => {
+    if (!activeSymbol) {
+      return reports;
+    }
+    const bucket = symbolMap.get(activeSymbol);
+    if (bucket) {
+      return bucket.reports;
+    }
+    return reports;
+  }, [activeSymbol, symbolMap, reports]);
+  const displayedReports = (0, import_react2.useMemo)(() => {
+    if (visibleReports.length <= MAX_VISIBLE_REPORTS) {
+      return visibleReports;
+    }
+    return visibleReports.slice(0, MAX_VISIBLE_REPORTS);
+  }, [visibleReports]);
+  const extraReportCount = visibleReports.length - displayedReports.length;
+  const handleSelectSymbol = (0, import_react2.useCallback)(
+    (symbol) => {
+      const normalized = normalizeSymbol(symbol);
+      if (!normalized || !symbolMap.has(normalized)) {
+        return;
+      }
+      setActiveSymbol((prev) => prev === normalized ? prev : normalized);
+    },
+    [symbolMap]
+  );
+  const summaryCopy = (0, import_react2.useMemo)(() => {
+    const dateLabel = meta?.selectedDateLabel || "today";
+    const focusSymbol = activeSymbol || null;
+    const visibleCount = visibleReports.length;
+    const displayedCount = Math.min(visibleCount, MAX_VISIBLE_REPORTS);
+    const maxReports = meta?.maxReports ?? "?";
+    const hasMore = visibleCount > displayedCount;
+    const headline = focusSymbol ? `${focusSymbol} game plan` : `${displayedCount || "No"} active coverage`;
+    const subtitleParts = [];
+    subtitleParts.push(`Generated ${dateLabel}`);
+    if (focusSymbol) {
+      subtitleParts.push("Tap another ticker to pivot instantly");
+    } else {
+      subtitleParts.push("Broad-read across tracked symbols");
+    }
+    const footer = hasMore ? `Showing ${displayedCount} of ${visibleCount} drops \xB7 window max ${maxReports}` : `${displayedCount} drop${displayedCount === 1 ? "" : "s"} locked \xB7 window max ${maxReports}`;
+    return {
+      headline,
+      subtitle: subtitleParts.join(" \xB7 "),
+      footer
+    };
+  }, [activeSymbol, meta?.maxReports, meta?.selectedDateLabel, visibleReports.length]);
+  const hasReports = displayedReports.length > 0;
+  const activeSymbolLabel = activeSymbol || normalizeSymbol(meta?.selectedSymbol);
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-8", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-inner shadow-black/30", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-4 md:flex-row md:items-center md:justify-between", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs uppercase tracking-widest text-slate-500", children: "Shared intel" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-2xl font-semibold tracking-tight text-white", children: summaryCopy.headline }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm leading-relaxed text-slate-300", children: summaryCopy.subtitle })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-2 w-2 rounded-full bg-sky-400", "aria-hidden": "true" }),
+          summaryCopy.footer
+        ] })
+      ] }),
+      meta?.excludedReportCount ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("p", { className: "mt-4 text-sm text-amber-300", children: [
+        "Holding ",
         meta.excludedReportCount,
         " report",
         meta.excludedReportCount === 1 ? "" : "s",
-        " awaiting processing."
-      ] }) : null,
-      availableSymbols.length ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mt-4 flex flex-wrap gap-2", children: availableSymbols.map((symbol) => {
-        const symbolLabel = symbol.toUpperCase();
-        const href = buildSymbolHref(symbolLabel, meta);
-        const isActive = symbolLabel === activeSymbol;
-        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "a",
-          {
-            href,
-            className: `rounded-full border px-3 py-1 text-sm transition ${isActive ? "border-sky-400 bg-sky-400/10 text-sky-200" : "border-slate-700 bg-slate-900/60 text-slate-200 hover:border-slate-600"}`,
-            children: symbolLabel
-          },
-          symbolLabel
-        );
-      }) }) : null
+        " while they hydrate."
+      ] }) : null
     ] }),
-    reports.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 p-12 text-center text-slate-400", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "text-lg font-medium", children: "No AI reports found for this selection." }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("p", { className: "mt-2 text-sm", children: [
-        "Try a different date",
-        activeSymbol ? " or clear the symbol filter" : "",
-        "."
-      ] })
-    ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "flex flex-col gap-8", children: reports.map((report) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-      ReportCard,
-      {
-        report,
-        isFavorite: isFavorite(report),
-        pending: isPending(report),
-        onToggleFavorite: handleToggleFavorite
-      },
-      `${report.symbol}-${report.generated_unix ?? report.generated_iso ?? report.stored_at ?? ""}`
-    )) })
+    planOptions.length ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReportPlanSwitcher, { options: planOptions, activeSymbol, onSelect: handleSelectSymbol }) : null,
+    !hasReports ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 p-12 text-center text-slate-400", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Status check" }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "mt-3 text-lg font-medium text-slate-200", children: activeSymbolLabel ? `No AI drops matched ${activeSymbolLabel}.` : "No AI drops matched this slice." }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "mt-2 text-sm", children: "Nudge the date or adjust the symbol filter to rerun coverage." })
+    ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-8", children: [
+      extraReportCount > 0 ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: [
+        "Showing top ",
+        MAX_VISIBLE_REPORTS,
+        " drops \xB7 ",
+        extraReportCount,
+        " more in reserve"
+      ] }) : null,
+      displayedReports.map((report) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+        ReportCard,
+        {
+          report,
+          isFavorite: isFavorite(report),
+          pending: isPending(report),
+          onToggleFavorite: handleToggleFavorite
+        },
+        `${report.symbol}-${report.generated_unix ?? report.generated_iso ?? report.stored_at ?? ""}`
+      ))
+    ] })
   ] });
 }
 
 // report_center2/index.tsx
-var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+var import_jsx_runtime4 = __toESM(require_jsx_runtime());
 function readBootstrapPayload() {
   const node = document.getElementById("reportCenterBootstrap");
   if (!node) {
@@ -25056,7 +25234,7 @@ function main() {
   const favorites = Array.isArray(bootstrap.favorites) ? bootstrap.favorites : [];
   const meta = bootstrap.meta ?? {};
   const root = (0, import_client.createRoot)(container);
-  root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReportCenterApp, { reports, favorites, meta }));
+  root.render(/* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ReportCenterApp, { reports, favorites, meta }));
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", main, { once: true });

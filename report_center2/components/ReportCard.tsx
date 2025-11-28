@@ -150,18 +150,18 @@ const TradeSetupBlock = ({
 
   return (
     <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 p-4">
-      <p className={`text-xs font-semibold uppercase tracking-wide ${accent}`}>{label}</p>
+      <p className={`text-xs font-semibold uppercase tracking-widest ${accent}`}>{label}</p>
       <dl className="mt-3 space-y-2 text-sm text-slate-200">
         <div className="flex items-center justify-between gap-3 text-slate-300">
-          <dt className="text-slate-400">Entry</dt>
-          <dd className="font-semibold text-slate-100">{formatPriceValue(setup.entry)}</dd>
+          <dt className="text-xs uppercase tracking-wide text-slate-500">Entry</dt>
+          <dd className="text-base font-semibold text-slate-100">{formatPriceValue(setup.entry)}</dd>
         </div>
         <div className="flex items-center justify-between gap-3 text-slate-300">
-          <dt className="text-slate-400">Stop</dt>
-          <dd className="font-semibold text-slate-100">{formatPriceValue(setup.stop)}</dd>
+          <dt className="text-xs uppercase tracking-wide text-slate-500">Stop</dt>
+          <dd className="text-base font-semibold text-slate-100">{formatPriceValue(setup.stop)}</dd>
         </div>
         <div>
-          <dt className="text-slate-400">Targets</dt>
+          <dt className="text-xs uppercase tracking-wide text-slate-500">Targets</dt>
           <dd className="mt-1 flex flex-wrap gap-2">
             {targets.length ? (
               targets.map((target, index) => (
@@ -186,7 +186,7 @@ const NoTradeZoneBlock = ({ zones }: { zones?: NoTradeZone[] }) => {
   const ranges = formatNoTradeZones(zones);
   return (
     <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">No Trade Zone</p>
+      <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">No-Trade Lane</p>
       {ranges.length ? (
         <ul className="mt-3 space-y-2 text-sm text-amber-200">
           {ranges.map((range, index) => (
@@ -200,30 +200,33 @@ const NoTradeZoneBlock = ({ zones }: { zones?: NoTradeZone[] }) => {
   );
 };
 
-const MarketSnapshot = ({ price }: { price?: ReportCenterPrice }) => {
+const MarketPulse = ({ price }: { price?: ReportCenterPrice }) => {
   if (!price) {
     return null;
   }
 
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Market Snapshot</h3>
-      <div className="mt-3 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs uppercase tracking-wide text-slate-500">Market pulse</span>
+        {price.timestamp ? <span className="text-xs text-slate-500">{price.timestamp}</span> : null}
+      </div>
+      <div className="mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="text-slate-500">Timeframe</p>
-          <p className="font-medium text-slate-100">{price.timeframe ?? "—"}</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Timeframe</p>
+          <p className="mt-1 text-base font-semibold text-slate-100">{price.timeframe ?? "—"}</p>
         </div>
         <div>
-          <p className="text-slate-500">Close</p>
-          <p className="font-medium text-slate-100">{formatPriceValue(price.close)}</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Close</p>
+          <p className="mt-1 text-base font-semibold text-slate-100">{formatPriceValue(price.close)}</p>
         </div>
         <div>
-          <p className="text-slate-500">Change %</p>
-          <p className="font-medium text-slate-100">{formatPercent(price.change_pct)}</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Change</p>
+          <p className="mt-1 text-base font-semibold text-slate-100">{formatPercent(price.change_pct)}</p>
         </div>
         <div>
-          <p className="text-slate-500">Volume</p>
-          <p className="font-medium text-slate-100">{formatVolume(price.volume)}</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Volume</p>
+          <p className="mt-1 text-base font-semibold text-slate-100">{formatVolume(price.volume)}</p>
         </div>
       </div>
     </section>
@@ -240,7 +243,7 @@ const ConsensusPanel = ({ consensus }: { consensus?: ReportCenterConsensus }) =>
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Technical Consensus</h3>
+        <span className="text-xs uppercase tracking-wide text-slate-500">Technical read</span>
         <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
           {recommendation ? (
             <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-200">{recommendation}</span>
@@ -276,9 +279,9 @@ const ConsensusPanel = ({ consensus }: { consensus?: ReportCenterConsensus }) =>
       {reasoning?.length ? (
         <ul className="mt-4 space-y-2 text-sm text-slate-300">
           {reasoning.map((item, index) => (
-            <li key={`reason-${index}`} className="flex gap-2">
+            <li key={`reason-${index}`} className="flex gap-3">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
-              <span>{item}</span>
+              <span className="text-slate-200">{item}</span>
             </li>
           ))}
         </ul>
@@ -300,18 +303,18 @@ const PriceActionPanel = ({ priceAction }: { priceAction?: ReportCenterPriceActi
 
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Price Action Notes</h3>
+      <span className="text-xs uppercase tracking-wide text-slate-500">Tape color</span>
       {trendAlignment ? (
-        <p className="mt-3 text-sm text-slate-300">{trendAlignment}</p>
+        <p className="mt-3 text-sm leading-relaxed text-slate-300">{trendAlignment}</p>
       ) : null}
       {keyLevels?.length ? (
         <div className="mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-3">
           {keyLevels.map((level, index) => (
             <div key={`level-${index}`} className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4">
-              <p className="text-slate-500">Level</p>
-              <p className="text-lg font-semibold text-slate-100">{formatPriceValue(level.price)}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Level</p>
+              <p className="mt-1 text-lg font-semibold text-slate-100">{formatPriceValue(level.price)}</p>
               {level.distance_pct !== undefined && level.distance_pct !== null ? (
-                <p className="text-sm text-slate-400">{formatPercent(level.distance_pct)} away</p>
+                <p className="mt-1 text-sm text-slate-400">{formatPercent(level.distance_pct)} away</p>
               ) : null}
             </div>
           ))}
@@ -320,9 +323,9 @@ const PriceActionPanel = ({ priceAction }: { priceAction?: ReportCenterPriceActi
       {patterns?.length ? (
         <ul className="mt-4 space-y-2 text-sm text-slate-300">
           {patterns.map((pattern, index) => (
-            <li key={`pattern-${index}`} className="flex gap-2">
+            <li key={`pattern-${index}`} className="flex gap-3">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
-              <span>{pattern}</span>
+              <span className="text-slate-200">{pattern}</span>
             </li>
           ))}
         </ul>
@@ -345,7 +348,7 @@ const FavoriteButton = ({
     onClick={onClick}
     disabled={pending}
     aria-pressed={isFavorite}
-    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300/40 focus:ring-offset-0 ${
+    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition focus:outline-none focus:ring-2 focus:ring-slate-300/40 focus:ring-offset-0 ${
       isFavorite
         ? "border-amber-400 bg-amber-400/10 text-amber-200 hover:border-amber-300"
         : "border-slate-700 bg-slate-800/80 text-slate-200 hover:border-slate-600"
@@ -375,7 +378,8 @@ const StrategySection = ({
     <section className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h3 className="text-xl font-semibold text-slate-100">{label}</h3>
+          <span className="text-xs uppercase tracking-widest text-slate-500">Strategy lane</span>
+          <h3 className="mt-2 text-xl font-semibold text-slate-100">{label}</h3>
           {plan.summary ? (
             <p className="mt-2 text-sm leading-relaxed text-slate-300">{plan.summary}</p>
           ) : summary?.summary ? (
@@ -433,23 +437,25 @@ export function ReportCard({ report, isFavorite, pending, onToggleFavorite }: Re
   return (
     <article className="rounded-3xl border border-slate-800 bg-slate-950/60 shadow-xl shadow-black/40 transition hover:border-slate-700">
       <header className="flex flex-col gap-4 border-b border-slate-800 p-6 md:flex-row md:items-center md:justify-between">
-        <div>
+        <div className="flex flex-col gap-3">
+          <span className="text-xs uppercase tracking-widest text-slate-500">Shared plan</span>
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-3xl font-semibold tracking-tight text-slate-50">{report.symbol_display ?? report.symbol}</h2>
             {latestPrice !== undefined && latestPrice !== null ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-200">
-                Last Price {formatPriceValue(latestPrice)}
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />
+                Last {formatPriceValue(latestPrice)}
               </span>
             ) : null}
           </div>
           {report.generated_display ? (
-            <p className="mt-2 text-sm text-slate-400">Generated {report.generated_display}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Generated {report.generated_display}</p>
           ) : null}
         </div>
         <FavoriteButton isFavorite={isFavorite} pending={pending} onClick={handleFavoriteToggle} />
       </header>
       <div className="flex flex-col gap-6 p-6">
-        <MarketSnapshot price={report.price} />
+        <MarketPulse price={report.price} />
         <ConsensusPanel consensus={report.consensus} />
         {strategies.length ? (
           <div className="flex flex-col gap-6">
