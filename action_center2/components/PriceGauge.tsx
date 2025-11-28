@@ -217,81 +217,26 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const metaForKey = (key: string) => zoneMeta[key] ?? zoneMeta.neutral;
 
-  const decoratedSegments: Array<Segment & {
-    startNorm: number;
-    endNorm: number;
-    actualWidth: number;
-    share: number;
-  }> = mergedSegments.map((segment) => {
+  const decoratedSegments = mergedSegments
+    .map((segment) => {
     const meta = metaForKey(segment.key);
-    const startNorm = (segment.start - minBound) / totalSpan;
-    const endNorm = (segment.end - minBound) / totalSpan;
-    const actualWidth = Math.max(endNorm - startNorm, 0);
-    const EPSILON = 1e-6;
-    const MIN_SHARE = 0.02;
-    let share = actualWidth;
-    if (segment.key === "shortEntry" || segment.key === "longEntry") {
-      share += 0.05;
-    }
-    if (segment.key === "neutral") {
-      share += 0.08;
-    }
-    if (segment.key === "shortTarget2" || segment.key === "longTarget2") {
-      share += 0.03;
-    }
-    if (share < MIN_SHARE) {
-      share = MIN_SHARE;
-    }
-    if (actualWidth < EPSILON) {
-      share = Math.max(share, MIN_SHARE);
-    }
-    return {
-      key: segment.key,
-      label: meta.label,
-      value: meta.value(),
-      className: meta.className,
-      start: segment.start,
-      end: segment.end,
-      width: 0,
-      startNorm,
-      endNorm,
-      actualWidth: Math.max(actualWidth, EPSILON),
-      share,
-    };
-  });
-
-  const totalShare = decoratedSegments.reduce((sum, segment) => sum + segment.share, 0) || 1;
-
-  const segmentsWithWidth: Segment[] = decoratedSegments.map((segment) => ({
-    key: segment.key,
-    label: segment.label,
-    value: segment.value,
-    className: segment.className,
-    start: segment.start,
-    end: segment.end,
-    width: (segment.share / totalShare) * 100,
-  }));
-
-  const pointer = (() => {
-    const ratio = clamp((latestPrice - minBound) / totalSpan, 0, 1);
-    let cumulativeDisplay = 0;
-
-    for (const segment of decoratedSegments) {
-      const segmentEnd = segment.endNorm;
-      const segmentStart = segment.startNorm;
-      const displayShare = segment.share / totalShare;
-
-      if (ratio <= segmentEnd || segment === decoratedSegments[decoratedSegments.length - 1]) {
-        const relative = clamp((ratio - segmentStart) / segment.actualWidth, 0, 1);
-        const pointerDisplay = cumulativeDisplay + displayShare * relative;
-        return clamp(pointerDisplay * 100, 0, 100);
+      const span = Math.max(segment.end - segment.start, 0);
+      if (span <= 0) {
+        return null;
       }
+      return {
+        key: segment.key,
+        label: meta.label,
+        value: meta.value(),
+        className: meta.className,
+        start: segment.start,
+        end: segment.end,
+        width: (span / totalSpan) * 100,
+      } as Segment;
+    })
+    .filter((segment): segment is Segment => Boolean(segment));
 
-      cumulativeDisplay += displayShare;
-    }
-
-    return ratio < 0.5 ? 0 : 100;
-  })();
+  const pointer = clamp(((latestPrice - minBound) / totalSpan) * 100, 0, 100);
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm">
