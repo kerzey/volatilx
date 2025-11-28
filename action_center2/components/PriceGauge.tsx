@@ -79,6 +79,8 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const candidateMin = candidateValues.length ? Math.min(...candidateValues) : latestPrice - 1;
   const candidateMax = candidateValues.length ? Math.max(...candidateValues) : latestPrice + 1;
+  const planLowerBound = candidateMin;
+  const planUpperBound = candidateMax;
   const baseSpan = Math.max(candidateMax - candidateMin, Math.abs(latestPrice) * 0.02, 1);
   const padding = baseSpan * 0.08;
   const minBound = candidateMin - padding;
@@ -86,6 +88,8 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   const totalSpan = Math.max(maxBound - minBound, 1e-6);
 
   const breakpointsSet = new Set<number>([minBound, maxBound]);
+  if (Number.isFinite(planLowerBound)) breakpointsSet.add(planLowerBound);
+  if (Number.isFinite(planUpperBound)) breakpointsSet.add(planUpperBound);
   if (Number.isFinite(shortTargetFar)) breakpointsSet.add(shortTargetFar);
   if (Number.isFinite(shortTargetNear)) breakpointsSet.add(shortTargetNear);
   if (Number.isFinite(shortEntry)) breakpointsSet.add(shortEntry);
@@ -101,6 +105,14 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const resolveZoneKey = (start: number, end: number): string => {
     const mid = (start + end) / 2;
+
+    if (mid < planLowerBound) {
+      return "belowPlan";
+    }
+
+    if (mid > planUpperBound) {
+      return "abovePlan";
+    }
 
     if (hasShortTarget2 && Number.isFinite(shortTargetFar) && mid <= shortTargetFar) {
       return "shortTarget2";
@@ -134,7 +146,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       return "longTarget2";
     }
 
-    if (mid < shortEntry) {
+    if (Number.isFinite(shortEntry) && mid < shortEntry) {
       return "belowPlan";
     }
 
@@ -171,7 +183,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     belowPlan: {
       label: "Below Plan",
       className: "bg-slate-900/60 text-slate-300 border-r border-slate-700/40",
-      value: () => `< ${formatPrice(shortTargetFar || shortEntry || minBound)}`,
+      value: () => `< ${formatPrice(planLowerBound)}`,
     },
     shortTarget2: {
       label: "Short Target 2",
@@ -211,7 +223,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     abovePlan: {
       label: "Above Plan",
       className: "bg-slate-900/60 text-slate-300",
-      value: () => `> ${formatPrice(longTargetFar || longEntry || maxBound)}`,
+      value: () => `> ${formatPrice(planUpperBound)}`,
     },
   };
 
