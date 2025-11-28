@@ -6,6 +6,7 @@
     <title>VolatilX - Sign In</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/css/volatilx-header.css">
+    <link rel="stylesheet" href="/static/css/signin.css">
 
 
 
@@ -19,7 +20,7 @@
   gtag('config', 'G-BC00YPJSRJ');
 </script>
 </head>
-<body class="signin-body">
+<body class="bg-slate-950 text-slate-100 font-sans antialiased">
     {% from "_header.html" import render_header %}
     {{ render_header(
         page='',
@@ -28,99 +29,23 @@
         badge='Secure Access',
         cta={'href': '/signup', 'label': 'Create Account', 'variant': 'primary', 'show_dot': False}
     ) }}
-    <!-- <div class="signin-container">
-        <div class="branding">
-            <img src="/static/volatilx_logo.png" alt="VolatilX Logo" class="logo-img">
-            <div class="logo-text">VolatilX</div>
-            <div class="subtitle">AI-Powered Trading Platform</div>
+    <main id="signInRoot" class="min-h-[60vh]"></main>
+    <noscript>
+        <div class="mx-auto mt-10 max-w-2xl rounded-3xl border border-slate-800 bg-slate-900/80 p-6 text-center text-slate-200">
+            <p class="text-sm">JavaScript is required for the full VolatilX experience.</p>
+            <p class="mt-2">
+                <a class="font-semibold text-sky-300 underline" href="/auth/google/login">Continue with Google</a>
+            </p>
         </div>
-    
-        <a href="/auth/google/login" class="google-signin-btn">
-            <svg class="google-icon" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Continue with Google
-        </a>
-    
-        <div class="features">
-            <div class="feature">Real-time market analysis</div>
-            <div class="feature">AI-powered trading signals</div>
-            <div class="feature">Multi-timeframe analysis</div>
-            <div class="feature">Secure Authentication</div>
-        </div>
-    </div> -->
-<div class="signin-wrapper">
-    <div class="signin-container">
-    <a class="logo" href="/analyze">
-        <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
-        <span>VolatilX</span>
-    </a>
-        <div class="subtitle">AI-Powered Trading Platform</div>
+    </noscript>
 
-        <a href="/auth/google/login" class="google-signin-btn">
-        <svg class="google-icon" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-            <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-        </svg>
-        Continue with Google
-        </a>
-
-        <p class="signin-helper">Sign in securely to access your trading Report Center and AI agents.</p>
-    </div>
-
-    <div class="signin-video">
-        <div class="signin-video-frame">
-            <iframe
-                src="https://www.youtube.com/embed/HZUbGpUUXL4"
-                title="VolatilX overview"
-                loading="lazy"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen
-            ></iframe>
-        </div>
-        <p class="signin-video-caption">Watch a quick tour of VolatilX before you dive in.</p>
-    </div>
-
-    <section class="marketing-section">
-        <h2>Trade Smarter With VolatilX</h2>
-        <p class="marketing-intro">Unlock your edge in the markets with real-time intelligence, multi-agent strategies, and secure access designed to keep you confidently in control.</p>
-
-        <div class="marketing-grid">
-            <div class="marketing-card card-insights">
-                <div class="marketing-icon icon-insights"><span>IN</span></div>
-                <h3>Instant Insights</h3>
-                <p>Get market context the moment you log in so you never trade in the dark.</p>
-            </div>
-            <div class="marketing-card card-ai">
-                <div class="marketing-icon icon-ai"><span>AI</span></div>
-                <h3>AI Analysis</h3>
-                <p>Leverage agent-driven analysis that adapts to your goals and risk profile.</p>
-            </div>
-            <div class="marketing-card card-strategy">
-                <div class="marketing-icon icon-strategy"><span>ST</span></div>
-                <h3>Strategy Library</h3>
-                <p>Access ready-to-run trading playbooks for day, swing, and momentum setups.</p>
-            </div>
-            <div class="marketing-card card-security">
-                <div class="marketing-icon icon-security"><span>SEC</span></div>
-                <h3>Secure Access</h3>
-                <p>Enterprise-grade protections keep your account safe every time you sign in.</p>
-            </div>
-            <div class="marketing-card card-decisions">
-                <div class="marketing-icon icon-decisions"><span>DX</span></div>
-                <h3>Data-Driven Decisions</h3>
-                <p>Track performance and alerts in one place to execute with clarity.</p>
-            </div>
-        </div>
-
-        <p class="marketing-footnote">All analysises are provided for informational purposes only and does not constitute financial advice.</p>
-    </section>
-</div>
+    <script id="signInBootstrap" type="application/json">
+        {{ {
+            "loginUrl": "/auth/google/login",
+            "videoEmbedUrl": "https://www.youtube.com/embed/HZUbGpUUXL4"
+        } | tojson | safe }}
+    </script>
+    <script type="module" src="/static/js/signin.js"></script>
     {% include "_contact_widget.html" %}
 </body>
 </html>
