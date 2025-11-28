@@ -2861,7 +2861,7 @@ var require_react_dom_development = __commonJS({
           );
         });
         var CAMELIZE = /[\-\:]([a-z])/g;
-        var capitalize2 = function(token) {
+        var capitalize = function(token) {
           return token[1].toUpperCase();
         };
         [
@@ -2942,7 +2942,7 @@ var require_react_dom_development = __commonJS({
           // you'll need to set attributeName to name.toLowerCase()
           // instead in the assignment below.
         ].forEach(function(attributeName) {
-          var name = attributeName.replace(CAMELIZE, capitalize2);
+          var name = attributeName.replace(CAMELIZE, capitalize);
           properties[name] = new PropertyInfoRecord(
             name,
             STRING,
@@ -2967,7 +2967,7 @@ var require_react_dom_development = __commonJS({
           // you'll need to set attributeName to name.toLowerCase()
           // instead in the assignment below.
         ].forEach(function(attributeName) {
-          var name = attributeName.replace(CAMELIZE, capitalize2);
+          var name = attributeName.replace(CAMELIZE, capitalize);
           properties[name] = new PropertyInfoRecord(
             name,
             STRING,
@@ -2988,7 +2988,7 @@ var require_react_dom_development = __commonJS({
           // you'll need to set attributeName to name.toLowerCase()
           // instead in the assignment below.
         ].forEach(function(attributeName) {
-          var name = attributeName.replace(CAMELIZE, capitalize2);
+          var name = attributeName.replace(CAMELIZE, capitalize);
           properties[name] = new PropertyInfoRecord(
             name,
             STRING,
@@ -24499,7 +24499,7 @@ function AiInsightsApp({ bootstrap }) {
   const [market, setMarket] = (0, import_react.useState)(initialMarket);
   const [symbol, setSymbol] = (0, import_react.useState)("");
   const [useAiSummary, setUseAiSummary] = (0, import_react.useState)(false);
-  const [usePrincipalPlan, setUsePrincipalPlan] = (0, import_react.useState)(true);
+  const [usePrincipalPlan, setUsePrincipalPlan] = (0, import_react.useState)(false);
   const [includePrincipalRaw, setIncludePrincipalRaw] = (0, import_react.useState)(false);
   const [status, setStatus] = (0, import_react.useState)("idle");
   const [error, setError] = (0, import_react.useState)(null);
@@ -25168,7 +25168,7 @@ function PriceActionPanel({ analysis }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 md:grid-cols-2", children: Array.isArray(overview.key_levels) && overview.key_levels.length ? overview.key_levels.slice(0, 6).map((level, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-200", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-400", children: formatTimeframeLabel(level?.timeframe) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-sm font-semibold text-white", children: formatPrice(level?.price) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-xs text-slate-400", children: capitalize(level?.type || "level") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-xs text-slate-400", children: capitalizeLabel(level?.type || "level") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "mt-2 text-xs text-slate-500", children: [
             formatPercent(level?.distance_pct),
             " from spot"
@@ -25671,6 +25671,17 @@ function formatTimeframeLabel(value) {
   const normalized = lookup[unitRaw] || lookup[unitRaw.slice(0, 2)] || lookup[unitRaw.charAt(0)] || unitRaw.toUpperCase();
   const plural = Number.isFinite(quantity) && quantity !== 1;
   return `${quantity} ${plural ? `${normalized}s` : normalized}`;
+}
+function capitalizeLabel(value) {
+  if (value === null || value === void 0) {
+    return "";
+  }
+  const text = String(value).trim();
+  if (!text) {
+    return "";
+  }
+  const lower = text.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 function renderValue(value) {
   if (value === null || value === void 0) {

@@ -48,7 +48,7 @@ export function AiInsightsApp({ bootstrap }: { bootstrap: AiInsightsBootstrap })
   const [market, setMarket] = useState<Market>(initialMarket);
   const [symbol, setSymbol] = useState("");
   const [useAiSummary, setUseAiSummary] = useState(false);
-  const [usePrincipalPlan, setUsePrincipalPlan] = useState(true);
+  const [usePrincipalPlan, setUsePrincipalPlan] = useState(false);
   const [includePrincipalRaw, setIncludePrincipalRaw] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -863,7 +863,7 @@ function PriceActionPanel({ analysis }: { analysis: AnalyzeState }) {
                   <div key={index} className="rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-200">
                     <p className="text-xs uppercase tracking-wide text-slate-400">{formatTimeframeLabel(level?.timeframe)}</p>
                     <p className="mt-1 text-sm font-semibold text-white">{formatPrice(level?.price)}</p>
-                    <p className="mt-1 text-xs text-slate-400">{capitalize(level?.type || "level")}</p>
+                    <p className="mt-1 text-xs text-slate-400">{capitalizeLabel(level?.type || "level")}</p>
                     <p className="mt-2 text-xs text-slate-500">{formatPercent(level?.distance_pct)} from spot</p>
                   </div>
                 ))
@@ -1520,6 +1520,18 @@ function formatTimeframeLabel(value: unknown): string {
   const normalized = lookup[unitRaw] || lookup[unitRaw.slice(0, 2)] || lookup[unitRaw.charAt(0)] || unitRaw.toUpperCase();
   const plural = Number.isFinite(quantity) && quantity !== 1;
   return `${quantity} ${plural ? `${normalized}s` : normalized}`;
+}
+
+function capitalizeLabel(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  const text = String(value).trim();
+  if (!text) {
+    return "";
+  }
+  const lower = text.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
 function renderValue(value: unknown): React.ReactNode {
