@@ -107,7 +107,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     }
 
     if (Number.isFinite(shortTargetNear) && mid <= shortTargetNear) {
-      return hasShortTarget2 && mid <= (shortTargetFar + shortTargetNear) / 2 ? "shortTarget2" : "shortTarget1";
+      return "shortTarget1";
     }
 
     if (Number.isFinite(shortEntry) && mid <= shortEntry) {
