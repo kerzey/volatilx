@@ -1,35 +1,141 @@
 import type { SignInBootstrap } from "../types";
 
-const FEATURE_CARDS = [
+type IconProps = { className?: string };
+
+const SparkIcon = ({ className = "h-5 w-5" }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    className={className}
+  >
+    <circle cx={12} cy={12} r={3.75} />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.75V6.5m0 11v2.75m8.25-8.25H17.5M6.5 12H3.75m14.116-6.366l-1.944 1.944M7.078 16.884l-1.944 1.944m12.25 0l-1.944-1.944M7.078 7.116 5.134 5.172" />
+  </svg>
+);
+
+const NetworkIcon = ({ className = "h-5 w-5" }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    className={className}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12a3 3 0 100-6 3 3 0 000 6z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 12a3 3 0 100-6 3 3 0 000 6z" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M18 19.5v-1.125A2.625 2.625 0 0015.375 15.75h-6.75A2.625 2.625 0 006 18.375V19.5"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M20.25 19.5v-1.125a2.625 2.625 0 00-2.625-2.625h-1.5"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M3.75 19.5v-1.125a2.625 2.625 0 012.625-2.625h1.5"
+    />
+  </svg>
+);
+
+const BlueprintIcon = ({ className = "h-5 w-5" }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    className={className}
+  >
+    <rect x={4.5} y={4.5} width={6} height={6} rx={1.25} />
+    <rect x={13.5} y={4.5} width={6} height={6} rx={1.25} />
+    <rect x={4.5} y={13.5} width={6} height={6} rx={1.25} />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 13.5v6m-3-3h6" />
+  </svg>
+);
+
+const ShieldIcon = ({ className = "h-5 w-5" }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    className={className}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M12 3.75L4.5 6.75v4.5c0 4.97 3.134 9.674 7.5 11.25 4.366-1.576 7.5-6.28 7.5-11.25v-4.5L12 3.75z"
+    />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 12.75l1.875 1.875 2.625-3.75" />
+  </svg>
+);
+
+const ChartIcon = ({ className = "h-5 w-5" }: IconProps) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    className={className}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 19.5h16.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 15.75V12m4.5 3.75V9.75m4.5 6V6" />
+  </svg>
+);
+
+type FeatureCard = {
+  title: string;
+  description: string;
+  Icon: (props: IconProps) => JSX.Element;
+  cardTone: string;
+  iconTone: string;
+};
+
+const FEATURE_CARDS: FeatureCard[] = [
   {
-    code: "IN",
     title: "Instant Insights",
     description: "Get AI-curated market context the moment you log in so you never trade in the dark.",
-    accent: "bg-sky-500/10 border-sky-500/40 text-sky-100",
+    Icon: SparkIcon,
+    cardTone: "border-sky-500/35 bg-gradient-to-br from-sky-500/15 via-slate-950/70 to-slate-950/80",
+    iconTone: "border-sky-500/40 bg-sky-500/15 text-sky-100",
   },
   {
-    code: "AI",
     title: "Agent Collaboration",
     description: "Leverage multi-agent strategies that adapt to your intent, timeframe, and risk profile.",
-    accent: "bg-emerald-500/10 border-emerald-500/40 text-emerald-100",
+    Icon: NetworkIcon,
+    cardTone: "border-emerald-500/35 bg-gradient-to-br from-emerald-500/12 via-slate-950/70 to-slate-950/80",
+    iconTone: "border-emerald-500/35 bg-emerald-500/15 text-emerald-100",
   },
   {
-    code: "ST",
     title: "Strategy Library",
     description: "Browse playbooks for day, swing, and momentum flows, complete with ready-to-execute setups.",
-    accent: "bg-amber-500/10 border-amber-500/40 text-amber-100",
+    Icon: BlueprintIcon,
+    cardTone: "border-amber-500/35 bg-gradient-to-br from-amber-500/12 via-slate-950/70 to-slate-950/80",
+    iconTone: "border-amber-500/35 bg-amber-500/15 text-amber-100",
   },
   {
-    code: "SEC",
     title: "Secure Access",
     description: "OAuth-backed authentication keeps your workspace protected across sessions and devices.",
-    accent: "bg-rose-500/10 border-rose-500/40 text-rose-100",
+    Icon: ShieldIcon,
+    cardTone: "border-rose-500/35 bg-gradient-to-br from-rose-500/12 via-slate-950/70 to-slate-950/80",
+    iconTone: "border-rose-500/35 bg-rose-500/15 text-rose-100",
   },
   {
-    code: "DX",
     title: "Data Clarity",
     description: "Track alerts, PnL, and risk in one command center so you can execute with confidence.",
-    accent: "bg-indigo-500/10 border-indigo-500/40 text-indigo-100",
+    Icon: ChartIcon,
+    cardTone: "border-indigo-500/35 bg-gradient-to-br from-indigo-500/12 via-slate-950/70 to-slate-950/80",
+    iconTone: "border-indigo-500/35 bg-indigo-500/15 text-indigo-100",
   },
 ];
 
@@ -116,16 +222,18 @@ export function SignInApp({ bootstrap }: SignInAppProps) {
           </ul>
         </div>
         <div className="grid gap-6 sm:grid-cols-2">
-          {FEATURE_CARDS.map((feature) => (
+          {FEATURE_CARDS.map(({ title, description, Icon, cardTone, iconTone }) => (
             <article
-              key={feature.title}
-              className={`flex flex-col gap-3 rounded-3xl border ${feature.accent} bg-slate-950/70 p-6 shadow-inner shadow-black/30`}
+              key={title}
+              className={`flex flex-col gap-4 rounded-3xl border ${cardTone} p-6 shadow-inner shadow-black/30 transition hover:border-white/30`}
             >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-sm font-semibold uppercase tracking-wide text-white/90">
-                {feature.code}
+              <span
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border ${iconTone} shadow-lg shadow-black/20`}
+              >
+                <Icon className="h-5 w-5" />
               </span>
-              <h3 className="text-lg font-semibold text-white">{feature.title}</h3>
-              <p className="text-sm leading-relaxed text-slate-300">{feature.description}</p>
+              <h3 className="text-base font-semibold tracking-tight text-white">{title}</h3>
+              <p className="text-sm leading-relaxed text-slate-300">{description}</p>
             </article>
           ))}
         </div>

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Sign In</title>
-    <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/css/volatilx-header.css">
     <link rel="stylesheet" href="/static/css/signin.css">
 
@@ -20,7 +19,7 @@
   gtag('config', 'G-BC00YPJSRJ');
 </script>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased">
+<body class="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
     {% from "_header.html" import render_header %}
     {{ render_header(
         page='',
@@ -29,7 +28,7 @@
         badge='Secure Access',
         cta={'href': '/signup', 'label': 'Create Account', 'variant': 'primary', 'show_dot': False}
     ) }}
-    <main id="signInRoot" class="min-h-[60vh]"></main>
+    <main id="signInRoot" class="block"></main>
     <noscript>
         <div class="mx-auto mt-10 max-w-2xl rounded-3xl border border-slate-800 bg-slate-900/80 p-6 text-center text-slate-200">
             <p class="text-sm">JavaScript is required for the full VolatilX experience.</p>
