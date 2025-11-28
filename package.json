@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build:action-center2": "tailwindcss -c tailwind.config.js -i ./action_center2/tailwind.css -o ./static/css/action-center2.css --minify && node scripts/build-action-center2.mjs",
-    "build:report-center2": "tailwindcss -c tailwind.config.js -i ./report_center2/tailwind.css -o ./static/css/report-center2.css --minify && node scripts/build-report-center2.mjs",
-    "build:web": "npm run build:action-center2 && npm run build:report-center2"
+    "build:report-center": "tailwindcss -c tailwind.config.js -i ./report_center_frontend/tailwind.css -o ./static/css/report-center.css --minify && node scripts/build-report-center-frontend.mjs",
+    "build:web": "npm run build:action-center2 && npm run build:report-center"
   },
   "dependencies": {
     "react": "^18.3.1",

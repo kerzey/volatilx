@@ -24485,13 +24485,13 @@ var require_jsx_runtime = __commonJS({
   }
 });
 
-// report_center2/index.tsx
+// report_center_frontend/index.tsx
 var import_client = __toESM(require_client());
 
-// report_center2/components/ReportCenterApp.tsx
+// report_center_frontend/components/ReportCenterApp.tsx
 var import_react2 = __toESM(require_react());
 
-// report_center2/components/ReportCard.tsx
+// report_center_frontend/components/ReportCard.tsx
 var import_react = __toESM(require_react());
 
 // action_center2/utils/planMath.ts
@@ -24505,7 +24505,7 @@ function formatPrice(value, digits = 2) {
   });
 }
 
-// report_center2/components/ReportCard.tsx
+// report_center_frontend/components/ReportCard.tsx
 var import_jsx_runtime = __toESM(require_jsx_runtime());
 var STRATEGY_ORDER = [
   { key: "day_trading", label: "Day Trading" },
@@ -24855,7 +24855,7 @@ function ReportCard({ report, isFavorite, pending, onToggleFavorite }) {
   ] });
 }
 
-// report_center2/components/ReportPlanSwitcher.tsx
+// report_center_frontend/components/ReportPlanSwitcher.tsx
 var import_jsx_runtime2 = __toESM(require_jsx_runtime());
 function ReportPlanSwitcher({ options, activeSymbol, onSelect }) {
   if (!options.length) {
@@ -24884,7 +24884,7 @@ function ReportPlanSwitcher({ options, activeSymbol, onSelect }) {
   ] }) });
 }
 
-// report_center2/components/ReportCenterApp.tsx
+// report_center_frontend/components/ReportCenterApp.tsx
 var import_jsx_runtime3 = __toESM(require_jsx_runtime());
 var MAX_VISIBLE_REPORTS = 10;
 var normalizeSymbol = (value) => {
@@ -25206,7 +25206,7 @@ function ReportCenterApp({ reports, favorites, meta }) {
   ] });
 }
 
-// report_center2/index.tsx
+// report_center_frontend/index.tsx
 var import_jsx_runtime4 = __toESM(require_jsx_runtime());
 function readBootstrapPayload() {
   const node = document.getElementById("reportCenterBootstrap");
@@ -25300,4 +25300,4 @@ react/cjs/react-jsx-runtime.development.js:
    * LICENSE file in the root directory of this source tree.
    *)
 */
-//# sourceMappingURL=report-center2.js.map
+//# sourceMappingURL=report-center.js.map

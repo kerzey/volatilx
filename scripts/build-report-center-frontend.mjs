@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
-const entryFile = path.resolve(projectRoot, "report_center2/index.tsx");
+const entryFile = path.resolve(projectRoot, "report_center_frontend/index.tsx");
 const outputDir = path.resolve(projectRoot, "static/js");
-const outputFile = path.resolve(outputDir, "report-center2.js");
+const outputFile = path.resolve(outputDir, "report-center.js");
 
 async function ensureOutputDir() {
   await fs.mkdir(outputDir, { recursive: true });
@@ -30,16 +30,16 @@ async function main() {
     });
 
     if (result.errors?.length) {
-      console.error("[ReportCenter2] Build finished with errors:");
+      console.error("[ReportCenter] Build finished with errors:");
       result.errors.forEach((err) => console.error(err));
       process.exitCode = 1;
       return;
     }
 
     const relativeOutFile = path.relative(projectRoot, outputFile);
-    console.log(`[ReportCenter2] Bundle written to ${relativeOutFile}`);
+    console.log(`[ReportCenter] Bundle written to ${relativeOutFile}`);
   } catch (error) {
-    console.error("[ReportCenter2] Build failed:", error);
+    console.error("[ReportCenter] Build failed:", error);
     process.exitCode = 1;
   }
 }

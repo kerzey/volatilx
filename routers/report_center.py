@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from azure_storage import fetch_reports_for_date
 from db import SessionLocal
-from report_center.report_center_service import resolve_report_center_date, summarize_report_center_entry
+from report_center_backend.report_center_service import resolve_report_center_date, summarize_report_center_entry
 from services.favorites import favorite_symbols
 from utils.symbols import canonicalize_symbol
 from user import User, get_current_user_sync
