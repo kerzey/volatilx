@@ -3,6 +3,7 @@ module.exports = {
   content: [
     "./templates/**/*.html",
     "./action_center2/**/*.{ts,tsx}",
+    "./report_center2/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {},

@@ -1,0 +1,469 @@
+import { useMemo } from "react";
+import { formatPrice } from "../../action_center2/utils/planMath";
+import type {
+  NoTradeZone,
+  StrategyKey,
+  StrategyPlan,
+  TradeSetup,
+} from "../../action_center2/types";
+import type {
+  ReportCenterConsensus,
+  ReportCenterEntry,
+  ReportCenterPrice,
+  ReportCenterPriceAction,
+  ReportCenterStrategySummary,
+} from "../types";
+
+const STRATEGY_ORDER: Array<{ key: StrategyKey; label: string }> = [
+  { key: "day_trading", label: "Day Trading" },
+  { key: "swing_trading", label: "Swing Trading" },
+  { key: "longterm_trading", label: "Long-Term" },
+];
+
+const BULLISH_ACCENT = "text-emerald-300";
+const BEARISH_ACCENT = "text-rose-300";
+
+const coerceNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const formatPriceValue = (value: unknown): string => {
+  const numeric = coerceNumber(value);
+  if (numeric === null) {
+    return "—";
+  }
+  return formatPrice(numeric);
+};
+
+const formatPercent = (value: unknown): string => {
+  const numeric = coerceNumber(value);
+  if (numeric === null) {
+    return "—";
+  }
+  const percentage = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  const prefix = percentage > 0 ? "+" : "";
+  return `${prefix}${percentage.toFixed(2)}%`;
+};
+
+const formatRewardRisk = (value: unknown): string | null => {
+  const numeric = coerceNumber(value);
+  if (numeric === null) {
+    return null;
+  }
+  return numeric.toFixed(2);
+};
+
+const formatConviction = (value: unknown): string | null => {
+  const numeric = coerceNumber(value);
+  if (numeric === null) {
+    return null;
+  }
+  const scaled = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  return `${Math.round(scaled)}%`;
+};
+
+const formatNoTradeZones = (zones: NoTradeZone[] | undefined): string[] => {
+  if (!zones?.length) {
+    return [];
+  }
+  return zones.map((zone) => {
+    const low = formatPriceValue(zone?.min ?? null);
+    const high = formatPriceValue(zone?.max ?? null);
+    return `${low} – ${high}`;
+  });
+};
+
+const formatVolume = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      return "—";
+    }
+    if (Math.abs(value) >= 1_000_000_000) {
+      return `${(value / 1_000_000_000).toFixed(1)}B`;
+    }
+    if (Math.abs(value) >= 1_000_000) {
+      return `${(value / 1_000_000).toFixed(1)}M`;
+    }
+    if (Math.abs(value) >= 1_000) {
+      return `${(value / 1_000).toFixed(1)}K`;
+    }
+    return value.toString();
+  }
+  return String(value);
+};
+
+const resolveStrategySummary = (
+  summaries: Record<string, ReportCenterStrategySummary> | undefined,
+  key: StrategyKey,
+): ReportCenterStrategySummary | undefined => {
+  if (!summaries) {
+    return undefined;
+  }
+  return summaries[key];
+};
+
+const StrategyMetrics = ({ plan }: { plan: StrategyPlan }) => {
+  const rewardRisk = formatRewardRisk(plan.rewardRisk);
+  const conviction = formatConviction(plan.conviction);
+
+  if (!rewardRisk && !conviction) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
+      {rewardRisk ? (
+        <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-300">R/R {rewardRisk}</span>
+      ) : null}
+      {conviction ? (
+        <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-300">Conviction {conviction}</span>
+      ) : null}
+    </div>
+  );
+};
+
+const TradeSetupBlock = ({
+  label,
+  setup,
+  tone,
+}: {
+  label: string;
+  setup?: TradeSetup;
+  tone: "bullish" | "bearish";
+}) => {
+  if (!setup) {
+    return null;
+  }
+
+  const accent = tone === "bullish" ? BULLISH_ACCENT : BEARISH_ACCENT;
+  const targets = Array.isArray(setup.targets) ? setup.targets : [];
+
+  return (
+    <div className="rounded-2xl border border-slate-800/70 bg-slate-900/50 p-4">
+      <p className={`text-xs font-semibold uppercase tracking-wide ${accent}`}>{label}</p>
+      <dl className="mt-3 space-y-2 text-sm text-slate-200">
+        <div className="flex items-center justify-between gap-3 text-slate-300">
+          <dt className="text-slate-400">Entry</dt>
+          <dd className="font-semibold text-slate-100">{formatPriceValue(setup.entry)}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-slate-300">
+          <dt className="text-slate-400">Stop</dt>
+          <dd className="font-semibold text-slate-100">{formatPriceValue(setup.stop)}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-400">Targets</dt>
+          <dd className="mt-1 flex flex-wrap gap-2">
+            {targets.length ? (
+              targets.map((target, index) => (
+                <span
+                  key={`target-${index}`}
+                  className="rounded-full border border-slate-800 px-2 py-0.5 text-xs font-medium text-slate-200"
+                >
+                  T{index + 1}: {formatPriceValue(target)}
+                </span>
+              ))
+            ) : (
+              <span className="text-slate-500">—</span>
+            )}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  );
+};
+
+const NoTradeZoneBlock = ({ zones }: { zones?: NoTradeZone[] }) => {
+  const ranges = formatNoTradeZones(zones);
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">No Trade Zone</p>
+      {ranges.length ? (
+        <ul className="mt-3 space-y-2 text-sm text-amber-200">
+          {ranges.map((range, index) => (
+            <li key={`zone-${index}`}>{range}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm text-amber-200/70">Safe range not defined for this strategy.</p>
+      )}
+    </div>
+  );
+};
+
+const MarketSnapshot = ({ price }: { price?: ReportCenterPrice }) => {
+  if (!price) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Market Snapshot</h3>
+      <div className="mt-3 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <p className="text-slate-500">Timeframe</p>
+          <p className="font-medium text-slate-100">{price.timeframe ?? "—"}</p>
+        </div>
+        <div>
+          <p className="text-slate-500">Close</p>
+          <p className="font-medium text-slate-100">{formatPriceValue(price.close)}</p>
+        </div>
+        <div>
+          <p className="text-slate-500">Change %</p>
+          <p className="font-medium text-slate-100">{formatPercent(price.change_pct)}</p>
+        </div>
+        <div>
+          <p className="text-slate-500">Volume</p>
+          <p className="font-medium text-slate-100">{formatVolume(price.volume)}</p>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const ConsensusPanel = ({ consensus }: { consensus?: ReportCenterConsensus }) => {
+  if (!consensus) {
+    return null;
+  }
+
+  const { recommendation, confidence, strength, reasoning, focus } = consensus;
+
+  return (
+    <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Technical Consensus</h3>
+        <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
+          {recommendation ? (
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-200">{recommendation}</span>
+          ) : null}
+          {confidence ? (
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-200">Confidence {confidence}</span>
+          ) : null}
+          {strength !== undefined && strength !== null ? (
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-200">Strength {strength}</span>
+          ) : null}
+        </div>
+      </div>
+      {focus ? (
+        <div className="mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-slate-500">Focus</p>
+            <p className="font-medium text-slate-100">{focus.timeframe ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-slate-500">Recommendation</p>
+            <p className="font-medium text-slate-100">{focus.recommendation ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-slate-500">Entry</p>
+            <p className="font-medium text-slate-100">{formatPriceValue(focus.entry_price)}</p>
+          </div>
+          <div>
+            <p className="text-slate-500">Stop</p>
+            <p className="font-medium text-slate-100">{formatPriceValue(focus.stop_loss)}</p>
+          </div>
+        </div>
+      ) : null}
+      {reasoning?.length ? (
+        <ul className="mt-4 space-y-2 text-sm text-slate-300">
+          {reasoning.map((item, index) => (
+            <li key={`reason-${index}`} className="flex gap-2">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+};
+
+const PriceActionPanel = ({ priceAction }: { priceAction?: ReportCenterPriceAction }) => {
+  if (!priceAction) {
+    return null;
+  }
+
+  const { trend_alignment: trendAlignment, key_levels: keyLevels, recent_patterns: patterns } = priceAction;
+
+  if (!trendAlignment && !keyLevels?.length && !patterns?.length) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Price Action Notes</h3>
+      {trendAlignment ? (
+        <p className="mt-3 text-sm text-slate-300">{trendAlignment}</p>
+      ) : null}
+      {keyLevels?.length ? (
+        <div className="mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-3">
+          {keyLevels.map((level, index) => (
+            <div key={`level-${index}`} className="rounded-xl border border-slate-800/70 bg-slate-950/40 p-4">
+              <p className="text-slate-500">Level</p>
+              <p className="text-lg font-semibold text-slate-100">{formatPriceValue(level.price)}</p>
+              {level.distance_pct !== undefined && level.distance_pct !== null ? (
+                <p className="text-sm text-slate-400">{formatPercent(level.distance_pct)} away</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {patterns?.length ? (
+        <ul className="mt-4 space-y-2 text-sm text-slate-300">
+          {patterns.map((pattern, index) => (
+            <li key={`pattern-${index}`} className="flex gap-2">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
+              <span>{pattern}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+};
+
+const FavoriteButton = ({
+  isFavorite,
+  pending,
+  onClick,
+}: {
+  isFavorite: boolean;
+  pending: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={pending}
+    aria-pressed={isFavorite}
+    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-slate-300/40 focus:ring-offset-0 ${
+      isFavorite
+        ? "border-amber-400 bg-amber-400/10 text-amber-200 hover:border-amber-300"
+        : "border-slate-700 bg-slate-800/80 text-slate-200 hover:border-slate-600"
+    } ${pending ? "opacity-60" : ""}`}
+  >
+    <span aria-hidden="true" className={isFavorite ? "text-amber-300" : "text-slate-300"}>
+      {isFavorite ? "★" : "☆"}
+    </span>
+    <span>{isFavorite ? "Favorited" : "Favorite"}</span>
+  </button>
+);
+
+const StrategySection = ({
+  label,
+  plan,
+  summary,
+}: {
+  label: string;
+  plan?: StrategyPlan;
+  summary?: ReportCenterStrategySummary;
+}) => {
+  if (!plan) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="text-xl font-semibold text-slate-100">{label}</h3>
+          {plan.summary ? (
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">{plan.summary}</p>
+          ) : summary?.summary ? (
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">{summary.summary}</p>
+          ) : null}
+          {summary?.next_actions?.length ? (
+            <ul className="mt-3 space-y-1 text-sm text-slate-300">
+              {summary.next_actions.map((action, index) => (
+                <li key={`action-${index}`} className="flex gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
+                  <span>{action}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <StrategyMetrics plan={plan} />
+      </div>
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <TradeSetupBlock label="Buy Setup" setup={plan.buy_setup} tone="bullish" />
+        <TradeSetupBlock label="Sell Setup" setup={plan.sell_setup} tone="bearish" />
+        <NoTradeZoneBlock zones={plan.no_trade_zone} />
+      </div>
+    </section>
+  );
+};
+
+export type ReportCardProps = {
+  report: ReportCenterEntry;
+  isFavorite: boolean;
+  pending: boolean;
+  onToggleFavorite: (report: ReportCenterEntry, follow: boolean) => void;
+};
+
+export function ReportCard({ report, isFavorite, pending, onToggleFavorite }: ReportCardProps) {
+  const plan = report.plan ?? undefined;
+  const latestPrice = plan?.latest_price;
+
+  const strategies = useMemo(() => {
+    if (!plan?.strategies) {
+      return [] as Array<{ key: StrategyKey; label: string; plan?: StrategyPlan; summary?: ReportCenterStrategySummary }>;
+    }
+    return STRATEGY_ORDER.map(({ key, label }) => ({
+      key,
+      label,
+      plan: plan.strategies[key],
+      summary: resolveStrategySummary(report.strategies, key),
+    })).filter((entry) => Boolean(entry.plan));
+  }, [plan?.strategies, report.strategies]);
+
+  const handleFavoriteToggle = () => {
+    onToggleFavorite(report, !isFavorite);
+  };
+
+  return (
+    <article className="rounded-3xl border border-slate-800 bg-slate-950/60 shadow-xl shadow-black/40 transition hover:border-slate-700">
+      <header className="flex flex-col gap-4 border-b border-slate-800 p-6 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-50">{report.symbol_display ?? report.symbol}</h2>
+            {latestPrice !== undefined && latestPrice !== null ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-200">
+                Last Price {formatPriceValue(latestPrice)}
+              </span>
+            ) : null}
+          </div>
+          {report.generated_display ? (
+            <p className="mt-2 text-sm text-slate-400">Generated {report.generated_display}</p>
+          ) : null}
+        </div>
+        <FavoriteButton isFavorite={isFavorite} pending={pending} onClick={handleFavoriteToggle} />
+      </header>
+      <div className="flex flex-col gap-6 p-6">
+        <MarketSnapshot price={report.price} />
+        <ConsensusPanel consensus={report.consensus} />
+        {strategies.length ? (
+          <div className="flex flex-col gap-6">
+            {strategies.map(({ key, label, plan: strategyPlan, summary }) => (
+              <StrategySection key={key} label={label} plan={strategyPlan} summary={summary} />
+            ))}
+          </div>
+        ) : null}
+        <PriceActionPanel priceAction={report.price_action} />
+      </div>
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 px-6 py-4 text-xs text-slate-500">
+        {report.source?.blob ? <span>Blob: {report.source.blob}</span> : <span>Blob: unknown</span>}
+        {report.source?.user_id ? <span>Author: {report.source.user_id}</span> : null}
+      </footer>
+    </article>
+  );
+}

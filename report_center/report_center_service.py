@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from core.datetime_utils import parse_iso_datetime
 from core.numeric_utils import safe_float
@@ -48,6 +48,13 @@ def summarize_report_center_entry(report: Dict[str, Any]) -> Optional[Dict[str, 
     symbol_sanitized = sanitize_symbol(symbol_clean)
     symbol_canonical = canonicalize_symbol(symbol_clean)
 
+    symbol_display_raw = plan_data.get("symbol_display")
+    symbol_display = symbol_display_raw.strip() if isinstance(symbol_display_raw, str) else None
+    if not symbol_display:
+        symbol_display = symbol_clean
+    else:
+        symbol_display = symbol_display.upper()
+
     generated_dt = parse_iso_datetime(
         plan_data.get("generated")
         or plan_data.get("generated_at")
@@ -81,9 +88,16 @@ def summarize_report_center_entry(report: Dict[str, Any]) -> Optional[Dict[str, 
     consensus = _extract_consensus_snapshot(report, symbol_clean)
     price_info, price_action = _extract_price_details(report)
 
+    plan_payload = _prepare_principal_plan_payload(
+        plan_data,
+        report,
+        symbol=symbol_clean,
+        generated_display=generated_display,
+    )
+
     summary: Dict[str, Any] = {
         "symbol": symbol_clean,
-        "symbol_display": symbol_clean,
+        "symbol_display": symbol_display,
         "symbol_sanitized": symbol_sanitized or None,
         "symbol_canonical": symbol_canonical or None,
         "generated_iso": generated_iso,
@@ -101,7 +115,232 @@ def summarize_report_center_entry(report: Dict[str, Any]) -> Optional[Dict[str, 
         },
     }
 
+    if plan_payload:
+        summary["plan"] = plan_payload
+
     return summary
+
+
+def _prepare_principal_plan_payload(
+    plan_data: Mapping[str, Any],
+    report: Mapping[str, Any],
+    *,
+    symbol: str,
+    generated_display: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    strategies_raw = plan_data.get("strategies")
+    if not isinstance(strategies_raw, Mapping):
+        return None
+
+    prepared_strategies: Dict[str, Dict[str, Any]] = {}
+    for key in ("day_trading", "swing_trading", "longterm_trading"):
+        prepared = _prepare_strategy_payload(strategies_raw.get(key))
+        if prepared:
+            prepared_strategies[key] = prepared
+
+    if not prepared_strategies:
+        return None
+
+    plan_price = safe_float(plan_data.get("latest_price"))
+    report_price = safe_float(report.get("latest_price"))
+    latest_price = plan_price if plan_price is not None else report_price
+    if latest_price is None:
+        latest_price = 0.0
+
+    symbol_display_raw = plan_data.get("symbol_display")
+    symbol_display = symbol_display_raw.strip() if isinstance(symbol_display_raw, str) else symbol
+    if not symbol_display:
+        symbol_display = symbol
+    else:
+        symbol_display = symbol_display.upper()
+
+    payload: Dict[str, Any] = {
+        "symbol": symbol,
+        "symbol_display": symbol_display,
+        "generated_display": generated_display or plan_data.get("generated_display") or "",
+        "latest_price": latest_price,
+        "strategies": prepared_strategies,
+    }
+
+    consensus_payload = _extract_plan_consensus(report, symbol)
+    if consensus_payload:
+        payload["technical_consensus"] = consensus_payload
+
+    return payload
+
+
+def _normalise_confidence_label(raw_confidence: Optional[str]) -> str:
+    if not raw_confidence:
+        return "MEDIUM"
+    normalized = str(raw_confidence).strip().upper()
+    mapping = {
+        "LOW": "LOW",
+        "MEDIUM": "MEDIUM",
+        "MID": "MEDIUM",
+        "MODERATE": "MEDIUM",
+        "HIGH": "HIGH",
+        "STRONG": "HIGH",
+    }
+    return mapping.get(normalized, "MEDIUM")
+
+
+def _normalise_recommendation(raw_recommendation: Optional[str]) -> str:
+    if not raw_recommendation:
+        return "HOLD"
+    normalized = str(raw_recommendation).strip().upper()
+    mapping = {
+        "BUY": "BUY",
+        "STRONG BUY": "BUY",
+        "SELL": "SELL",
+        "STRONG SELL": "SELL",
+        "HOLD": "HOLD",
+        "NEUTRAL": "HOLD",
+    }
+    return mapping.get(normalized, "HOLD")
+
+
+def _extract_plan_consensus(report: Mapping[str, Any], symbol: str) -> Optional[Dict[str, Any]]:
+    snapshot_map = report.get("technical_snapshot")
+    if not isinstance(snapshot_map, Mapping):
+        return None
+
+    snapshot: Optional[Mapping[str, Any]] = None
+    for candidate in (symbol, symbol.upper(), symbol.lower()):
+        candidate_snapshot = snapshot_map.get(candidate)
+        if isinstance(candidate_snapshot, Mapping):
+            snapshot = candidate_snapshot
+            break
+
+    if not isinstance(snapshot, Mapping):
+        return None
+
+    consensus = snapshot.get("consensus")
+    if not isinstance(consensus, Mapping):
+        return None
+
+    recommendation = _normalise_recommendation(consensus.get("overall_recommendation"))
+    confidence = _normalise_confidence_label(consensus.get("confidence"))
+    strength = safe_float(consensus.get("strength"))
+
+    payload: Dict[str, Any] = {
+        "overall_recommendation": recommendation,
+        "confidence": confidence,
+    }
+    if strength is not None:
+        payload["strength"] = strength
+
+    return payload
+
+
+def _coerce_trade_setup(setup: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(setup, Mapping):
+        return None
+
+    entry_val = safe_float(setup.get("entry"))
+    stop_val = safe_float(setup.get("stop"))
+
+    targets: List[float] = []
+    raw_targets = setup.get("targets")
+    if isinstance(raw_targets, (list, tuple, set)):
+        for target in raw_targets:
+            target_val = safe_float(target)
+            if target_val is not None:
+                targets.append(target_val)
+
+    if entry_val is None and stop_val is None and not targets:
+        return None
+
+    return {
+        "entry": entry_val if entry_val is not None else 0.0,
+        "stop": stop_val if stop_val is not None else 0.0,
+        "targets": targets,
+    }
+
+
+def _coerce_no_trade_zones(zones: Any) -> List[Dict[str, float]]:
+    prepared: List[Dict[str, float]] = []
+    if not isinstance(zones, (list, tuple, set)):
+        return prepared
+
+    for zone in zones:
+        if not isinstance(zone, Mapping):
+            continue
+        low_raw = zone.get("min") if zone.get("min") is not None else zone.get("low")
+        high_raw = zone.get("max") if zone.get("max") is not None else zone.get("high")
+        low_val = safe_float(low_raw)
+        high_val = safe_float(high_raw)
+        if low_val is None or high_val is None:
+            continue
+        if low_val > high_val:
+            low_val, high_val = high_val, low_val
+        prepared.append({"min": low_val, "max": high_val})
+
+    return prepared
+
+
+def _coerce_bias(bias: Any) -> Optional[Dict[str, float]]:
+    if not isinstance(bias, Mapping):
+        return None
+
+    low_val = safe_float(bias.get("low"))
+    high_val = safe_float(bias.get("high"))
+    invalid_val = safe_float(bias.get("invalid"))
+
+    if None in (low_val, high_val, invalid_val):
+        return None
+
+    return {
+        "low": low_val,
+        "high": high_val,
+        "invalid": invalid_val,
+    }
+
+
+def _prepare_strategy_payload(strategy: Any) -> Optional[Dict[str, Any]]:
+    if not isinstance(strategy, Mapping):
+        return None
+
+    summary = str(strategy.get("summary") or "").strip()
+    buy_setup = _coerce_trade_setup(strategy.get("buy_setup"))
+    sell_setup = _coerce_trade_setup(strategy.get("sell_setup"))
+    no_trade_zone = _coerce_no_trade_zones(strategy.get("no_trade_zone"))
+
+    if buy_setup is None:
+        buy_setup = {"entry": 0.0, "stop": 0.0, "targets": []}
+    if sell_setup is None:
+        sell_setup = {"entry": 0.0, "stop": 0.0, "targets": []}
+
+    payload: Dict[str, Any] = {
+        "summary": summary,
+        "buy_setup": buy_setup,
+        "sell_setup": sell_setup,
+        "no_trade_zone": no_trade_zone,
+    }
+
+    bias_payload = _coerce_bias(strategy.get("bias"))
+    if bias_payload:
+        payload["bias"] = bias_payload
+
+    reward_risk = safe_float(
+        strategy.get("rewardRisk")
+        or strategy.get("reward_risk")
+        or strategy.get("reward_to_risk")
+        or strategy.get("reward_to_risk_ratio")
+        or strategy.get("risk_reward_ratio")
+    )
+    if reward_risk is not None:
+        payload["rewardRisk"] = reward_risk
+
+    conviction = safe_float(
+        strategy.get("conviction")
+        or strategy.get("confidence_score")
+        or strategy.get("confidence")
+        or strategy.get("strength")
+    )
+    if conviction is not None:
+        payload["conviction"] = conviction
+
+    return payload
 
 
 def _prepare_strategy_for_report_center(strategy: Any) -> Optional[Dict[str, Any]]:

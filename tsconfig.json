@@ -13,6 +13,7 @@
     "skipLibCheck": true
   },
   "include": [
-    "action_center2/**/*"
+    "action_center2/**/*",
+    "report_center2/**/*"
   ]
 }

@@ -4,359 +4,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Shared AI Report Center</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/report-center2.css">
 </head>
-<body>
-    <div class="header">
-        <a class="logo" href="/report-center">
-            <img src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
-            <span>VolatilX</span>
-        </a>
-        <div class="nav-links">
-            <a href="/analyze">AI Insights</a>
-            <a href="/action-center">Action Center</a>
-            <a href="/report-center" class="active">Report Center</a>
-            <a href="/subscribe">Plans</a>
-            <a href="/settings">Settings</a>
-            <span>{{ user.email }}</span>
-            <a href="/logout">Logout</a>
-        </div>
-    </div>
-
-    <div class="container dashboard-container">
-        <section class="dashboard-meta">
-            <h1>Shared AI Report Center</h1>
-            <p>Viewing cached multi-agent strategies for <strong>{{ selected_date_label }}</strong>{% if selected_symbol %} focused on <strong>{{ selected_symbol }}</strong>{% endif %}. {{ report_count }} curated report{{ 's' if report_count != 1 else '' }} available.</p>
-        </section>
-
-        <form class="dashboard-filters" method="get" action="/report-center">
-            <div class="filter-group">
-                <label for="dateInput">Date</label>
-                <input type="date" id="dateInput" name="date" value="{{ selected_date }}" max="{{ today_date }}">
+<body class="bg-slate-950 text-slate-100">
+    <nav class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+        <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+            <a class="flex items-center gap-3 text-lg font-semibold text-slate-100" href="/report-center">
+                <img class="h-8 w-auto" src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
+                <span>VolatilX</span>
+            </a>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+                <a href="/analyze" class="transition hover:text-white">AI Insights</a>
+                <a href="/action-center" class="transition hover:text-white">Action Center</a>
+                <a href="/report-center" class="text-white">Report Center</a>
+                <a href="/subscribe" class="transition hover:text-white">Plans</a>
+                <a href="/settings" class="transition hover:text-white">Settings</a>
+                <span class="hidden border-l border-slate-700 pl-4 md:inline">{{ user.email }}</span>
+                <a href="/logout" class="rounded-full border border-slate-700 px-3 py-1 transition hover:border-slate-500 hover:text-white">Logout</a>
             </div>
-            <div class="filter-group">
-                <label for="symbolInput">Symbol</label>
-                <input type="text" id="symbolInput" name="symbol" value="{{ selected_symbol_input }}" placeholder="Optional ticker filter (e.g., AAPL)">
-            </div>
-            <button type="submit" class="filter-submit">Refresh</button>
-            {% if selected_symbol %}
-            <a class="filter-reset" href="/report-center?date={{ selected_date }}">Clear symbol</a>
-            {% endif %}
-        </form>
-
-        {% if available_symbols %}
-        <div class="dashboard-available">
-            <span>Symbols found:</span>
-            {% for symbol_option in available_symbols %}
-                <a class="symbol-chip" href="/report-center?date={{ selected_date }}&symbol={{ symbol_option }}">{{ symbol_option }}</a>
-            {% endfor %}
         </div>
-        {% endif %}
+    </nav>
 
-        {% if excluded_report_count %}
-        <div class="dashboard-alert warning">
-            {{ excluded_report_count }} stored report{{ 's' if excluded_report_count != 1 else '' }} could not be summarised yet and were hidden.
-        </div>
-        {% endif %}
+    <main class="mx-auto max-w-7xl px-6 py-10">
+        <div class="space-y-8">
+            <header class="space-y-3">
+                <h1 class="text-3xl font-semibold tracking-tight text-white">Shared AI Report Center</h1>
+                <p class="text-sm text-slate-300">
+                    Viewing cached multi-agent strategies for <strong>{{ selected_date_label }}</strong>{% if selected_symbol %} focused on <strong>{{ selected_symbol }}</strong>{% endif %}.
+                </p>
+            </header>
 
-        {% if reports %}
-        <section class="dashboard-grid">
-            {% for report in reports %}
-            <article class="dashboard-card">
-                {% set display_symbol = report.symbol_display or report.symbol or '' %}
-                {% set symbol_canonical = report.symbol_canonical or '' %}
-                {% set canonical_favorites = favorite_symbols_canonical or [] %}
-                {% set is_favorite = symbol_canonical in canonical_favorites %}
-                <header class="dashboard-card-header">
-                    <div>
-                        <h2>{{ display_symbol }}</h2>
-                        {% if report.generated_display %}
-                        <p class="timestamp">Generated {{ report.generated_display }}</p>
-                        {% endif %}
+            <section class="rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-inner shadow-black/30">
+                <form class="grid gap-4 md:grid-cols-[repeat(3,minmax(0,1fr))] md:items-end" method="get" action="/report-center">
+                    <div class="flex flex-col gap-2">
+                        <label for="dateInput" class="text-xs font-semibold uppercase tracking-wide text-slate-400">Date</label>
+                        <input
+                            type="date"
+                            id="dateInput"
+                            name="date"
+                            value="{{ selected_date }}"
+                            max="{{ today_date }}"
+                            class="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-slate-100 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                        >
                     </div>
-                    <div class="dashboard-card-actions">
-                        {% if report.consensus and report.consensus.recommendation %}
-                        <span class="badge consensus-{{ report.consensus.recommendation|lower|replace(' ', '-') }}">{{ report.consensus.recommendation }}</span>
-                        {% endif %}
-                        <button type="button" class="favorite-toggle{% if is_favorite %} favorite-toggle--active{% endif %}" data-favorite-toggle data-favorite-symbol="{{ display_symbol }}" data-favorite-canonical="{{ symbol_canonical }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}" title="{% if is_favorite %}Remove from favorites{% else %}Add to favorites{% endif %}">
-                            <span class="favorite-toggle__icon" data-favorite-icon aria-hidden="true">{% if is_favorite %}&#9733;{% else %}&#9734;{% endif %}</span>
-                            <span class="favorite-toggle__label" data-favorite-label>{% if is_favorite %}Favorited{% else %}Favorite{% endif %}</span>
+                    <div class="flex flex-col gap-2">
+                        <label for="symbolInput" class="text-xs font-semibold uppercase tracking-wide text-slate-400">Symbol</label>
+                        <input
+                            type="text"
+                            id="symbolInput"
+                            name="symbol"
+                            value="{{ selected_symbol_input }}"
+                            placeholder="Optional ticker (e.g., AAPL)"
+                            class="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-slate-100 placeholder-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                        >
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button
+                            type="submit"
+                            class="rounded-xl bg-sky-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/70"
+                        >
+                            Refresh
                         </button>
+                        {% if selected_symbol %}
+                        <a
+                            href="/report-center?date={{ selected_date }}"
+                            class="rounded-xl border border-slate-700 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/50"
+                        >
+                            Clear symbol
+                        </a>
+                        {% endif %}
                     </div>
-                </header>
+                </form>
+            </section>
 
-                {% if report.price %}
-                <section class="dashboard-section price-overview">
-                    <h3>Market Snapshot</h3>
-                    <div class="price-grid">
-                        <div>
-                            <span class="label">Timeframe</span>
-                            <span>{{ report.price.timeframe }}</span>
-                        </div>
-                        <div>
-                            <span class="label">Close</span>
-                            <span>{{ report.price.close }}</span>
-                        </div>
-                        <div>
-                            <span class="label">Change %</span>
-                            <span>{% if report.price.change_pct is not none %}{{ '{:.2f}'.format(report.price.change_pct|float) }}%{% else %}—{% endif %}</span>
-                        </div>
-                        <div>
-                            <span class="label">Volume</span>
-                            <span>{{ report.price.volume or '—' }}</span>
-                        </div>
-                    </div>
-                </section>
-                {% endif %}
-
-                {% if report.consensus %}
-                <section class="dashboard-section consensus-overview">
-                    <h3>Consensus</h3>
-                    <div class="consensus-grid">
-                        {% if report.consensus.confidence %}
-                        <div>
-                            <span class="label">Confidence</span>
-                            <span>{{ report.consensus.confidence }}</span>
-                        </div>
-                        {% endif %}
-                        {% if report.consensus.strength is not none %}
-                        <div>
-                            <span class="label">Strength</span>
-                            <span>{{ report.consensus.strength }}</span>
-                        </div>
-                        {% endif %}
-                        {% if report.consensus.buy_signals is not none %}
-                        <div>
-                            <span class="label">Buy Signals</span>
-                            <span>{{ report.consensus.buy_signals }}</span>
-                        </div>
-                        {% endif %}
-                        {% if report.consensus.sell_signals is not none %}
-                        <div>
-                            <span class="label">Sell Signals</span>
-                            <span>{{ report.consensus.sell_signals }}</span>
-                        </div>
-                        {% endif %}
-                        {% if report.consensus.hold_signals is not none %}
-                        <div>
-                            <span class="label">Hold Signals</span>
-                            <span>{{ report.consensus.hold_signals }}</span>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% if report.consensus.focus %}
-                    <div class="focus-card">
-                        <div>
-                            <span class="label">Focus Timeframe</span>
-                            <span>{{ report.consensus.focus.timeframe }}</span>
-                        </div>
-                        {% if report.consensus.focus.recommendation %}
-                        <div>
-                            <span class="label">Recommendation</span>
-                            <span>{{ report.consensus.focus.recommendation }}</span>
-                        </div>
-                        {% endif %}
-                        {% if report.consensus.focus.confidence %}
-                        <div>
-                            <span class="label">Confidence</span>
-                            <span>{{ report.consensus.focus.confidence }}</span>
-                        </div>
-                        {% endif %}
-                        {% for price_key, price_value in report.consensus.focus.items() %}
-                        {% if price_key in ['entry_price', 'stop_loss', 'take_profit', 'risk_reward_ratio'] and price_value %}
-                        <div>
-                            <span class="label">{{ price_key|replace('_', ' ')|title }}</span>
-                            <span>{{ price_value }}</span>
-                        </div>
-                        {% endif %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    {% if report.consensus.reasoning %}
-                    <ul class="reasoning-list">
-                        {% for reason in report.consensus.reasoning %}
-                        <li>{{ reason }}</li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-                </section>
-                {% endif %}
-
-                {% if report.strategies %}
-                <section class="dashboard-section strategy-overview">
-                    <h3>Strategy Highlights</h3>
-                    <div class="strategy-grid">
-                        {% for key, strategy in report.strategies.items() %}
-                        <div class="strategy-card">
-                            <h4>{{ strategy.label }}</h4>
-                            {% if strategy.summary %}
-                            <p>{{ strategy.summary }}</p>
-                            {% endif %}
-                            {% if strategy.next_actions %}
-                            <ul>
-                                {% for action in strategy.next_actions %}
-                                <li>{{ action }}</li>
-                                {% endfor %}
-                            </ul>
-                            {% endif %}
-                            {% if strategy.confidence %}
-                            <p class="muted">Confidence: {{ strategy.confidence }}</p>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                </section>
-                {% endif %}
-
-                {% if report.price_action %}
-                <section class="dashboard-section price-action-overview">
-                    <h3>Price Action Notes</h3>
-                    {% if report.price_action.trend_alignment %}
-                    <p><strong>Trend:</strong> {{ report.price_action.trend_alignment }}</p>
-                    {% endif %}
-                    {% if report.price_action.key_levels %}
-                    <div class="levels-grid">
-                        {% for level in report.price_action.key_levels %}
-                        <div>
-                            <span class="label">Level</span>
-                            <span>{{ level.price }}</span>
-                            {% if level.distance_pct is not none %}
-                            <span class="muted">{{ '%.2f'|format(level.distance_pct) }}% away</span>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    {% if report.price_action.recent_patterns %}
-                    <ul class="pattern-list">
-                        {% for pattern in report.price_action.recent_patterns %}
-                        <li>{{ pattern }}</li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-                </section>
-                {% endif %}
-
-                <footer class="dashboard-card-footer">
-                    <span class="muted">Blob: {{ report.source.blob or 'unknown' }}</span>
-                    {% if report.source.user_id %}
-                    <span class="muted">Author: {{ report.source.user_id }}</span>
-                    {% endif %}
-                </footer>
-            </article>
-            {% endfor %}
-        </section>
-        {% else %}
-        <div class="dashboard-empty">
-            <p>No AI reports found for {{ selected_date_label }}{% if selected_symbol %} matching {{ selected_symbol }}{% endif %}. Try another date or remove the symbol filter.</p>
+            <section id="reportCenterRoot" class="flex flex-col gap-8"></section>
         </div>
-        {% endif %}
-    </div>
+    </main>
 
-    <script id="reportCenterReportsData" type="application/json">
-        {{ reports | tojson | safe }}
+    <script id="reportCenterBootstrap" type="application/json">
+        {{ {
+            "reports": reports,
+            "favorites": favorite_symbols or [],
+            "meta": {
+                "reportCount": report_count,
+                "excludedReportCount": excluded_report_count,
+                "maxReports": max_reports,
+                "selectedDate": selected_date,
+                "selectedDateLabel": selected_date_label,
+                "selectedSymbol": selected_symbol,
+                "availableSymbols": available_symbols
+            }
+        } | tojson | safe }}
     </script>
-    <script id="reportCenterFavorites" type="application/json">{{ (favorite_symbols or []) | tojson | safe }}</script>
-    <script>
-    (function () {
-        const favoriteSource = document.getElementById('reportCenterFavorites');
-        let favoriteSymbols = new Set();
-
-        const normalizeSymbol = (value) => (value == null ? '' : String(value)).trim().toUpperCase();
-        const canonicalizeSymbol = (value) => {
-            const normalized = normalizeSymbol(value);
-            if (!normalized) {
-                return '';
-            }
-            return normalized.replace(/[^A-Z0-9]/g, '');
-        };
-
-        if (favoriteSource) {
-            try {
-                const parsed = JSON.parse(favoriteSource.textContent || '[]');
-                if (Array.isArray(parsed)) {
-                    const canonicalValues = parsed
-                        .map((value) => canonicalizeSymbol(value))
-                        .filter(Boolean);
-                    favoriteSymbols = new Set(canonicalValues);
-                }
-            } catch (error) {
-                console.warn('Unable to parse favorites payload', error);
-            }
-        }
-
-        function setButtonState(button, active) {
-            button.classList.toggle('favorite-toggle--active', active);
-            button.setAttribute('aria-pressed', active ? 'true' : 'false');
-            button.dataset.favoriteActive = active ? '1' : '0';
-            button.title = active ? 'Remove from favorites' : 'Add to favorites';
-            const icon = button.querySelector('[data-favorite-icon]');
-            if (icon) {
-                icon.innerHTML = active ? '&#9733;' : '&#9734;';
-            }
-            const label = button.querySelector('[data-favorite-label]');
-            if (label) {
-                label.textContent = active ? 'Favorited' : 'Favorite';
-            }
-        }
-
-        async function toggleFavorite(button) {
-            const symbolDisplay = button.dataset.favoriteSymbol;
-            const normalizedSymbol = normalizeSymbol(symbolDisplay);
-            const canonicalSymbol = canonicalizeSymbol(normalizedSymbol);
-
-            if (!canonicalSymbol) {
-                return;
-            }
-
-            const follow = !button.classList.contains('favorite-toggle--active');
-            button.disabled = true;
-
-            try {
-                const response = await fetch('/api/action-center/favorites', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ symbol: normalizedSymbol, follow }),
-                });
-
-                if (!response.ok) {
-                    throw new Error('Favorite toggle failed with status ' + response.status);
-                }
-
-                setButtonState(button, follow);
-                if (follow) {
-                    favoriteSymbols.add(canonicalSymbol);
-                } else {
-                    favoriteSymbols.delete(canonicalSymbol);
-                }
-            } catch (error) {
-                console.warn('Unable to update favorite', error);
-                const message = follow ? 'Unable to add symbol to favorites. Please try again.' : 'Unable to remove symbol from favorites. Please try again.';
-                window.alert(message);
-            } finally {
-                button.disabled = false;
-            }
-        }
-
-        const toggleButtons = Array.from(document.querySelectorAll('[data-favorite-toggle]'));
-        if (!toggleButtons.length) {
-            return;
-        }
-
-        toggleButtons.forEach((button) => {
-            const symbol = normalizeSymbol(button.dataset.favoriteSymbol);
-            const canonicalSymbol = canonicalizeSymbol(symbol);
-            button.dataset.favoriteCanonical = canonicalSymbol;
-            setButtonState(button, canonicalSymbol && favoriteSymbols.has(canonicalSymbol));
-            button.addEventListener('click', () => {
-                toggleFavorite(button);
-            });
-        });
-    })();
-    </script>
+    <script type="module" src="/static/js/report-center2.js"></script>
     {% include "_contact_widget.html" %}
 </body>
 </html>
