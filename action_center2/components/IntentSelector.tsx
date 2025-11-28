@@ -19,7 +19,7 @@ export function IntentSelector({ selected, onSelect }: IntentSelectorProps) {
         const baseClasses =
           "flex-1 rounded-full px-4 py-2 transition border border-transparent text-center cursor-pointer";
         const stateClasses = isActive
-          ? " bg-sky-500/20 text-sky-100 border-sky-400/40"
+          ? " bg-indigo-500 text-white border-indigo-500 shadow"
           : " hover:bg-slate-800/80 hover:text-slate-100";
         return (
           <button
