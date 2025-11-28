@@ -73,16 +73,13 @@ export function AlertsList({ alerts, symbol, latestPrice }: AlertsListProps) {
     [payloadLatestPrice, statusMap, uppercaseSymbol],
   );
 
-  const handleCheckboxChange = useCallback(
-    (alert: AlertSuggestion, checked: boolean) => {
-      if (checked) {
-        queueAlertEmail(alert);
-      } else {
-        setStatusMap((prev) => ({ ...prev, [alert.id]: "idle" }));
-      }
-    },
-    [queueAlertEmail],
-  );
+  const deactivateAlert = useCallback((alertId: string) => {
+    setStatusMap((prev) => ({ ...prev, [alertId]: "idle" }));
+    setErrorMap((prev) => {
+      const { [alertId]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }, []);
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm">
@@ -100,55 +97,61 @@ export function AlertsList({ alerts, symbol, latestPrice }: AlertsListProps) {
       <ul className="flex flex-col gap-4">
         {alerts.map((alert) => {
           const state = statusMap[alert.id] ?? "idle";
-          const isChecked = state === "sent" || state === "sending";
-          const isDisabled = serviceError !== null || state === "sending" || state === "sent";
+          const isActive = state === "sent";
+          const isSending = state === "sending";
+          const cardTone = isActive
+            ? "border-indigo-400/60 bg-indigo-900/40 shadow-lg shadow-indigo-500/10"
+            : "border-slate-800/80 bg-slate-950/60";
           const errorMessage = errorMap[alert.id];
 
           return (
             <li
               key={alert.id}
-              className="flex flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-5 shadow-sm md:flex-row md:items-center md:justify-between"
+              className={`flex flex-col gap-3 rounded-2xl p-5 shadow-sm transition-colors md:flex-row md:items-center md:justify-between ${cardTone}`}
             >
-              <label className="flex w-full cursor-pointer items-start gap-3 md:w-auto md:flex-1">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-950 text-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-0"
-                  checked={isChecked}
-                  disabled={isDisabled && !errorMessage}
-                  onChange={(event) => handleCheckboxChange(alert, event.target.checked)}
-                  aria-label={`Email me the alert ${alert.label}`}
-                />
-                <span>
-                  <p className="text-sm font-semibold text-slate-100">{alert.label}</p>
-                  <p className="text-sm text-slate-400">{alert.description}</p>
-                </span>
-              </label>
-
-              <div className="text-xs font-semibold uppercase tracking-wide">
-                {state === "sending" ? (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-indigo-200">
-                    Sending...
-                  </span>
-                ) : null}
-                {state === "sent" ? (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-200">
-                    Email queued — watch your inbox
-                  </span>
+              <div>
+                <p className="text-sm font-semibold text-slate-100">{alert.label}</p>
+                <p className="text-sm text-slate-400">{alert.description}</p>
+                {errorMessage ? <p className="mt-2 text-xs text-rose-300">{errorMessage}</p> : null}
+              </div>
+              <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:gap-3">
+                <button
+                  type="button"
+                  className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                    isActive
+                      ? "border border-emerald-400/50 bg-emerald-500/15 text-emerald-100 hover:border-emerald-300"
+                      : isSending
+                        ? "border border-indigo-400/40 bg-indigo-500/20 text-indigo-100"
+                        : "border border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:border-indigo-400 hover:bg-indigo-500/20"
+                  }`}
+                  onClick={() => {
+                    if (isActive) {
+                      deactivateAlert(alert.id);
+                    } else if (!isSending) {
+                      queueAlertEmail(alert);
+                    }
+                  }}
+                  disabled={isSending}
+                >
+                  {isSending ? "Sending..." : isActive ? "Alert active" : "Create alert"}
+                </button>
+                {isActive ? (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold uppercase tracking-wide text-slate-400 transition hover:text-slate-200"
+                    onClick={() => deactivateAlert(alert.id)}
+                  >
+                    Deselect
+                  </button>
                 ) : null}
                 {state === "error" ? (
-                  <div className="flex flex-col items-start gap-2 text-left text-rose-200">
-                    <span>{errorMessage ?? "Could not send email."}</span>
-                    <button
-                      type="button"
-                      className="rounded-full border border-rose-400/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-200 transition hover:border-rose-300"
-                      onClick={() => queueAlertEmail(alert)}
-                    >
-                      Retry email
-                    </button>
-                  </div>
-                ) : null}
-                {state === "idle" && !errorMessage ? (
-                  <span className="text-slate-500">Check to email yourself this alert</span>
+                  <button
+                    type="button"
+                    className="text-xs font-semibold uppercase tracking-wide text-rose-300 transition hover:text-rose-200"
+                    onClick={() => queueAlertEmail(alert)}
+                  >
+                    Retry
+                  </button>
                 ) : null}
               </div>
             </li>
