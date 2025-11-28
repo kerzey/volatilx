@@ -337,13 +337,13 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
             >
               <div className="flex flex-col items-center">
                 <div className="flex flex-col items-center text-[10px]">
-                  <span className={`mb-2 h-6 w-px ${tone.line}`} />
+                  <span className={`mb-1 h-4 w-px ${tone.line}`} />
                   <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
-                  <span className={`mt-2 h-6 w-px ${tone.line}`} />
+                  <span className={`mt-1 h-4 w-px ${tone.line}`} />
                 </div>
 
                 {bottomMarkers.length > 0 && (
-                  <div className="flex flex-col items-center gap-1 pt-4">
+                  <div className="flex flex-col items-center pt-1">
                     <span className={priceChipClass}>{formatPrice(group.value)}</span>
                   </div>
                 )}
@@ -371,7 +371,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       </div>
 
       {legendItemsSorted.length > 0 && (
-        <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+        <div className="mt-10 flex flex-wrap items-center gap-3 text-sm text-slate-300">
           {legendItemsSorted.map((item) => {
             const tone = toneStyles[item.tone];
             return (
