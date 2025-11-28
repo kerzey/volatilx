@@ -15,6 +15,7 @@
   "include": [
     "action_center2/**/*",
     "report_center_frontend/**/*",
-    "signin_frontend/**/*"
+    "signin_frontend/**/*",
+    "ai_insights_frontend/**/*"
   ]
 }
