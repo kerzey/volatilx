@@ -28,7 +28,7 @@ type PersistedSymbolPrefs = {
 
 type PersistedSelections = {
   activeSymbol?: string;
-  perSymbol?: Record<string, PersistedSymbolPrefs>;
+  perSymbol: Record<string, PersistedSymbolPrefs>;
 };
 
 const STORAGE_KEY = "volatilx:action-center:selections";
@@ -40,46 +40,44 @@ const isTradeIntent = (value: unknown): value is TradeIntent => value === "buy" 
 
 function readPersistedSelections(): PersistedSelections {
   if (typeof window === "undefined") {
-    return {};
+    return { perSymbol: {} };
   }
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return {};
+      return { perSymbol: {} };
     }
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") {
-      return {};
+      return { perSymbol: {} };
     }
 
     const activeSymbol = typeof parsed.activeSymbol === "string" ? parsed.activeSymbol : undefined;
-    const perSymbolInput = parsed.perSymbol && typeof parsed.perSymbol === "object" ? parsed.perSymbol : undefined;
+    const perSymbolInput = parsed.perSymbol && typeof parsed.perSymbol === "object" ? parsed.perSymbol : {};
     const perSymbol: Record<string, PersistedSymbolPrefs> = {};
 
-    if (perSymbolInput) {
-      Object.entries(perSymbolInput).forEach(([symbol, prefs]) => {
-        if (!prefs || typeof prefs !== "object") {
-          return;
-        }
-        const strategyValue = (prefs as PersistedSymbolPrefs).strategy;
-        const strategy = isStrategyKey(strategyValue) ? strategyValue : undefined;
-        const intent = isTradeIntent((prefs as PersistedSymbolPrefs).intent) ? (prefs as PersistedSymbolPrefs).intent : undefined;
-        if (strategy || intent) {
-          perSymbol[symbol] = {
-            ...(strategy ? { strategy: strategy as StrategyKey } : {}),
-            ...(intent ? { intent } : {}),
-          };
-        }
-      });
-    }
+    Object.entries(perSymbolInput).forEach(([symbol, prefs]) => {
+      if (!prefs || typeof prefs !== "object") {
+        return;
+      }
+      const strategyValue = (prefs as PersistedSymbolPrefs).strategy;
+      const strategy = isStrategyKey(strategyValue) ? strategyValue : undefined;
+      const intent = isTradeIntent((prefs as PersistedSymbolPrefs).intent) ? (prefs as PersistedSymbolPrefs).intent : undefined;
+      if (strategy || intent) {
+        perSymbol[symbol] = {
+          ...(strategy ? { strategy: strategy as StrategyKey } : {}),
+          ...(intent ? { intent } : {}),
+        };
+      }
+    });
 
     return {
       ...(activeSymbol ? { activeSymbol } : {}),
-      ...(Object.keys(perSymbol).length ? { perSymbol } : {}),
+      perSymbol,
     };
   } catch (error) {
-    return {};
+    return { perSymbol: {} };
   }
 }
 
@@ -89,7 +87,7 @@ function writePersistedSelections(selections: PersistedSelections): void {
   }
 
   try {
-    const payload: PersistedSelections = {};
+    const payload: PersistedSelections = { perSymbol: {} };
     if (selections.activeSymbol && typeof selections.activeSymbol === "string") {
       payload.activeSymbol = selections.activeSymbol;
     }
@@ -111,12 +109,10 @@ function writePersistedSelections(selections: PersistedSelections): void {
           sanitized[symbol] = entry;
         }
       });
-      if (Object.keys(sanitized).length) {
-        payload.perSymbol = sanitized;
-      }
+      payload.perSymbol = sanitized;
     }
 
-    if (!payload.activeSymbol && !payload.perSymbol) {
+    if (!payload.activeSymbol && !Object.keys(payload.perSymbol).length) {
       window.localStorage.removeItem(STORAGE_KEY);
       return;
     }
@@ -125,15 +121,6 @@ function writePersistedSelections(selections: PersistedSelections): void {
   } catch (error) {
     // Swallow storage errors (e.g., private mode)
   }
-}
-
-function updatePersistedSelections(updater: (prev: PersistedSelections) => PersistedSelections): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  const previous = readPersistedSelections();
-  const next = updater(previous);
-  writePersistedSelections(next);
 }
 
 export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: ActionCenterProps) {
@@ -172,19 +159,30 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     return list;
   }, [plan, planOptions]);
 
-    const initialSelectionsRef = useRef<PersistedSelections | null>(null);
-    if (initialSelectionsRef.current === null) {
-      initialSelectionsRef.current = readPersistedSelections();
-    }
-    const initialSelections = initialSelectionsRef.current ?? {};
+  const initialSelectionsRef = useRef<PersistedSelections | null>(null);
+  if (initialSelectionsRef.current === null) {
+    initialSelectionsRef.current = readPersistedSelections();
+  }
+  const initialSelections = initialSelectionsRef.current ?? { perSymbol: {} };
 
-    const initialActiveSymbol = initialSelections.activeSymbol || plan.symbol;
-
-    const [activeSymbol, setActiveSymbol] = useState<string>(initialActiveSymbol);
+  const [activeSymbol, setActiveSymbol] = useState<string>(initialSelections.activeSymbol || plan.symbol);
+  const [symbolPrefs, setSymbolPrefs] = useState<Record<string, PersistedSymbolPrefs>>(initialSelections.perSymbol);
 
   useEffect(() => {
-    if (!normalizedOptions.some((option) => option.symbol === activeSymbol)) {
-      setActiveSymbol(plan.symbol);
+    const availableSymbols = normalizedOptions.map((option) => option.symbol);
+    if (availableSymbols.includes(activeSymbol)) {
+      return;
+    }
+
+    const persistedSymbol = initialSelectionsRef.current?.activeSymbol;
+    if (persistedSymbol && availableSymbols.includes(persistedSymbol)) {
+      setActiveSymbol(persistedSymbol);
+      return;
+    }
+
+    const fallback = availableSymbols[0] ?? plan.symbol;
+    if (fallback && fallback !== activeSymbol) {
+      setActiveSymbol(fallback);
     }
   }, [activeSymbol, normalizedOptions, plan.symbol]);
 
@@ -195,28 +193,24 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
 
   const activePlan = activeOption?.plan ?? plan;
 
-    const initialSymbolPrefs = (initialSelections.perSymbol ?? {})[initialActiveSymbol];
-
-    const deriveInitialStrategy = (): StrategyKey => {
-      const preferred = initialSymbolPrefs?.strategy;
-      if (preferred && activePlan.strategies[preferred]) {
-        return preferred;
-      }
-      if (initialStrategy && activePlan.strategies[initialStrategy]) {
-        return initialStrategy;
-      }
-      if (activePlan.strategies[DEFAULT_STRATEGY]) {
-        return DEFAULT_STRATEGY;
-      }
-      const availableKeys = Object.keys(activePlan.strategies ?? {}) as StrategyKey[];
-      return availableKeys[0] ?? DEFAULT_STRATEGY;
-    };
-
-    const [selectedStrategy, setSelectedStrategy] = useState<StrategyKey>(deriveInitialStrategy);
-    const [selectedIntent, setSelectedIntent] = useState<TradeIntent>(() => {
-      const preferred = initialSymbolPrefs?.intent;
-      return isTradeIntent(preferred) ? preferred : "buy";
-    });
+  const [selectedStrategy, setSelectedStrategy] = useState<StrategyKey>(() => {
+    const prefs = symbolPrefs[activeSymbol];
+    if (prefs?.strategy && activePlan.strategies[prefs.strategy]) {
+      return prefs.strategy;
+    }
+    if (initialStrategy && activePlan.strategies[initialStrategy]) {
+      return initialStrategy;
+    }
+    if (activePlan.strategies[DEFAULT_STRATEGY]) {
+      return DEFAULT_STRATEGY;
+    }
+    const availableKeys = Object.keys(activePlan.strategies ?? {}) as StrategyKey[];
+    return availableKeys[0] ?? DEFAULT_STRATEGY;
+  });
+  const [selectedIntent, setSelectedIntent] = useState<TradeIntent>(() => {
+    const prefs = symbolPrefs[activeSymbol];
+    return prefs?.intent && isTradeIntent(prefs.intent) ? prefs.intent : "buy";
+  });
 
   useEffect(() => {
     if (activePlan.strategies[selectedStrategy]) {
@@ -241,21 +235,18 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
   const previousSymbolRef = useRef<string>(activeSymbol);
 
   useEffect(() => {
-    const previous = previousSymbolRef.current;
-    if (activeSymbol === previous) {
+    const previousSymbol = previousSymbolRef.current;
+    if (activeSymbol === previousSymbol) {
       return;
     }
     previousSymbolRef.current = activeSymbol;
 
-    const persisted = readPersistedSelections();
-    const prefs = (persisted.perSymbol ?? {})[activeSymbol];
+    const prefs = symbolPrefs[activeSymbol];
     const available = activePlan.strategies ?? {};
 
     let nextStrategy: StrategyKey | undefined;
     if (prefs?.strategy && available[prefs.strategy]) {
       nextStrategy = prefs.strategy;
-    } else if (available[selectedStrategy]) {
-      nextStrategy = selectedStrategy;
     } else if (initialStrategy && available[initialStrategy]) {
       nextStrategy = initialStrategy;
     } else if (available[DEFAULT_STRATEGY]) {
@@ -269,39 +260,35 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
       setSelectedStrategy(nextStrategy);
     }
 
-    const nextIntent = prefs?.intent && isTradeIntent(prefs.intent) ? prefs.intent : selectedIntent;
+    const nextIntent = prefs?.intent && isTradeIntent(prefs.intent) ? prefs.intent : "buy";
     if (nextIntent !== selectedIntent) {
       setSelectedIntent(nextIntent);
     }
-  }, [activePlan, activeSymbol, initialStrategy, selectedIntent, selectedStrategy]);
+  }, [activePlan, activeSymbol, initialStrategy, selectedIntent, selectedStrategy, symbolPrefs]);
 
   useEffect(() => {
     if (!activeSymbol) {
       return;
     }
-    updatePersistedSelections((prev) => ({
-      ...prev,
-      activeSymbol,
-    }));
-  }, [activeSymbol]);
-
-  useEffect(() => {
-    if (!activeSymbol || !activePlan.strategies[selectedStrategy]) {
-      return;
-    }
-    updatePersistedSelections((prev) => {
-      const perSymbol = { ...(prev.perSymbol ?? {}) };
-      perSymbol[activeSymbol] = {
-        strategy: selectedStrategy,
-        intent: selectedIntent,
-      };
+    setSymbolPrefs((prev) => {
+      const existing = prev[activeSymbol] ?? {};
+      if (existing.strategy === selectedStrategy && existing.intent === selectedIntent) {
+        return prev;
+      }
       return {
         ...prev,
-        activeSymbol,
-        perSymbol,
+        [activeSymbol]: {
+          ...existing,
+          strategy: selectedStrategy,
+          intent: selectedIntent,
+        },
       };
     });
-  }, [activePlan.strategies, activeSymbol, selectedIntent, selectedStrategy]);
+  }, [activeSymbol, selectedIntent, selectedStrategy]);
+
+  useEffect(() => {
+    writePersistedSelections({ activeSymbol, perSymbol: symbolPrefs });
+  }, [activeSymbol, symbolPrefs]);
 
   const strategyPlan: StrategyPlan = activePlan.strategies[selectedStrategy] ?? activePlan.strategies[DEFAULT_STRATEGY];
 
