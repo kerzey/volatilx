@@ -36,9 +36,6 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   const uniqueShortTargets = Array.from(new Set(normalizedSellTargets));
   const uniqueLongTargets = Array.from(new Set(normalizedBuyTargets));
 
-  const hasShortTarget2 = uniqueShortTargets.length >= 2;
-  const hasLongTarget2 = uniqueLongTargets.length >= 2;
-
   const shortEntry = toNumber(sellSetup?.entry);
   const longEntry = toNumber(buySetup?.entry);
 
@@ -77,165 +74,134 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     latestPrice,
   ].filter((value): value is number => Number.isFinite(value));
 
-  const candidateMin = candidateValues.length ? Math.min(...candidateValues) : latestPrice - 1;
-  const candidateMax = candidateValues.length ? Math.max(...candidateValues) : latestPrice + 1;
-  const planLowerBound = candidateMin;
-  const planUpperBound = candidateMax;
-  const baseSpan = Math.max(candidateMax - candidateMin, Math.abs(latestPrice) * 0.02, 1);
-  const padding = baseSpan * 0.08;
-  const minBound = candidateMin - padding;
-  const maxBound = candidateMax + padding;
-  const totalSpan = Math.max(maxBound - minBound, 1e-6);
+  const levelOrder = [
+    "shortTarget2",
+    "shortTarget1",
+    "shortEntry",
+    "neutralLower",
+    "neutralUpper",
+    "longEntry",
+    "longTarget1",
+    "longTarget2",
+  ] as const;
 
-  const breakpointsSet = new Set<number>([minBound, maxBound]);
-  if (Number.isFinite(planLowerBound)) breakpointsSet.add(planLowerBound);
-  if (Number.isFinite(planUpperBound)) breakpointsSet.add(planUpperBound);
-  if (Number.isFinite(shortTargetFar)) breakpointsSet.add(shortTargetFar);
-  if (Number.isFinite(shortTargetNear)) breakpointsSet.add(shortTargetNear);
-  if (Number.isFinite(shortEntry)) breakpointsSet.add(shortEntry);
-  if (Number.isFinite(neutralLower)) breakpointsSet.add(neutralLower);
-  if (Number.isFinite(neutralUpper)) breakpointsSet.add(neutralUpper);
-  if (Number.isFinite(longEntry)) breakpointsSet.add(longEntry);
-  if (Number.isFinite(longTargetNear)) breakpointsSet.add(longTargetNear);
-  if (Number.isFinite(longTargetFar)) breakpointsSet.add(longTargetFar);
-
-  const breakpoints = Array.from(breakpointsSet)
-    .filter((value) => Number.isFinite(value))
-    .sort((a, b) => a - b);
-
-  const resolveZoneKey = (start: number, end: number): string => {
-    const mid = (start + end) / 2;
-
-    if (mid < planLowerBound) {
-      return "belowPlan";
-    }
-
-    if (mid > planUpperBound) {
-      return "abovePlan";
-    }
-
-    if (hasShortTarget2 && Number.isFinite(shortTargetFar) && mid <= shortTargetFar) {
-      return "shortTarget2";
-    }
-
-    if (Number.isFinite(shortTargetNear) && mid <= shortTargetNear) {
-      return "shortTarget1";
-    }
-
-    if (Number.isFinite(shortEntry) && mid <= shortEntry) {
-      return "shortEntry";
-    }
-
-    if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && mid >= neutralLower && mid <= neutralUpper) {
-      return "neutral";
-    }
-
-    if (Number.isFinite(neutralUpper) && mid < neutralLower && Number.isFinite(shortEntry)) {
-      return "shortEntry";
-    }
-
-    if (Number.isFinite(longEntry) && mid <= longEntry) {
-      return "longEntry";
-    }
-
-    if (Number.isFinite(longTargetNear) && mid <= longTargetNear) {
-      return "longTarget1";
-    }
-
-    if (hasLongTarget2 && Number.isFinite(longTargetFar) && mid <= longTargetFar) {
-      return "longTarget2";
-    }
-
-    if (Number.isFinite(shortEntry) && mid < shortEntry) {
-      return "belowPlan";
-    }
-
-    return "abovePlan";
+  const originalLevels: Record<(typeof levelOrder)[number], number | undefined> = {
+    shortTarget2: Number.isFinite(shortTargetFar) ? shortTargetFar : undefined,
+    shortTarget1: Number.isFinite(shortTargetNear) ? shortTargetNear : undefined,
+    shortEntry: Number.isFinite(shortEntry) ? shortEntry : undefined,
+    neutralLower: Number.isFinite(neutralLower) ? neutralLower : undefined,
+    neutralUpper: Number.isFinite(neutralUpper) ? neutralUpper : undefined,
+    longEntry: Number.isFinite(longEntry) ? longEntry : undefined,
+    longTarget1: Number.isFinite(longTargetNear) ? longTargetNear : undefined,
+    longTarget2: Number.isFinite(longTargetFar) ? longTargetFar : undefined,
   };
 
-  const numericSegments: Array<{ key: string; start: number; end: number }> = [];
+  const finiteLevelValues = levelOrder
+    .map((key) => originalLevels[key])
+    .filter((value): value is number => Number.isFinite(value));
 
-  for (let index = 0; index < breakpoints.length - 1; index += 1) {
-    const start = breakpoints[index];
-    const end = breakpoints[index + 1];
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-      continue;
-    }
-    const key = resolveZoneKey(start, end);
-    numericSegments.push({ key, start, end });
+  const derivedRange = finiteLevelValues.length >= 2 ? Math.max(...finiteLevelValues) - Math.min(...finiteLevelValues) : 0;
+  let fallbackSpacing = derivedRange > 0 ? derivedRange / (levelOrder.length + 1) : 0;
+  if (!Number.isFinite(fallbackSpacing) || fallbackSpacing <= 0) {
+    const basis = candidateValues.length >= 2 ? Math.max(...candidateValues) - Math.min(...candidateValues) : Math.abs(latestPrice) * 0.05;
+    fallbackSpacing = Math.max(basis, 1);
   }
 
-  if (!numericSegments.length) {
-    numericSegments.push({ key: "neutral", start: minBound, end: maxBound });
-  }
+  const firstLevel = originalLevels[levelOrder[0]];
+  let minBound = Number.isFinite(firstLevel)
+    ? (firstLevel as number) - fallbackSpacing
+    : finiteLevelValues.length
+      ? Math.min(...finiteLevelValues) - fallbackSpacing
+      : latestPrice - fallbackSpacing;
 
-  const mergedSegments: Array<{ key: string; start: number; end: number }> = [];
-  numericSegments.forEach((segment) => {
-    const last = mergedSegments[mergedSegments.length - 1];
-    if (last && last.key === segment.key) {
-      last.end = segment.end;
-    } else {
-      mergedSegments.push({ ...segment });
+  let lastValue = minBound;
+  const resolvedLevels = {} as Record<(typeof levelOrder)[number], number>;
+
+  levelOrder.forEach((key) => {
+    let value = originalLevels[key];
+    if (!Number.isFinite(value)) {
+      value = lastValue + fallbackSpacing;
     }
+    const minimumIncrement = Math.max(fallbackSpacing * 0.25, 0.01);
+    if (value <= lastValue) {
+      value = lastValue + minimumIncrement;
+    }
+    resolvedLevels[key] = value as number;
+    lastValue = value as number;
   });
+
+  const maxBound = lastValue + fallbackSpacing;
+  const totalSpan = Math.max(maxBound - minBound, 1e-6);
 
   const zoneMeta: Record<string, { label: string; className: string; value: () => string }> = {
     belowPlan: {
       label: "Below Plan",
       className: "bg-slate-900/60 text-slate-300 border-r border-slate-700/40",
-      value: () => `< ${formatPrice(planLowerBound)}`,
+      value: () => `< ${formatPrice(originalLevels.shortTarget2 ?? resolvedLevels.shortTarget2)}`,
     },
     shortTarget2: {
       label: "Short Target 2",
       className: "bg-rose-950/70 text-rose-100 border-r border-rose-900/40",
-      value: () => formatPrice(shortTargetFar),
+      value: () => formatPrice(originalLevels.shortTarget2 ?? resolvedLevels.shortTarget2),
     },
     shortTarget1: {
       label: "Short Target 1",
       className: "bg-rose-900/55 text-rose-100 border-r border-rose-700/45",
-      value: () => formatPrice(shortTargetNear),
+      value: () => formatPrice(originalLevels.shortTarget1 ?? resolvedLevels.shortTarget1),
     },
     shortEntry: {
       label: "Short Entry",
       className: "bg-rose-700/45 text-rose-50 border-r border-rose-500/35",
-      value: () => formatPrice(shortEntry),
+      value: () => formatPrice(originalLevels.shortEntry ?? resolvedLevels.shortEntry),
     },
     neutral: {
       label: "No-Trade",
       className: "bg-amber-400/25 text-amber-50 border-r border-amber-300/40",
-      value: () => `${formatPrice(neutralLower)} – ${formatPrice(neutralUpper)}`,
+      value: () => `${formatPrice(originalLevels.neutralLower ?? resolvedLevels.neutralLower)} – ${formatPrice(originalLevels.neutralUpper ?? resolvedLevels.neutralUpper)}`,
     },
     longEntry: {
       label: "Long Entry",
       className: "bg-emerald-700/40 text-emerald-50 border-r border-emerald-500/35",
-      value: () => formatPrice(longEntry),
+      value: () => formatPrice(originalLevels.longEntry ?? resolvedLevels.longEntry),
     },
     longTarget1: {
       label: "Long Target 1",
       className: "bg-emerald-800/45 text-emerald-100 border-r border-emerald-600/40",
-      value: () => formatPrice(longTargetNear),
+      value: () => formatPrice(originalLevels.longTarget1 ?? resolvedLevels.longTarget1),
     },
     longTarget2: {
       label: "Long Target 2",
       className: "bg-emerald-950/65 text-emerald-100",
-      value: () => formatPrice(longTargetFar),
+      value: () => formatPrice(originalLevels.longTarget2 ?? resolvedLevels.longTarget2),
     },
     abovePlan: {
       label: "Above Plan",
       className: "bg-slate-900/60 text-slate-300",
-      value: () => `> ${formatPrice(planUpperBound)}`,
+      value: () => `> ${formatPrice(originalLevels.longTarget2 ?? resolvedLevels.longTarget2)}`,
     },
   };
 
   const metaForKey = (key: string) => zoneMeta[key] ?? zoneMeta.neutral;
 
-  const segmentsWithWidth = mergedSegments
+  const segmentsBlueprint: Array<{ key: Segment["key"]; start: number; end: number }> = [
+    { key: "belowPlan", start: minBound, end: resolvedLevels.shortTarget2 },
+    { key: "shortTarget2", start: resolvedLevels.shortTarget2, end: resolvedLevels.shortTarget1 },
+    { key: "shortTarget1", start: resolvedLevels.shortTarget1, end: resolvedLevels.shortEntry },
+    { key: "shortEntry", start: resolvedLevels.shortEntry, end: resolvedLevels.neutralLower },
+    { key: "neutral", start: resolvedLevels.neutralLower, end: resolvedLevels.neutralUpper },
+    { key: "longEntry", start: resolvedLevels.neutralUpper, end: resolvedLevels.longEntry },
+    { key: "longTarget1", start: resolvedLevels.longEntry, end: resolvedLevels.longTarget1 },
+    { key: "longTarget2", start: resolvedLevels.longTarget1, end: resolvedLevels.longTarget2 },
+    { key: "abovePlan", start: resolvedLevels.longTarget2, end: maxBound },
+  ];
+
+  const segmentsWithWidth = segmentsBlueprint
     .map((segment) => {
-    const meta = metaForKey(segment.key);
-      const span = Math.max(segment.end - segment.start, 0);
-      if (span <= 0) {
+      const span = segment.end - segment.start;
+      if (!Number.isFinite(span) || span <= 0) {
         return null;
       }
+      const meta = metaForKey(segment.key);
       return {
         key: segment.key,
         label: meta.label,
