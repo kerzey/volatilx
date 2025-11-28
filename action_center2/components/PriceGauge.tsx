@@ -265,7 +265,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         </div>
         <div
           className="pointer-events-none absolute -top-3 flex flex-col items-center text-xs text-slate-200"
-          style={{ left: `calc(${pointer}% - 12px)` }}
+          style={{ left: `${pointer}%`, transform: "translateX(-50%)" }}
         >
           <span className="h-3 w-[2px] rounded-full bg-indigo-400" />
           <span className="mt-1 rounded-full bg-indigo-500/20 px-3 py-1 text-[10px] font-semibold">
