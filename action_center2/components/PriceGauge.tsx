@@ -132,6 +132,48 @@ const adjustMarkerGroupPercents = (groups: MarkerGroup[], minSpacingPercent: num
   return adjusted;
 };
 
+const alignPointerPercentWithMarkers = (
+  pointerPercent: number,
+  groups: MarkerGroup[],
+  latestPrice: number,
+): number => {
+  if (!Number.isFinite(pointerPercent) || !Number.isFinite(latestPrice) || !groups.length) {
+    return clamp(pointerPercent, 0, 100);
+  }
+
+  const epsilon = 0.5; // small visual offset so the pointer stays clearly to one side
+  let adjusted = clamp(pointerPercent, 0, 100);
+
+  const leftGroups = groups.filter((group) => Number.isFinite(group.value) && latestPrice >= group.value);
+  const rightGroups = groups.filter((group) => Number.isFinite(group.value) && latestPrice <= group.value);
+
+  if (leftGroups.length) {
+    const maxLeftPercent = Math.max(...leftGroups.map((group) => group.percent));
+    if (adjusted <= maxLeftPercent) {
+      adjusted = Math.min(100, maxLeftPercent + epsilon);
+    }
+  }
+
+  if (rightGroups.length) {
+    const minRightPercent = Math.min(...rightGroups.map((group) => group.percent));
+    if (adjusted >= minRightPercent) {
+      adjusted = Math.max(0, minRightPercent - epsilon);
+    }
+  }
+
+  if (leftGroups.length && rightGroups.length) {
+    const leftBound = Math.max(...leftGroups.map((group) => group.percent)) + epsilon;
+    const rightBound = Math.min(...rightGroups.map((group) => group.percent)) - epsilon;
+    if (leftBound > rightBound) {
+      adjusted = clamp((leftBound + rightBound) / 2, 0, 100);
+    } else {
+      adjusted = clamp(Math.min(Math.max(adjusted, leftBound), rightBound), 0, 100);
+    }
+  }
+
+  return clamp(adjusted, 0, 100);
+};
+
 export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
   const normalizedSellTargets = Array.isArray(sellSetup?.targets)
     ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
@@ -292,10 +334,11 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   const maxBound = maxValue + padding;
   const totalSpan = Math.max(maxBound - minBound, 1e-6);
 
-  const pointerPercent = clamp(((latestPrice - minBound) / totalSpan) * 100, 0, 100);
+  const pointerPercentRaw = clamp(((latestPrice - minBound) / totalSpan) * 100, 0, 100);
 
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
   const spacedMarkerGroups = adjustMarkerGroupPercents(markerGroups, 3);
+  const pointerPercent = alignPointerPercentWithMarkers(pointerPercentRaw, spacedMarkerGroups, latestPrice);
 
   const priceChipClass =
     "rounded-lg border border-slate-700/70 bg-slate-950/90 px-2.5 py-1 text-xs font-semibold text-slate-100 shadow-inner shadow-black/20 backdrop-blur-sm";
