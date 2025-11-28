@@ -1083,7 +1083,7 @@ var require_react_development = __commonJS({
           }
           return dispatcher.useContext(Context);
         }
-        function useState2(initialState) {
+        function useState3(initialState) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useState(initialState);
         }
@@ -1091,11 +1091,11 @@ var require_react_development = __commonJS({
           var dispatcher = resolveDispatcher();
           return dispatcher.useReducer(reducer, initialArg, init);
         }
-        function useRef(initialValue) {
+        function useRef3(initialValue) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useRef(initialValue);
         }
-        function useEffect2(create, deps) {
+        function useEffect4(create, deps) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useEffect(create, deps);
         }
@@ -1107,11 +1107,11 @@ var require_react_development = __commonJS({
           var dispatcher = resolveDispatcher();
           return dispatcher.useLayoutEffect(create, deps);
         }
-        function useCallback(callback, deps) {
+        function useCallback3(callback, deps) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useCallback(callback, deps);
         }
-        function useMemo2(create, deps) {
+        function useMemo3(create, deps) {
           var dispatcher = resolveDispatcher();
           return dispatcher.useMemo(create, deps);
         }
@@ -1874,19 +1874,19 @@ var require_react_development = __commonJS({
         exports.memo = memo;
         exports.startTransition = startTransition;
         exports.unstable_act = act;
-        exports.useCallback = useCallback;
+        exports.useCallback = useCallback3;
         exports.useContext = useContext;
         exports.useDebugValue = useDebugValue;
         exports.useDeferredValue = useDeferredValue;
-        exports.useEffect = useEffect2;
+        exports.useEffect = useEffect4;
         exports.useId = useId;
         exports.useImperativeHandle = useImperativeHandle;
         exports.useInsertionEffect = useInsertionEffect;
         exports.useLayoutEffect = useLayoutEffect;
-        exports.useMemo = useMemo2;
+        exports.useMemo = useMemo3;
         exports.useReducer = useReducer;
-        exports.useRef = useRef;
-        exports.useState = useState2;
+        exports.useRef = useRef3;
+        exports.useState = useState3;
         exports.useSyncExternalStore = useSyncExternalStore;
         exports.useTransition = useTransition;
         exports.version = ReactVersion;
@@ -2433,7 +2433,7 @@ var require_react_dom_development = __commonJS({
         var HostPortal = 4;
         var HostComponent = 5;
         var HostText = 6;
-        var Fragment = 7;
+        var Fragment2 = 7;
         var Mode = 8;
         var ContextConsumer = 9;
         var ContextProvider = 10;
@@ -3590,7 +3590,7 @@ var require_react_dom_development = __commonJS({
               return "DehydratedFragment";
             case ForwardRef:
               return getWrappedName$1(type, type.render, "ForwardRef");
-            case Fragment:
+            case Fragment2:
               return "Fragment";
             case HostComponent:
               return type;
@@ -12019,7 +12019,7 @@ var require_react_dom_development = __commonJS({
             }
           }
           function updateFragment2(returnFiber, current2, fragment, lanes, key) {
-            if (current2 === null || current2.tag !== Fragment) {
+            if (current2 === null || current2.tag !== Fragment2) {
               var created = createFiberFromFragment(fragment, returnFiber.mode, lanes, key);
               created.return = returnFiber;
               return created;
@@ -12422,7 +12422,7 @@ var require_react_dom_development = __commonJS({
               if (child.key === key) {
                 var elementType = element.type;
                 if (elementType === REACT_FRAGMENT_TYPE) {
-                  if (child.tag === Fragment) {
+                  if (child.tag === Fragment2) {
                     deleteRemainingChildren(returnFiber, child.sibling);
                     var existing = useFiber(child, element.props.children);
                     existing.return = returnFiber;
@@ -17898,7 +17898,7 @@ var require_react_dom_development = __commonJS({
               var _resolvedProps2 = workInProgress2.elementType === type ? _unresolvedProps2 : resolveDefaultProps(type, _unresolvedProps2);
               return updateForwardRef(current2, workInProgress2, type, _resolvedProps2, renderLanes2);
             }
-            case Fragment:
+            case Fragment2:
               return updateFragment(current2, workInProgress2, renderLanes2);
             case Mode:
               return updateMode(current2, workInProgress2, renderLanes2);
@@ -18170,7 +18170,7 @@ var require_react_dom_development = __commonJS({
             case SimpleMemoComponent:
             case FunctionComponent:
             case ForwardRef:
-            case Fragment:
+            case Fragment2:
             case Mode:
             case Profiler:
             case ContextConsumer:
@@ -22431,7 +22431,7 @@ var require_react_dom_development = __commonJS({
           return fiber;
         }
         function createFiberFromFragment(elements, mode, lanes, key) {
-          var fiber = createFiber(Fragment, elements, key, mode);
+          var fiber = createFiber(Fragment2, elements, key, mode);
           fiber.lanes = lanes;
           return fiber;
         }
@@ -24486,11 +24486,11 @@ var require_jsx_runtime = __commonJS({
 });
 
 // action_center2/index.ts
-var import_react2 = __toESM(require_react());
+var import_react4 = __toESM(require_react());
 var import_client = __toESM(require_client());
 
 // action_center2/components/ActionCenterPage.tsx
-var import_react = __toESM(require_react());
+var import_react3 = __toESM(require_react());
 
 // action_center2/utils/planMath.ts
 var NEAR_TOLERANCE = 2e-3;
@@ -24764,22 +24764,6 @@ function classifyPriceZone({
   }
   return { zone: "NEUTRAL" };
 }
-function describeTradeState(tradeState, focus) {
-  switch (tradeState) {
-    case "BUY_TRIGGERING":
-      return focus === "long" ? "Momentum is arming the long trigger." : null;
-    case "SELL_TRIGGERING":
-      return focus === "short" ? "Momentum is arming the short trigger." : null;
-    case "BUY_ACTIVE":
-      return focus === "long" ? "Long setup is active \u2014 manage position sizing." : null;
-    case "SELL_ACTIVE":
-      return focus === "short" ? "Short setup is active \u2014 expect pressure." : null;
-    case "NO_TRADE":
-      return focus === "neutral" ? "Respect the neutral range until price exits decisively." : null;
-    default:
-      return null;
-  }
-}
 function formatRange(lower, upper) {
   if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
     return null;
@@ -24794,123 +24778,123 @@ function resolveBuySummary(context) {
     longTargets,
     shortEntry,
     shortTargets,
-    neutralBands,
-    tradeState
+    neutralBands
   } = context;
-  const firstLongTarget = longTargets[0];
-  const finalLongTarget = longTargets[longTargets.length - 1];
   const lowestShort = shortTargets[shortTargets.length - 1];
   const highestShort = shortTargets[0];
+  const firstLongTarget = longTargets[0];
+  const secondLongTarget = longTargets[1];
+  const finalLongTarget = longTargets[longTargets.length - 1];
   const primaryNeutral = neutralBands[0];
   const ladderBounds = classification.ladderBounds;
+  const longEntryLabel = Number.isFinite(longEntry) ? formatPrice(longEntry) : null;
+  const longStopLabel = Number.isFinite(longStop) ? formatPrice(longStop) : null;
+  const shortEntryLabel = Number.isFinite(shortEntry) ? formatPrice(shortEntry) : null;
+  const lowestShortLabel = Number.isFinite(lowestShort) ? formatPrice(lowestShort) : null;
+  const highestShortLabel = Number.isFinite(highestShort) ? formatPrice(highestShort) : null;
+  const targetOneLabel = Number.isFinite(firstLongTarget) ? formatPrice(firstLongTarget) : null;
+  const targetTwoLabel = Number.isFinite(secondLongTarget) ? formatPrice(secondLongTarget) : null;
+  const finalLongTargetLabel = Number.isFinite(finalLongTarget) ? formatPrice(finalLongTarget) : null;
+  const neutralRangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+  const ladderRangeLabel = ladderBounds ? formatRange(ladderBounds.lower, ladderBounds.upper) : null;
   switch (classification.zone) {
     case "LONG_INVALIDATED":
       return {
-        title: "Long thesis invalidated",
-        subtitle: `Price slipped below ${formatPrice(longStop)}`,
+        title: "Long plan broken",
+        subtitle: longStopLabel ? `Price has moved below the long stop (${longStopLabel}).` : "Price has moved below the long stop.",
         bullets: [
-          "Abort long entries until a fresh analysis rebuilds the plan.",
-          "Wait for volatility to settle before re-engaging."
+          "Close or avoid long positions.",
+          "Allow volatility to cool and wait for a fresh setup from the new analysis."
         ],
-        status: "neutral"
+        status: "bearish"
       };
     case "SHORT_INVALIDATED":
       return {
         title: "Short setup failed",
-        subtitle: `Momentum is squeezing above ${formatPrice(shortEntry)}`,
+        subtitle: shortEntryLabel ? `Price is squeezing above the bearish level (${shortEntryLabel}).` : "Price is squeezing above the bearish level.",
         bullets: [
-          "Prepare to execute the long plan \u2014 sellers are capitulating.",
-          `Expect acceleration if ${formatPrice(shortEntry)} now holds as support.`
+          "Bias shifts more positive for longs.",
+          "Expect acceleration if price holds above that level and prepare a revised long plan."
         ],
         status: "bullish"
       };
     case "BREAKDOWN":
       return {
         title: "Stand aside",
-        subtitle: "Selling pressure dominates the tape.",
+        subtitle: "Strong downward move in progress.",
         bullets: [
-          lowestShort ? `Wait for price to reclaim ${formatPrice(lowestShort)} before planning longs.` : "Stay patient until price stabilises above the last short target.",
-          "Monitor momentum for a higher low before deploying capital."
+          "Wait until price stops making new lows.",
+          lowestShortLabel ? `Look for a clear bounce back above the lowest short target (${lowestShortLabel}) before considering longs.` : "Look for a clear bounce back above the lowest short target before considering longs."
         ],
         status: "bearish"
       };
     case "SHORT_LADDER":
       return {
-        title: "Let shorts exhaust",
-        subtitle: "Price is still working through downside targets.",
+        title: "Let sellers finish their move",
+        subtitle: "Price is still moving through downside targets.",
         bullets: [
-          ladderBounds ? `Watch reactions between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.` : "Track short targets for signs of exhaustion.",
-          "Only prepare longs once momentum slows and a higher low forms."
+          ladderRangeLabel ? `Watch how price reacts between ${ladderRangeLabel}.` : "Watch how price reacts near each short target.",
+          "Only prepare long ideas once the drops start getting smaller and momentum slows."
         ],
         status: "bearish"
       };
     case "PRE_SHORT":
       return {
-        title: "Still below bearish pivot",
-        subtitle: "Long setup needs price back above resistance.",
+        title: "Still below key resistance",
+        subtitle: "Long setup needs price back above the bearish pivot.",
         bullets: [
-          `Set an alert at ${formatPrice(shortEntry)} to know when selling pressure fades.`,
-          highestShort ? `Watch ${formatPrice(highestShort)} for basing attempts.` : "Wait for the first higher low before committing capital."
+          shortEntryLabel ? `Set an alert at the short trigger level (${shortEntryLabel}).` : "Set an alert at the short trigger level.",
+          "Stay patient until price can reclaim resistance and hold."
         ],
         status: "neutral"
       };
-    case "NEUTRAL": {
-      const rangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+    case "NEUTRAL":
       return {
         title: "Inside neutral band",
-        subtitle: "No directional edge yet.",
+        subtitle: "No clear edge for new longs yet.",
         bullets: [
-          rangeLabel ? `Sit out until price exits ${rangeLabel}.` : "Stand aside until price leaves the neutral range.",
-          `Long bias requires a breakout above ${formatPrice(longEntry)}.`
+          neutralRangeLabel ? `Avoid forcing trades while price is stuck in the range (${neutralRangeLabel}).` : "Avoid forcing trades while price is stuck in the range.",
+          longEntryLabel ? `Wait for a clean break above the band and toward the long entry (${longEntryLabel}).` : "Wait for a clean break above the band and toward the long entry."
         ],
         status: "neutral"
       };
-    }
-    case "PRE_LONG": {
-      const tradeCue = describeTradeState(tradeState, "long");
+    case "PRE_LONG":
       return {
-        title: "Prep the long trigger",
-        subtitle: `Price is approaching ${formatPrice(longEntry)}.`,
+        title: "Prepare the long setup",
+        subtitle: "Price is moving toward your long entry.",
         bullets: [
-          `Queue entry orders near ${formatPrice(longEntry)} with stop at ${formatPrice(longStop)}.`,
-          tradeCue || "Let the breakout confirm before deploying full size."
+          longStopLabel ? `Plan order size and risk using the long stop (${longStopLabel}).` : "Plan order size and risk using the long stop.",
+          longEntryLabel ? `If momentum looks weak, let the candle close above ${longEntryLabel} before acting.` : "If momentum looks weak, let the candle close above the long entry before acting."
         ],
         status: "bullish"
       };
-    }
-    case "LONG_TRIGGER": {
-      const tradeCue = describeTradeState(tradeState, "long");
+    case "LONG_TRIGGER":
       return {
-        title: "Execute starter long",
-        subtitle: "Trigger level is engaging.",
+        title: "Starter long becomes valid",
+        subtitle: "Long trigger level is now in play.",
         bullets: [
-          `Enter near ${formatPrice(longEntry)} and honour ${formatPrice(longStop)} as the fail level.`,
-          firstLongTarget ? `Map first scale-out at ${formatPrice(firstLongTarget)}.` : "Use trail stops to protect gains while price confirms.",
-          tradeCue || "Manage size responsibly as volatility lifts."
+          longEntryLabel && longStopLabel ? `Open an initial long near ${longEntryLabel} with a stop at ${longStopLabel}.` : "Open an initial long near the entry with a stop at the long stop.",
+          targetOneLabel && targetTwoLabel ? `Plan to take first profits at ${targetOneLabel} and reassess toward ${targetTwoLabel}.` : targetOneLabel ? `Plan to take first profits at ${targetOneLabel} and reassess toward the next target.` : "Plan to take first profits at Target 1 and reassess toward Target 2."
         ],
         status: "bullish"
       };
-    }
-    case "LONG_LADDER": {
-      const tradeCue = describeTradeState(tradeState, "long");
+    case "LONG_LADDER":
       return {
-        title: "Manage the long ladder",
-        subtitle: "Price is advancing through profit targets.",
+        title: "Manage the winning long",
+        subtitle: "Price is moving through your profit targets.",
         bullets: [
-          ladderBounds ? `Scale partial profits between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.` : `Respect the profit ladder above ${formatPrice(longEntry)}.`,
-          `Trail stops to the prior rung to protect gains.`,
-          tradeCue || "Stay alert for momentum shifts near targets."
+          ladderRangeLabel ? `Take partial profits as each target is reached between ${ladderRangeLabel}.` : "Take partial profits as each target is reached.",
+          "Trail your stop up toward the previous target to lock in gains."
         ],
         status: "bullish"
       };
-    }
     case "BREAKOUT":
       return {
-        title: "Momentum breakout",
-        subtitle: "Price is extending beyond planned upside targets.",
+        title: "Upside extension",
+        subtitle: "Price is running beyond planned targets.",
         bullets: [
-          finalLongTarget ? `Use ${formatPrice(finalLongTarget)} as the new risk pivot.` : "Define a fresh risk pivot for continuation trades.",
-          "Either add with tight stops or wait for a pullback before adding size."
+          finalLongTargetLabel ? `Only add with very tight stops or wait for a pullback into the last target zone near ${finalLongTargetLabel}.` : "Only add with very tight stops or wait for a pullback into the last target zone.",
+          "Consider re-running analysis to update upside levels."
         ],
         status: "bullish"
       };
@@ -24919,7 +24903,7 @@ function resolveBuySummary(context) {
         title: "Long setup on watch",
         subtitle: "Follow the plan as levels evolve.",
         bullets: [
-          `Entry ${formatPrice(longEntry)} \xB7 Stop ${formatPrice(longStop)} \xB7 Target ${formatPrice(firstLongTarget)}`
+          highestShortLabel && longEntryLabel ? `Respect the path from ${highestShortLabel} to ${longEntryLabel} before leaning long.` : "Stay patient while the plan develops."
         ],
         status: "neutral"
       };
@@ -24932,112 +24916,117 @@ function resolveSellSummary(context) {
     longStop,
     longTargets,
     shortEntry,
-    shortTargets,
-    tradeState
+    neutralBands
   } = context;
   const firstLongTarget = longTargets[0];
   const finalLongTarget = longTargets[longTargets.length - 1];
-  const lowestShort = shortTargets[shortTargets.length - 1];
+  const primaryNeutral = neutralBands ? neutralBands[0] : void 0;
   const ladderBounds = classification.ladderBounds;
+  const longEntryLabel = Number.isFinite(longEntry) ? formatPrice(longEntry) : null;
+  const longStopLabel = Number.isFinite(longStop) ? formatPrice(longStop) : null;
+  const shortEntryLabel = Number.isFinite(shortEntry) ? formatPrice(shortEntry) : null;
+  const targetOneLabel = Number.isFinite(firstLongTarget) ? formatPrice(firstLongTarget) : null;
+  const finalLongTargetLabel = Number.isFinite(finalLongTarget) ? formatPrice(finalLongTarget) : null;
+  const neutralRangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+  const ladderRangeLabel = ladderBounds ? formatRange(ladderBounds.lower, ladderBounds.upper) : null;
   switch (classification.zone) {
     case "LONG_INVALIDATED":
       return {
-        title: "Exit the long",
-        subtitle: `Stop level ${formatPrice(longStop)} just broke.`,
+        title: "Exit the long idea",
+        subtitle: longStopLabel ? `Price has broken the long stop level (${longStopLabel}).` : "Price has broken the long stop level.",
         bullets: [
-          "Flatten remaining shares immediately to protect capital.",
-          "Review the trade and wait for a new plan before re-entering."
+          "Close remaining long exposure if not already flat.",
+          "Review the trade and risk management before re-entering."
         ],
         status: "bearish"
       };
     case "SHORT_INVALIDATED":
       return {
-        title: "Relief rally in progress",
-        subtitle: `Short stop near ${formatPrice(shortEntry)} triggered.`,
+        title: "Relief rally underway",
+        subtitle: shortEntryLabel ? `Short stop above the bearish level (${shortEntryLabel}) has triggered.` : "Short stop above the bearish level has triggered.",
         bullets: [
-          "Use the squeeze to scale out remaining size into strength.",
-          `Consider re-running analysis if you plan to flip long above ${formatPrice(shortEntry)}.`
+          "Use the bounce to exit any remaining longs on your terms.",
+          "Run a new analysis if you are considering flipping to a fresh long setup."
         ],
         status: "bullish"
       };
     case "BREAKDOWN":
       return {
-        title: "Emergency exit",
-        subtitle: "Long thesis failed \u2014 sellers are in control.",
+        title: "Emergency exit zone",
+        subtitle: "Long idea has failed; sellers are in control.",
         bullets: [
-          lowestShort ? `Close remaining exposure before ${formatPrice(lowestShort)} fails.` : "Prioritise capital preservation over targets.",
-          "Re-assess once price stabilises."
+          "Close remaining long exposure as price breaks down.",
+          "Reassess the chart once price stops making new lows."
         ],
         status: "bearish"
       };
     case "SHORT_LADDER":
       return {
-        title: "Sell into bounces",
-        subtitle: "Price is marching through short targets.",
+        title: "Sell into strength",
+        subtitle: "Price is moving through short-side targets.",
         bullets: [
-          ladderBounds ? `Trim into pops toward ${formatPrice(ladderBounds.upper)}.` : "Fade strength while the short ladder is in control.",
-          "Tighten trailing stops above recent micro highs."
+          ladderRangeLabel ? `Use intraday bounces to reduce or close long size between ${ladderRangeLabel}.` : "Use intraday bounces to reduce or close long size.",
+          "Tighten a trailing stop above recent minor highs."
         ],
         status: "bearish"
       };
     case "PRE_SHORT":
       return {
-        title: "Risk is rising",
-        subtitle: "Below the bearish pivot.",
+        title: "Risk is increasing",
+        subtitle: "Price is trading under the bearish pivot.",
         bullets: [
-          `If ${formatPrice(shortEntry)} breaks, trim more size immediately.`,
-          "Prepare contingency orders for a full breakdown."
+          shortEntryLabel ? `Trim longs if price cannot reclaim the short trigger (${shortEntryLabel}).` : "Trim longs if price cannot reclaim the short trigger.",
+          "Have a plan ready in case a full breakdown starts."
         ],
         status: "bearish"
       };
     case "NEUTRAL":
       return {
-        title: "Hold steady",
-        subtitle: "Price is back inside the neutral range.",
+        title: "Hold steady in the range",
+        subtitle: "Price is back inside the neutral band.",
         bullets: [
-          "Avoid panic selling mid-range; let levels dictate the next move.",
-          `Stage exits near ${formatPrice(longEntry)} or the upper band.`
+          neutralRangeLabel ? `Avoid panic selling in the middle of the range (${neutralRangeLabel}).` : "Avoid panic selling in the middle of the range.",
+          longEntryLabel ? `Plan staggered exits closer to resistance or your long entry area near ${longEntryLabel}.` : "Plan staggered exits closer to resistance or your long entry area."
         ],
         status: "neutral"
       };
     case "PRE_LONG":
       return {
         title: "Strength rebuilding",
-        subtitle: `Price approaching ${formatPrice(longEntry)} trigger.`,
+        subtitle: "Price is moving back toward the long trigger.",
         bullets: [
-          `Keep remaining shares with stop tightened under ${formatPrice(longStop)}.`,
-          "Trim weak hands into strength if conviction is low."
+          longStopLabel ? `Tighten your stop below key support or the long stop area (${longStopLabel}).` : "Tighten your stop below key support or the long stop area.",
+          "Consider taking partial profits if conviction is low."
         ],
         status: "bullish"
       };
     case "LONG_TRIGGER":
       return {
-        title: "Stay long with conviction",
-        subtitle: "Trigger level is engaging.",
+        title: "Stay confidently long",
+        subtitle: "Support is forming around the trigger level.",
         bullets: [
-          `Hold core while ${formatPrice(longEntry)} acts as support.`,
-          firstLongTarget ? `Book partial profits into ${formatPrice(firstLongTarget)}.` : "Use a trailing stop to lock in progress.",
-          describeTradeState(tradeState, "long") || "Let the plan dictate scale-out points."
+          longEntryLabel ? `Keep a core position while ${longEntryLabel} acts as support.` : "Keep a core position while entry acts as support.",
+          targetOneLabel ? `Take partial profits at Target 1 (${targetOneLabel}) and follow the trade-state cue for further scaling.` : "Take partial profits at Target 1 and follow the trade-state cue for further scaling."
         ],
         status: "bullish"
       };
     case "LONG_LADDER":
       return {
-        title: "Scale profits",
-        subtitle: "Price working through upside targets.",
+        title: "Scale out of the winner",
+        subtitle: "Price is moving through upside targets.",
         bullets: [
-          ladderBounds ? `Sell into strength between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.` : `Use the target ladder to guide remaining exits above ${formatPrice(longEntry)}.`,
-          "Trail stops tighter with each rung cleared."
+          ladderRangeLabel ? `Sell portions of your position into strength between ${ladderRangeLabel}.` : "Sell portions of your position into strength at each target.",
+          "Move stops higher to protect open profits."
         ],
         status: "bullish"
       };
     case "BREAKOUT":
       return {
-        title: "Parabolic push",
-        subtitle: "Use the final spike to exit gracefully.",
+        title: "Final push higher",
+        subtitle: "Use the strong spike to exit well.",
         bullets: [
-          finalLongTarget ? `Finish scaling out into strength beyond ${formatPrice(finalLongTarget)}.` : "Close remaining size as momentum extends.",
-          "Keep only a token runner with a very tight stop."
+          finalLongTargetLabel ? `Finish taking profits beyond the last target (${finalLongTargetLabel}).` : "Finish taking profits beyond the last target.",
+          "Keep only a small runner with a very tight stop if you want extra upside optionality."
         ],
         status: "neutral"
       };
@@ -25046,7 +25035,7 @@ function resolveSellSummary(context) {
         title: "Manage long exposure",
         subtitle: "Follow the exit plan level by level.",
         bullets: [
-          `Stop ${formatPrice(longStop)} \xB7 Next trim ${formatPrice(firstLongTarget)}.`
+          longStopLabel && targetOneLabel ? `Stop ${longStopLabel} \xB7 Next trim ${targetOneLabel}.` : "Stay systematic with stops and trims."
         ],
         status: "neutral"
       };
@@ -25060,111 +25049,121 @@ function resolveBothSummary(context) {
     longTargets,
     shortEntry,
     shortTargets,
-    tradeState
+    neutralBands
   } = context;
   const firstLongTarget = longTargets[0];
   const finalLongTarget = longTargets[longTargets.length - 1];
   const lowestShort = shortTargets[shortTargets.length - 1];
   const highestShort = shortTargets[0];
+  const primaryNeutral = neutralBands ? neutralBands[0] : void 0;
   const ladderBounds = classification.ladderBounds;
+  const longEntryLabel = Number.isFinite(longEntry) ? formatPrice(longEntry) : null;
+  const longStopLabel = Number.isFinite(longStop) ? formatPrice(longStop) : null;
+  const shortEntryLabel = Number.isFinite(shortEntry) ? formatPrice(shortEntry) : null;
+  const lowestShortLabel = Number.isFinite(lowestShort) ? formatPrice(lowestShort) : null;
+  const highestShortLabel = Number.isFinite(highestShort) ? formatPrice(highestShort) : null;
+  const targetOneLabel = Number.isFinite(firstLongTarget) ? formatPrice(firstLongTarget) : null;
+  const finalLongTargetLabel = Number.isFinite(finalLongTarget) ? formatPrice(finalLongTarget) : null;
+  const neutralRangeLabel = primaryNeutral ? formatRange(primaryNeutral.min, primaryNeutral.max) : null;
+  const ladderRangeLabel = ladderBounds ? formatRange(ladderBounds.lower, ladderBounds.upper) : null;
   switch (classification.zone) {
     case "LONG_INVALIDATED":
       return {
-        title: "Flip short bias",
-        subtitle: `Long stop at ${formatPrice(longStop)} just failed.`,
+        title: "Bias turns short",
+        subtitle: longStopLabel ? `Long stop has broken (${longStopLabel}).` : "Long stop has broken.",
         bullets: [
-          "Look for short entries on weak retests of the broken level.",
-          "Rebuild the plan once volatility cools."
+          "Look for fresh short entries on any retest of the broken support.",
+          "Rebuild the plan once the volatility spike settles."
         ],
         status: "bearish"
       };
     case "SHORT_INVALIDATED":
       return {
-        title: "Favour longs",
-        subtitle: `Short invalidation above ${formatPrice(shortEntry)} triggered.`,
+        title: "Bias turns long",
+        subtitle: shortEntryLabel ? `Short idea failed above the bearish level (${shortEntryLabel}).` : "Short idea failed above the bearish level.",
         bullets: [
-          "Shift focus to the long ladder while the squeeze runs.",
-          "Set tight stops in case the move reverses."
+          "Shift focus to the long setup and upside targets.",
+          "If entering new longs, use tighter stops due to recent volatility."
         ],
         status: "bullish"
       };
     case "BREAKDOWN":
       return {
-        title: "Short continuation",
-        subtitle: "Momentum is breaking supports.",
+        title: "Short continuation zone",
+        subtitle: "Momentum is breaking through supports.",
         bullets: [
-          lowestShort ? `Press shorts toward ${formatPrice(lowestShort)} with stop above the prior rung.` : "Lean short but trail stops aggressively.",
-          "Mark the extreme for potential bounce opportunities."
+          lowestShortLabel ? `Favor short trades toward the lowest short target (${lowestShortLabel}) with defined stops.` : "Favor short trades toward the lowest short target with defined stops.",
+          "Mark this area as an extreme level to watch for a later bounce."
         ],
         status: "bearish"
       };
     case "SHORT_LADDER":
       return {
-        title: "Trade the short ladder",
-        subtitle: "Price stepping through downside targets.",
+        title: "Trade the short path",
+        subtitle: "Price is stepping through downside targets.",
         bullets: [
-          ladderBounds ? `Take profits between ${formatPrice(ladderBounds.lower)} and ${formatPrice(ladderBounds.upper)}.` : "Respect each short target for profit taking.",
-          describeTradeState(tradeState, "short") || "Watch for reversal triggers as targets complete."
+          ladderRangeLabel ? `Take profits on shorts between ${ladderRangeLabel}.` : "Take profits on shorts between the ladder bounds.",
+          "Follow the trade-state cue for when to reduce size or look for reversal signs."
         ],
         status: "bearish"
       };
     case "PRE_SHORT":
       return {
         title: "Guard the short trigger",
-        subtitle: "Price is testing the bearish pivot.",
+        subtitle: "Price is testing the bearish pivot area.",
         bullets: [
-          `Initiate shorts on a breakdown below ${formatPrice(shortEntry)}.`,
-          highestShort ? `Fade into ${formatPrice(highestShort)} if momentum rolls over.` : "Keep long scalps small until buyers prove control."
+          shortEntryLabel ? `Open or add to shorts only once price is clearly below the short trigger (${shortEntryLabel}).` : "Open or add to shorts only once price is clearly below the short trigger.",
+          highestShortLabel ? `Aggressive traders may try a small position near the highest short target (${highestShortLabel}) with tight risk.` : "Aggressive traders may try a small position near the highest short target with tight risk."
         ],
         status: "neutral"
       };
     case "NEUTRAL":
       return {
-        title: "Low conviction zone",
-        subtitle: "Keep position sizes light.",
+        title: "Low-conviction zone",
+        subtitle: "Keep risk small or stay flat.",
         bullets: [
-          "Stay flat or scalp the edges of the neutral band.",
-          `Arm alerts above ${formatPrice(longEntry)} and below ${formatPrice(shortEntry)}.`
+          neutralRangeLabel ? `Avoid heavy positioning while price is inside the neutral band (${neutralRangeLabel}).` : "Avoid heavy positioning while price is inside the neutral band.",
+          longEntryLabel && shortEntryLabel ? `Use alerts at the top and bottom of the band to catch the next directional move (${longEntryLabel} / ${shortEntryLabel}).` : "Use alerts at the top and bottom of the band to catch the next directional move."
         ],
         status: "neutral"
       };
     case "PRE_LONG":
       return {
-        title: "Long trigger loading",
-        subtitle: `Price approaching ${formatPrice(longEntry)}.`,
+        title: "Long trigger setting up",
+        subtitle: "Price is approaching the long entry.",
         bullets: [
-          `Stalk the breakout for long entries with stop at ${formatPrice(longStop)}.`,
-          describeTradeState(tradeState, "long") || "Keep short risk tight while buyers test the level."
+          longEntryLabel && longStopLabel ? `Prepare for a breakout long with stop at the long stop (${longStopLabel}).` : "Prepare for a breakout long with stop at the long stop.",
+          "If you are still short, consider reducing risk as price nears the long trigger."
         ],
         status: "bullish"
       };
     case "LONG_TRIGGER":
       return {
-        title: "Execute the long plan",
-        subtitle: "Trigger level is firing.",
+        title: "Run the long playbook",
+        subtitle: "Long trigger level is firing.",
         bullets: [
-          `Go long near ${formatPrice(longEntry)} with stop ${formatPrice(longStop)}.`,
-          firstLongTarget ? `Scale out at ${formatPrice(firstLongTarget)} while monitoring for reversal to re-enter short.` : "Trail stops quickly; reassess if momentum stalls."
+          longEntryLabel && longStopLabel ? `Enter long with stop at the long stop (${longStopLabel}).` : "Enter long with stop at the long stop.",
+          targetOneLabel ? `Scale at Target 1 (${targetOneLabel}) or tighten stops quickly if volatility is high.` : "Scale at Target 1 or tighten stops quickly if volatility is high."
         ],
         status: "bullish"
       };
     case "LONG_LADDER":
       return {
-        title: "Manage both sides",
+        title: "Manage longs, watch for turn",
         subtitle: "Price is moving through upside targets.",
         bullets: [
-          ladderBounds ? `Trail longs and look for exhaustion near ${formatPrice(ladderBounds.upper)} for potential fades.` : `Use the ladder above ${formatPrice(longEntry)} for both profit taking and fade setups.`,
-          describeTradeState(tradeState, "long") || "Stay nimble \u2014 trend traders hold, mean-reverters wait for signals."
+          ladderRangeLabel ? `Trail long profits as targets are reached between ${ladderRangeLabel}.` : "Trail long profits as targets are reached.",
+          "Watch for exhaustion near the upper targets if you plan to look for a new short later."
         ],
         status: "bullish"
       };
     case "BREAKOUT":
       return {
-        title: "Choose continuation or fade",
+        title: "Decide: ride or fade",
         subtitle: "Price is stretching above planned targets.",
         bullets: [
-          finalLongTarget ? `Continuation: ride longs while ${formatPrice(finalLongTarget)} holds.` : "Continuation: only chase with tight risk.",
-          lowestShort ? `Mean reversion: scout fades back toward ${formatPrice(lowestShort)} once momentum cracks.` : "Mean reversion: wait for a failed high before leaning short."
+          "Either continue with the trend using tight risk.",
+          finalLongTargetLabel ? `Or wait for a controlled pullback to look for a new short near the final long target (${finalLongTargetLabel}) and previous resistance.` : "Or wait for a controlled pullback to look for a new short near the final long target and previous resistance."
         ],
         status: "neutral"
       };
@@ -25173,7 +25172,7 @@ function resolveBothSummary(context) {
         title: "Follow the dominant setup",
         subtitle: "Let price dictate the side to trade.",
         bullets: [
-          `Key levels \u2014 Long ${formatPrice(longEntry)} | Short ${formatPrice(shortEntry)}.`
+          longEntryLabel && shortEntryLabel ? `Key levels \u2014 Long ${longEntryLabel} | Short ${shortEntryLabel}.` : "Keep both plans in view and react to price."
         ],
         status: "neutral"
       };
@@ -25185,27 +25184,24 @@ function buildStopNotes({
   shortStop,
   intent
 }) {
-  const notes = [];
+  const notes = /* @__PURE__ */ new Set();
   const price = safeNumber(latestPrice);
   const longStopValue = safeNumber(longStop);
   const shortStopValue = safeNumber(shortStop);
   const nearLongStop = Number.isFinite(price) && Number.isFinite(longStopValue) && Math.abs(price - longStopValue) / Math.abs(longStopValue) <= STOP_PROXIMITY_TOLERANCE;
   const nearShortStop = Number.isFinite(price) && Number.isFinite(shortStopValue) && Math.abs(price - shortStopValue) / Math.abs(shortStopValue) <= STOP_PROXIMITY_TOLERANCE;
   if (nearLongStop) {
-    if (intent === "buy" || intent === "sell" || intent === "both") {
-      notes.push("Long stop is under pressure \u2014 tighten risk or exit immediately.");
-    }
+    notes.add("Price is very close to the stop level \u2014 expect fast moves.");
+    notes.add("If this level breaks, the setup is no longer valid.");
   }
-  if (nearShortStop && Number.isFinite(shortStopValue)) {
-    if (intent === "buy") {
-      notes.push("Short crowd is close to invalidation \u2014 expect a squeeze higher.");
-    } else if (intent === "sell") {
-      notes.push("Short stop is in play \u2014 use the bounce to finish scaling out.");
-    } else {
-      notes.push("Short stop nearly triggered \u2014 be ready to flip long on confirmation.");
+  if (nearShortStop) {
+    notes.add("Price is very close to the stop level \u2014 expect fast moves.");
+    if (intent === "both") {
+      notes.add("If this level breaks, the setup is no longer valid.");
     }
+    notes.add("The opposing idea is about to fail; a sharp squeeze is possible if this level breaks.");
   }
-  return notes;
+  return Array.from(notes);
 }
 function buildExtremeNotes({
   classification,
@@ -25213,23 +25209,21 @@ function buildExtremeNotes({
   longTargets,
   shortTargets
 }) {
-  const notes = [];
+  const notes = /* @__PURE__ */ new Set();
   const price = safeNumber(latestPrice);
   const lowestShort = shortTargets[shortTargets.length - 1];
-  if (classification.zone === "BREAKDOWN" && Number.isFinite(price) && Number.isFinite(lowestShort) && price <= lowestShort * 0.99) {
-    notes.push("Price broke beyond the last downside target \u2014 run a fresh analysis for new support.");
-  }
   const highestLong = longTargets[longTargets.length - 1];
-  if (classification.zone === "BREAKOUT" && Number.isFinite(price) && Number.isFinite(highestLong) && price >= highestLong * 1.01) {
-    notes.push("Price is extending more than 1% beyond the final upside target \u2014 refresh the plan.");
+  const extremeMessage = "Price has moved well beyond the planned range. Run a fresh analysis to update targets and risk.";
+  if (Number.isFinite(price) && Number.isFinite(highestLong) && price >= highestLong * 1.01) {
+    notes.add(extremeMessage);
   }
-  if (classification.zone === "LONG_INVALIDATED") {
-    notes.push("Plan invalidated \u2014 schedule another analysis once conditions reset.");
+  if (Number.isFinite(price) && Number.isFinite(lowestShort) && price <= lowestShort * 0.99) {
+    notes.add(extremeMessage);
   }
-  if (classification.zone === "SHORT_INVALIDATED") {
-    notes.push("Short playbook failed \u2014 rerun analysis for updated upside levels.");
+  if (classification.zone === "LONG_INVALIDATED" || classification.zone === "SHORT_INVALIDATED") {
+    notes.add("This plan is now outdated. Wait for a new analysis before building a fresh position.");
   }
-  return notes;
+  return Array.from(notes);
 }
 function buildPlanSnapshot({
   intent,
@@ -25241,30 +25235,38 @@ function buildPlanSnapshot({
   shortTargets
 }) {
   const snapshots = [];
-  const longSummary = [
-    `Entry ${formatPrice(longEntry)}`,
+  const longTargetsLabel = longTargets.length ? longTargets.map((value) => formatPrice(value)).join(" / ") : null;
+  const shortTargetsLabel = shortTargets.length ? shortTargets.map((value) => formatPrice(value)).join(" / ") : null;
+  const longSnapshotParts = [
+    `Long plan: Entry ${formatPrice(longEntry)}`,
     `Stop ${formatPrice(longStop)}`,
-    longTargets.length ? `Targets ${longTargets.map((value) => formatPrice(value)).join(" \xB7 ")}` : null
-  ].filter(Boolean).join(" | ");
-  const shortSummary = [
-    `Entry ${formatPrice(shortEntry)}`,
+    longTargetsLabel ? `Targets ${longTargetsLabel}` : null
+  ].filter(Boolean);
+  const shortSnapshotParts = [
+    `Short plan: Entry ${formatPrice(shortEntry)}`,
     `Stop ${formatPrice(shortStop)}`,
-    shortTargets.length ? `Targets ${shortTargets.map((value) => formatPrice(value)).join(" \xB7 ")}` : null
-  ].filter(Boolean).join(" | ");
+    shortTargetsLabel ? `Targets ${shortTargetsLabel}` : null
+  ].filter(Boolean);
+  const longSnapshot = longSnapshotParts.join(" \u2022 ");
+  const shortSnapshot = shortSnapshotParts.join(" \u2022 ");
   if (intent === "buy") {
-    if (longSummary) {
-      snapshots.push(`Long plan \u2014 ${longSummary}`);
+    if (longSnapshotParts.length) {
+      snapshots.push(longSnapshot);
+    } else if (shortSnapshotParts.length) {
+      snapshots.push(shortSnapshot);
     }
   } else if (intent === "sell") {
-    if (longSummary) {
-      snapshots.push(`Exit map \u2014 ${longSummary}`);
+    if (shortSnapshotParts.length) {
+      snapshots.push(shortSnapshot);
+    } else if (longSnapshotParts.length) {
+      snapshots.push(longSnapshot);
     }
   } else {
-    if (longSummary) {
-      snapshots.push(`Long plan \u2014 ${longSummary}`);
+    if (longSnapshotParts.length) {
+      snapshots.push(longSnapshot);
     }
-    if (shortSummary) {
-      snapshots.push(`Short plan \u2014 ${shortSummary}`);
+    if (shortSnapshotParts.length) {
+      snapshots.push(shortSnapshot);
     }
   }
   return snapshots;
@@ -25326,7 +25328,7 @@ function deriveActionSummary({
     ...buildPlanSnapshot({ intent, longEntry, longStop, longTargets, shortEntry, shortStop, shortTargets })
   ].filter(Boolean);
   if (strategy.rewardRisk && Number.isFinite(strategy.rewardRisk)) {
-    narrative.push(`Reward/Risk ${strategy.rewardRisk.toFixed(2)}`);
+    narrative.push(`Reward/Risk: ${strategy.rewardRisk.toFixed(2)} (potential gain vs planned loss).`);
   }
   const { label: confidenceLabel, score: confidenceScore } = computeConfidence(strategy.conviction);
   return {
@@ -25442,90 +25444,348 @@ function StrategySelector({ selected, onSelect }) {
 
 // action_center2/components/PriceGauge.tsx
 var import_jsx_runtime3 = __toESM(require_jsx_runtime());
-function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
-  const sellTargets = sellSetup?.targets ?? [];
-  const buyTargets = buySetup?.targets ?? [];
-  const lowest = Math.min(
-    sellTargets[0] ?? sellSetup?.entry ?? latestPrice,
-    ...noTradeZones.map((z) => z.min),
-    buySetup?.entry ?? latestPrice,
-    buyTargets[0] ?? latestPrice
-  );
-  const highest = Math.max(
-    sellTargets[sellTargets.length - 1] ?? sellSetup?.entry ?? latestPrice,
-    ...noTradeZones.map((z) => z.max),
-    buySetup?.entry ?? latestPrice,
-    buyTargets[buyTargets.length - 1] ?? latestPrice
-  );
-  const pointer = highest === lowest ? 50 : clampToRange((latestPrice - lowest) / (highest - lowest) * 100, 0, 100);
-  const noTradeLabel = noTradeZones.length ? noTradeZones.map((zone) => `${formatPrice(zone.min)} \u2013 ${formatPrice(zone.max)}`).join(" | ") : "No neutral zone";
-  const segments = [
-    {
-      key: "sellTarget",
-      label: "Short Targets",
-      value: formatPrice(sellTargets[sellTargets.length - 1] ?? sellSetup?.entry),
-      className: "bg-rose-600/20 text-rose-200 border-r border-rose-500/20"
-    },
-    {
-      key: "sellEntry",
-      label: "Short Entry",
-      value: formatPrice(sellSetup?.entry),
-      className: "bg-rose-500/15 text-rose-100 border-r border-rose-400/20"
-    },
-    {
-      key: "neutral",
-      label: "No-Trade",
-      value: noTradeLabel,
-      className: "bg-amber-500/15 text-amber-100 border-r border-amber-400/20"
-    },
-    {
-      key: "buyEntry",
-      label: "Long Entry",
-      value: formatPrice(buySetup?.entry),
-      className: "bg-emerald-500/15 text-emerald-100 border-r border-emerald-400/20"
-    },
-    {
-      key: "buyTarget",
-      label: "Long Targets",
-      value: formatPrice(buyTargets[buyTargets.length - 1] ?? buySetup?.entry),
-      className: "bg-emerald-600/20 text-emerald-200"
+var toneStyles = {
+  short: {
+    dot: "bg-rose-400 shadow-[0_0_0_3px_rgba(244,63,94,0.35)]",
+    line: "bg-rose-400/70",
+    swatch: "bg-gradient-to-r from-rose-500 to-rose-400",
+    legendText: "text-rose-200"
+  },
+  neutral: {
+    dot: "bg-amber-300 shadow-[0_0_0_3px_rgba(252,211,77,0.35)]",
+    line: "bg-amber-300/70",
+    swatch: "bg-gradient-to-r from-amber-400 to-amber-300",
+    legendText: "text-amber-200"
+  },
+  long: {
+    dot: "bg-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.35)]",
+    line: "bg-emerald-400/70",
+    swatch: "bg-gradient-to-r from-emerald-500 to-emerald-400",
+    legendText: "text-emerald-200"
+  }
+};
+var clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+var toNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : NaN;
+};
+var buildMarkerGroups = (markers, minBound, maxBound) => {
+  if (!markers.length) {
+    return [];
+  }
+  const totalSpan = Math.max(maxBound - minBound, 1e-6);
+  const percentForValue = (value) => clamp((value - minBound) / totalSpan * 100, 0, 100);
+  const tolerance = Math.max(totalSpan * 25e-4, 0.01);
+  const ordered = [...markers].sort((a, b) => a.value - b.value);
+  const groups = [];
+  ordered.forEach((marker) => {
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && Math.abs(lastGroup.value - marker.value) <= tolerance) {
+      lastGroup.markers.push(marker);
+    } else {
+      groups.push({
+        value: marker.value,
+        percent: percentForValue(marker.value),
+        markers: [marker]
+      });
     }
+  });
+  return groups;
+};
+var adjustMarkerGroupPercents = (groups, minSpacingPercent) => {
+  if (groups.length <= 1) {
+    return groups;
+  }
+  const adjusted = groups.map((group) => ({ ...group }));
+  adjusted[0].percent = clamp(adjusted[0].percent, 0, 100);
+  for (let i = 1; i < adjusted.length; i++) {
+    adjusted[i].percent = clamp(adjusted[i].percent, 0, 100);
+    if (adjusted[i].percent - adjusted[i - 1].percent < minSpacingPercent) {
+      adjusted[i].percent = Math.min(100, adjusted[i - 1].percent + minSpacingPercent);
+    }
+  }
+  for (let i = adjusted.length - 2; i >= 0; i--) {
+    if (adjusted[i + 1].percent - adjusted[i].percent < minSpacingPercent) {
+      adjusted[i].percent = Math.max(0, adjusted[i + 1].percent - minSpacingPercent);
+    }
+  }
+  for (let i = 1; i < adjusted.length; i++) {
+    if (adjusted[i].percent - adjusted[i - 1].percent < minSpacingPercent) {
+      adjusted[i].percent = Math.min(100, adjusted[i - 1].percent + minSpacingPercent);
+    }
+  }
+  return adjusted;
+};
+var alignPointerPercentWithMarkers = (pointerPercent, groups, latestPrice) => {
+  if (!Number.isFinite(pointerPercent) || !Number.isFinite(latestPrice) || !groups.length) {
+    return clamp(pointerPercent, 0, 100);
+  }
+  const epsilon = 0.5;
+  let adjusted = clamp(pointerPercent, 0, 100);
+  const leftGroups = groups.filter((group) => Number.isFinite(group.value) && latestPrice >= group.value);
+  const rightGroups = groups.filter((group) => Number.isFinite(group.value) && latestPrice <= group.value);
+  if (leftGroups.length) {
+    const maxLeftPercent = Math.max(...leftGroups.map((group) => group.percent));
+    if (adjusted <= maxLeftPercent) {
+      adjusted = Math.min(100, maxLeftPercent + epsilon);
+    }
+  }
+  if (rightGroups.length) {
+    const minRightPercent = Math.min(...rightGroups.map((group) => group.percent));
+    if (adjusted >= minRightPercent) {
+      adjusted = Math.max(0, minRightPercent - epsilon);
+    }
+  }
+  if (leftGroups.length && rightGroups.length) {
+    const leftBound = Math.max(...leftGroups.map((group) => group.percent)) + epsilon;
+    const rightBound = Math.min(...rightGroups.map((group) => group.percent)) - epsilon;
+    if (leftBound > rightBound) {
+      adjusted = clamp((leftBound + rightBound) / 2, 0, 100);
+    } else {
+      adjusted = clamp(Math.min(Math.max(adjusted, leftBound), rightBound), 0, 100);
+    }
+  }
+  return clamp(adjusted, 0, 100);
+};
+function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
+  const normalizedSellTargets = Array.isArray(sellSetup?.targets) ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b) : [];
+  const normalizedBuyTargets = Array.isArray(buySetup?.targets) ? [...buySetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b) : [];
+  const shortEntry = toNumber(sellSetup?.entry);
+  const longEntry = toNumber(buySetup?.entry);
+  const uniqueShortTargets = Array.from(new Set(normalizedSellTargets));
+  const uniqueLongTargets = Array.from(new Set(normalizedBuyTargets));
+  const normalizedZones = Array.isArray(noTradeZones) ? noTradeZones.map((zone) => {
+    const lower = toNumber(zone?.min);
+    const upper = toNumber(zone?.max);
+    if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+      return null;
+    }
+    return {
+      lower: Math.min(lower, upper),
+      upper: Math.max(lower, upper)
+    };
+  }).filter((value) => Boolean(value)) : [];
+  const neutralLower = normalizedZones.length ? Math.min(...normalizedZones.map((zone) => zone.lower)) : NaN;
+  const neutralUpper = normalizedZones.length ? Math.max(...normalizedZones.map((zone) => zone.upper)) : NaN;
+  const markers = [];
+  if (uniqueShortTargets.length === 1) {
+    const value = uniqueShortTargets[0];
+    markers.push({
+      key: "shortTarget",
+      label: "Short Target",
+      value,
+      tone: "short",
+      align: "bottom"
+    });
+  } else if (uniqueShortTargets.length > 1) {
+    const farTarget = uniqueShortTargets[0];
+    const nearTarget = uniqueShortTargets[uniqueShortTargets.length - 1];
+    if (Number.isFinite(farTarget)) {
+      markers.push({
+        key: "shortTarget2",
+        label: "Short Target 2",
+        value: farTarget,
+        tone: "short",
+        align: "bottom"
+      });
+    }
+    if (Number.isFinite(nearTarget) && Math.abs(nearTarget - farTarget) > 0) {
+      markers.push({
+        key: "shortTarget1",
+        label: "Short Target 1",
+        value: nearTarget,
+        tone: "short",
+        align: "bottom"
+      });
+    }
+  }
+  if (Number.isFinite(shortEntry)) {
+    markers.push({
+      key: "shortEntry",
+      label: "Short Entry",
+      value: shortEntry,
+      tone: "short",
+      align: "bottom"
+    });
+  }
+  if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralLower <= neutralUpper) {
+    markers.push({
+      key: "neutralLower",
+      label: "No-Trade Min",
+      value: neutralLower,
+      tone: "neutral",
+      align: "bottom"
+    });
+    if (Math.abs(neutralUpper - neutralLower) > 0) {
+      markers.push({
+        key: "neutralUpper",
+        label: "No-Trade Max",
+        value: neutralUpper,
+        tone: "neutral",
+        align: "bottom"
+      });
+    }
+  }
+  if (Number.isFinite(longEntry)) {
+    markers.push({
+      key: "longEntry",
+      label: "Long Entry",
+      value: longEntry,
+      tone: "long",
+      align: "bottom"
+    });
+  }
+  if (uniqueLongTargets.length === 1) {
+    const value = uniqueLongTargets[0];
+    markers.push({
+      key: "longTarget",
+      label: "Long Target",
+      value,
+      tone: "long",
+      align: "bottom"
+    });
+  } else if (uniqueLongTargets.length > 1) {
+    const nearTarget = uniqueLongTargets[0];
+    const farTarget = uniqueLongTargets[uniqueLongTargets.length - 1];
+    if (Number.isFinite(nearTarget)) {
+      markers.push({
+        key: "longTarget1",
+        label: "Long Target 1",
+        value: nearTarget,
+        tone: "long",
+        align: "bottom"
+      });
+    }
+    if (Number.isFinite(farTarget) && Math.abs(farTarget - nearTarget) > 0) {
+      markers.push({
+        key: "longTarget2",
+        label: "Long Target 2",
+        value: farTarget,
+        tone: "long",
+        align: "bottom"
+      });
+    }
+  }
+  const valuesForBounds = markers.map((marker) => marker.value).concat(Number.isFinite(latestPrice) ? [latestPrice] : []);
+  let minValue = valuesForBounds.length ? Math.min(...valuesForBounds) : latestPrice;
+  let maxValue = valuesForBounds.length ? Math.max(...valuesForBounds) : latestPrice;
+  if (!Number.isFinite(minValue)) {
+    minValue = latestPrice;
+  }
+  if (!Number.isFinite(maxValue)) {
+    maxValue = latestPrice;
+  }
+  let baseRange = maxValue - minValue;
+  if (!Number.isFinite(baseRange) || baseRange <= 0) {
+    baseRange = Math.max(Math.abs(latestPrice) * 0.1, 1);
+  }
+  const padding = Math.max(baseRange * 0.12, baseRange === 0 ? 1 : 0);
+  const minBound = minValue - padding;
+  const maxBound = maxValue + padding;
+  const totalSpan = Math.max(maxBound - minBound, 1e-6);
+  const pointerPercentRaw = clamp((latestPrice - minBound) / totalSpan * 100, 0, 100);
+  const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
+  const spacedMarkerGroups = adjustMarkerGroupPercents(markerGroups, 3);
+  const pointerPercent = alignPointerPercentWithMarkers(pointerPercentRaw, spacedMarkerGroups, latestPrice);
+  const priceChipClass = "rounded-lg border border-slate-700/70 bg-slate-950/90 px-2.5 py-1 text-xs font-semibold text-slate-100 shadow-inner shadow-black/20 backdrop-blur-sm";
+  const legendOrder = [
+    "shortTarget2",
+    "shortTarget1",
+    "shortTarget",
+    "shortEntry",
+    "neutralLower",
+    "neutralUpper",
+    "longEntry",
+    "longTarget1",
+    "longTarget2",
+    "longTarget"
   ];
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("header", { className: "mb-6 flex items-start justify-between", children: [
+  const legendMap = /* @__PURE__ */ new Map();
+  markers.forEach((marker) => {
+    if (!legendMap.has(marker.key)) {
+      legendMap.set(marker.key, marker);
+    }
+  });
+  const legendItems = legendOrder.map((key) => legendMap.get(key)).filter((value) => Boolean(value));
+  const legendItemsSorted = [...legendItems].sort((a, b) => a.value - b.value);
+  const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
+  const neutralStartPercent = hasNeutralZone ? clamp((neutralLower - minBound) / totalSpan * 100, 0, 100) : 0;
+  const neutralEndPercent = hasNeutralZone ? clamp((neutralUpper - minBound) / totalSpan * 100, 0, 100) : 0;
+  const neutralWidthPercent = Math.max(neutralEndPercent - neutralStartPercent, 0);
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "rounded-3xl border border-slate-800/70 bg-slate-950/80 p-8 shadow-lg shadow-indigo-500/5", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("header", { className: "flex flex-wrap items-start justify-between gap-3", children: [
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-semibold text-slate-50", children: "Price Gauge" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-slate-400", children: "Visualise key regions before committing risk" })
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-slate-400", children: "Track plan levels and see where price is leaning right now." })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-right", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Last" }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Last Trade" }),
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-lg font-semibold text-slate-100", children: formatPrice(latestPrice) })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "relative flex overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/80 text-[11px] font-semibold uppercase tracking-wide text-slate-200", children: segments.map((segment, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
-        "div",
-        {
-          className: `flex flex-1 flex-col items-center justify-center gap-1 p-4 text-center ${segment.className} ${index === segments.length - 1 ? "border-r-0" : ""}`,
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: segment.label }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-[10px] normal-case text-slate-300", children: segment.value })
-          ]
-        },
-        segment.key
-      )) }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative mt-10", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative h-3 w-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 rounded-full ring-1 ring-white/5" }),
+        hasNeutralZone && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "div",
+          {
+            className: "absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm",
+            style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
+          }
+        )
+      ] }),
+      spacedMarkerGroups.map((group) => {
+        const bottomMarkers = group.markers.filter((marker) => marker.align === "bottom");
+        const dominantTone = group.markers[0]?.tone ?? "neutral";
+        const tone = toneStyles[dominantTone];
+        return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "div",
+          {
+            className: "absolute top-0 z-20 flex h-full w-0 -translate-x-1/2",
+            style: { left: `${group.percent}%` },
+            children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center text-[10px]", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `mb-1 h-4 w-px ${tone.line}` }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `h-2 w-2 rounded-full ${tone.dot}` }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `mt-1 h-4 w-px ${tone.line}` })
+              ] }),
+              bottomMarkers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex flex-col items-center pt-3", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: priceChipClass, children: formatPrice(group.value) }) })
+            ] })
+          },
+          `${group.value}-${dominantTone}`
+        );
+      }),
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
         "div",
         {
-          className: "pointer-events-none absolute -top-3 flex flex-col items-center text-xs text-slate-200",
-          style: { left: `calc(${pointer}% - 12px)` },
+          className: "pointer-events-none absolute -top-12 z-30 flex -translate-x-1/2 flex-col items-center gap-2 text-xs text-indigo-100 transition-all duration-500",
+          style: { left: `${pointerPercent}%` },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-3 w-[2px] rounded-full bg-indigo-400" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "mt-1 rounded-full bg-indigo-500/20 px-3 py-1 text-[10px] font-semibold", children: formatPrice(latestPrice) })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30", children: formatPrice(latestPrice) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block h-9 w-[2px] rounded-full bg-indigo-400" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-2 w-2 rounded-full border border-indigo-200/60 bg-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]" })
           ]
         }
-      )
-    ] })
+      ),
+      !markerGroups.length && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "mt-6 text-center text-sm text-slate-400", children: "Plan did not publish level targets for this symbol. The gauge will activate as soon as fresh levels arrive." })
+    ] }),
+    legendItemsSorted.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-16 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-300", children: legendItemsSorted.map((item) => {
+      const tone = toneStyles[item.tone];
+      return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+        "div",
+        {
+          className: "flex items-center gap-3 rounded-2xl border border-slate-800/60 bg-slate-950/70 px-3 py-2",
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `h-2 w-10 rounded-full ${tone.swatch}` }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-[2px]", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: item.label }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `text-sm font-semibold ${tone.legendText}`, children: formatPrice(item.value) })
+            ] })
+          ]
+        },
+        item.key
+      );
+    }) })
   ] });
 }
 
@@ -25597,8 +25857,17 @@ function ScenarioCard({ tone, title, highlight, body }) {
 }
 
 // action_center2/components/PnLPreview.tsx
+var import_react = __toESM(require_react());
 var import_jsx_runtime5 = __toESM(require_jsx_runtime());
 function PnLPreview({ plan, latestPrice }) {
+  const tradeState = deriveTradeState({ plan, latestPrice });
+  const previousPriceRef = (0, import_react.useRef)(void 0);
+  const lastPrice = previousPriceRef.current;
+  const delta = typeof lastPrice === "number" ? latestPrice - lastPrice : 0;
+  const priceDirection = delta > 0 ? 1 : delta < 0 ? -1 : 0;
+  (0, import_react.useEffect)(() => {
+    previousPriceRef.current = latestPrice;
+  }, [latestPrice]);
   const longStats = computeLongStats(plan, latestPrice);
   const shortStats = computeShortStats(plan, latestPrice);
   if (!longStats && !shortStats) {
@@ -25610,44 +25879,89 @@ function PnLPreview({ plan, latestPrice }) {
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-sm text-slate-400", children: "Quick sanity check on reward versus risk for both sides" })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "grid gap-6 lg:grid-cols-2", children: [
-      longStats ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(SideCard, { tone: "bullish", title: "Long Path", stats: longStats, latestPrice }) : null,
-      shortStats ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(SideCard, { tone: "bearish", title: "Short Path", stats: shortStats, latestPrice }) : null
+      longStats ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        SideCard,
+        {
+          tone: "bullish",
+          title: "Long Path",
+          stats: longStats,
+          latestPrice,
+          neutralMode: tradeState === "NO_TRADE",
+          priceDirection
+        }
+      ) : null,
+      shortStats ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        SideCard,
+        {
+          tone: "bearish",
+          title: "Short Path",
+          stats: shortStats,
+          latestPrice,
+          neutralMode: tradeState === "NO_TRADE",
+          priceDirection
+        }
+      ) : null
     ] })
   ] });
 }
-function SideCard({ tone, title, stats, latestPrice }) {
+function SideCard({ tone, title, stats, latestPrice, neutralMode, priceDirection }) {
   const accent = tone === "bullish" ? "text-emerald-300" : "text-rose-300";
   const barTone = tone === "bullish" ? "bg-emerald-500" : "bg-rose-500";
   const stopTone = "bg-amber-400";
   const signedMove = formatPercent(stats.moveFromEntryPct, 1);
-  const target2Copy = typeof stats.progressToTarget2 === "number" ? `${Math.round(clampToRange(stats.progressToTarget2))}% of the way to Target 2, ` : "";
-  const stopDistance = 100 - Math.round(clampToRange(stats.progressToStop));
+  const showNeutral = neutralMode && !stats.entryTriggered;
   const entryPrice = formatPrice(stats.entry);
   const targetOne = formatPrice(stats.target1);
   const stopPrice = formatPrice(stats.stop);
-  const narrative = tone === "bullish" ? `If long from ${entryPrice}, price is ${signedMove} versus entry, ${Math.round(clampToRange(stats.progressToTarget1))}% of the push toward Target 1, ${target2Copy}${stopDistance}% of the stop buffer still intact.` : `If short from ${entryPrice}, price is ${signedMove} versus entry, ${Math.round(clampToRange(stats.progressToTarget1))}% of the path toward Target 1, ${target2Copy}${stopDistance}% of the stop buffer still open.`;
+  const targetGap = formatPrice(Math.max(0, stats.targetBufferValue));
+  const stopGap = formatPrice(Math.max(0, stats.stopBufferValue));
+  const planLine = `Plan: Entry ${entryPrice} \xB7 Target 1 ${targetOne} \xB7 Stop ${stopPrice}`;
+  const rewardLine = Number.isFinite(stats.rewardRisk) && Number.isFinite(stats.rewardValue) && Number.isFinite(stats.riskValue) ? `R:R ${stats.rewardRisk?.toFixed(1)}x \xB7 +${formatPrice(stats.rewardValue ?? 0)} vs -${formatPrice(stats.riskValue ?? 0)}` : void 0;
+  const distanceHelper = stats.entryTriggered ? tone === "bullish" ? "Entry filled. Manage the long toward your targets." : "Entry filled. Ride the short toward your targets." : tone === "bullish" ? `Need ${signedPercent(stats.entryDistancePct)} (${formatPrice(stats.entryDistanceValue)}) to trigger entry.` : `Need ${signedPercent(stats.entryDistancePct, "down")} (${formatPrice(stats.entryDistanceValue)}) to trigger entry.`;
+  const headline = showNeutral ? tone === "bullish" ? `Need ${signedPercent(stats.entryDistancePct)} (${formatPrice(stats.entryDistanceValue)}) to activate the long plan.` : `Need ${signedPercent(stats.entryDistancePct, "down")} (${formatPrice(stats.entryDistanceValue)}) to light up the short plan.` : stats.entryTriggered ? tone === "bullish" ? `Long is live. Price is ${signedMove} versus entry.` : `Short is live. Price is ${signedMove} versus entry.` : tone === "bullish" ? `${formatPrice(stats.entryDistanceValue)} below your buy price. Let it come to you.` : `${formatPrice(stats.entryDistanceValue)} above your short trigger. Stay patient.`;
+  const guidance = showNeutral ? tone === "bullish" ? `No trade yet. Set an alert at ${entryPrice}?` : `No trade yet. Set a breakdown alert at ${entryPrice}?` : stats.entryTriggered ? tone === "bullish" ? `Target 1 is ${targetGap} away. Still ${stopGap} before your safety stop.` : `Target 1 is ${targetGap} away. Stop is ${stopGap} overhead.` : tone === "bullish" ? `Next: Wait for a strong close over ${entryPrice}.` : `Next: Watch for momentum slipping under ${entryPrice}.`;
   return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("article", { className: "flex h-full flex-col gap-4 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-6 shadow-sm", children: [
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("header", { className: "flex items-center justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h3", { className: "text-base font-semibold text-slate-100", children: title }),
       /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: `rounded-full px-3 py-1 text-xs font-semibold ${accent}`, children: tone === "bullish" ? "LONG" : "SHORT" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: `text-sm leading-relaxed ${accent}`, children: narrative }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: `text-sm leading-relaxed ${accent}`, children: headline }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-xs font-semibold text-slate-200", children: guidance }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rounded-xl bg-slate-900/40 p-3 text-[11px] text-slate-300", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { children: planLine }),
+      rewardLine ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { children: rewardLine }) : null
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "space-y-4 text-xs font-medium text-slate-300", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProgressBar, { label: "Entry \u2192 Target 1", percent: clampToRange(stats.progressToTarget1), toneClass: barTone }),
-      typeof stats.progressToTarget2 === "number" ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProgressBar, { label: "Entry \u2192 Target 2", percent: clampToRange(stats.progressToTarget2), toneClass: barTone, subtle: true }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProgressBar, { label: "Entry \u2192 Stop", percent: clampToRange(stats.progressToStop), toneClass: stopTone }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center justify-between text-[11px] text-slate-400", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
-          "Entry ",
-          entryPrice
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
-          "Last ",
-          formatPrice(latestPrice)
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
-          "Stop ",
-          stopPrice
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        DistanceMeter,
+        {
+          label: "Price \u2192 Entry",
+          percent: stats.entryProximityPct,
+          toneClass: barTone,
+          entryTriggered: stats.entryTriggered,
+          helper: distanceHelper,
+          tone,
+          neutralMode: showNeutral,
+          momentumDirection: priceDirection
+        }
+      ),
+      showNeutral ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(NeutralGuidance, { tone, targetGap, stopGap }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProgressBar, { label: "Entry \u2192 Target 1", percent: clampToRange(stats.progressToTarget1), toneClass: barTone }),
+        typeof stats.progressToTarget2 === "number" ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProgressBar, { label: "Entry \u2192 Target 2", percent: clampToRange(stats.progressToTarget2), toneClass: barTone, subtle: true }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProgressBar, { label: "Entry \u2192 Stop", percent: clampToRange(stats.progressToStop), toneClass: stopTone }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center justify-between text-[11px] text-slate-400", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+            "Entry ",
+            entryPrice
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+            "Last ",
+            formatPrice(latestPrice)
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+            "Stop ",
+            stopPrice
+          ] })
         ] })
       ] })
     ] })
@@ -25671,6 +25985,51 @@ function ProgressBar({ label, percent, toneClass, subtle }) {
     ) })
   ] });
 }
+function DistanceMeter({ label, percent, toneClass, helper, entryTriggered, tone, neutralMode, momentumDirection }) {
+  const width = clampToRange(percent);
+  const neutralTone = "bg-slate-700";
+  const bullishMomentumTone = "bg-emerald-400";
+  const bearishMomentumTone = "bg-rose-400";
+  const activeMomentumTone = tone === "bullish" ? momentumDirection > 0 ? bullishMomentumTone : neutralTone : momentumDirection < 0 ? bearishMomentumTone : neutralTone;
+  const progressTone = entryTriggered ? `${toneClass} opacity-40` : neutralMode ? activeMomentumTone : momentumDirection === 0 ? toneClass : activeMomentumTone;
+  const trackTone = neutralMode ? "bg-slate-800" : "bg-slate-900";
+  const barHeight = neutralMode ? "h-1.5" : "h-2";
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "space-y-1", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: label }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { children: [
+        Math.round(width),
+        "%"
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `${barHeight} w-full rounded-full ${trackTone}`, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      "div",
+      {
+        className: `${barHeight} rounded-full ${progressTone}`,
+        style: { width: `${width}%` }
+      }
+    ) }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-[11px] font-medium text-slate-400", children: helper })
+  ] });
+}
+function NeutralGuidance({ tone, targetGap, stopGap }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "rounded-xl border border-slate-800/70 bg-slate-950/50 p-3 text-[11px] text-slate-300", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("p", { children: [
+      "Target 1 sits ",
+      targetGap,
+      " away."
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("p", { children: [
+      "Stop buffer is ",
+      stopGap,
+      "."
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("p", { className: "mt-1 text-slate-400", children: [
+      "Next: ",
+      tone === "bullish" ? "Wait for a breakout candle." : "Wait for momentum to roll over."
+    ] })
+  ] });
+}
 function computeLongStats(plan, latestPrice) {
   const entry = safeNumber2(plan.buy_setup?.entry);
   const stop = safeNumber2(plan.buy_setup?.stop);
@@ -25684,6 +26043,17 @@ function computeLongStats(plan, latestPrice) {
   const progressToTarget1 = (latestPrice - entry) / (target1 - entry) * 100;
   const progressToTarget2 = Number.isFinite(target2) && target2 !== entry ? (latestPrice - entry) / (target2 - entry) * 100 : void 0;
   const progressToStop = (entry - latestPrice) / (entry - stop) * 100;
+  const entryTriggered = latestPrice >= entry;
+  const entryDistanceValue = entryTriggered ? 0 : Math.max(0, entry - latestPrice);
+  const entryBase = Math.abs(entry);
+  const rawEntryDistancePct = entryTriggered || !entryBase ? 0 : (entry - latestPrice) / entryBase * 100;
+  const safeEntryDistancePct = Number.isFinite(rawEntryDistancePct) ? Math.max(0, rawEntryDistancePct) : 0;
+  const entryProximityPct = clampToRange(entryTriggered ? 100 : 100 - safeEntryDistancePct);
+  const rewardValue = Math.abs(target1 - entry);
+  const riskValue = Math.abs(entry - stop);
+  const rewardRisk = riskValue > 0 ? rewardValue / riskValue : void 0;
+  const stopBufferValue = Math.max(0, latestPrice - stop);
+  const targetBufferValue = Math.max(0, target1 - latestPrice);
   return {
     entry,
     stop,
@@ -25692,7 +26062,16 @@ function computeLongStats(plan, latestPrice) {
     moveFromEntryPct,
     progressToTarget1,
     progressToTarget2,
-    progressToStop
+    progressToStop,
+    entryTriggered,
+    entryDistanceValue,
+    entryDistancePct: safeEntryDistancePct,
+    entryProximityPct,
+    rewardRisk,
+    rewardValue,
+    riskValue,
+    stopBufferValue,
+    targetBufferValue
   };
 }
 function computeShortStats(plan, latestPrice) {
@@ -25708,6 +26087,17 @@ function computeShortStats(plan, latestPrice) {
   const progressToTarget1 = (entry - latestPrice) / (entry - target1) * 100;
   const progressToTarget2 = Number.isFinite(target2) && target2 !== entry ? (entry - latestPrice) / (entry - target2) * 100 : void 0;
   const progressToStop = (latestPrice - entry) / (stop - entry) * 100;
+  const entryTriggered = latestPrice <= entry;
+  const entryDistanceValue = entryTriggered ? 0 : Math.max(0, latestPrice - entry);
+  const entryBase = Math.abs(entry);
+  const rawEntryDistancePct = entryTriggered || !entryBase ? 0 : (latestPrice - entry) / entryBase * 100;
+  const safeEntryDistancePct = Number.isFinite(rawEntryDistancePct) ? Math.max(0, rawEntryDistancePct) : 0;
+  const entryProximityPct = clampToRange(entryTriggered ? 100 : 100 - safeEntryDistancePct);
+  const rewardValue = Math.abs(entry - target1);
+  const riskValue = Math.abs(stop - entry);
+  const rewardRisk = riskValue > 0 ? rewardValue / riskValue : void 0;
+  const stopBufferValue = Math.max(0, stop - latestPrice);
+  const targetBufferValue = Math.max(0, latestPrice - target1);
   return {
     entry,
     stop,
@@ -25716,43 +26106,239 @@ function computeShortStats(plan, latestPrice) {
     moveFromEntryPct,
     progressToTarget1,
     progressToTarget2,
-    progressToStop
+    progressToStop,
+    entryTriggered,
+    entryDistanceValue,
+    entryDistancePct: safeEntryDistancePct,
+    entryProximityPct,
+    rewardRisk,
+    rewardValue,
+    riskValue,
+    stopBufferValue,
+    targetBufferValue
   };
 }
 function safeNumber2(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : NaN;
 }
+function signedPercent(value, direction = "up") {
+  const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const formatted = safeValue.toFixed(1);
+  return direction === "down" ? `-${formatted}%` : `+${formatted}%`;
+}
 
 // action_center2/components/AlertsList.tsx
+var import_react2 = __toESM(require_react());
 var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-function AlertsList({ alerts }) {
+function AlertsList({ alerts, symbol, latestPrice, initialActiveAlerts = [], onActiveAlertsChange }) {
+  const normalizeActiveAlerts = (0, import_react2.useCallback)(
+    (candidates) => {
+      const available = new Set(alerts.map((alert) => alert.id));
+      const filtered = [];
+      candidates.forEach((id) => {
+        if (typeof id !== "string") {
+          return;
+        }
+        if (!available.has(id)) {
+          return;
+        }
+        if (!filtered.includes(id)) {
+          filtered.push(id);
+        }
+      });
+      return filtered;
+    },
+    [alerts]
+  );
+  const [activeAlertIds, setActiveAlertIds] = (0, import_react2.useState)(() => normalizeActiveAlerts(initialActiveAlerts));
+  const [statusMap, setStatusMap] = (0, import_react2.useState)({});
+  const [errorMap, setErrorMap] = (0, import_react2.useState)({});
+  const [serviceError, setServiceError] = (0, import_react2.useState)(null);
+  (0, import_react2.useEffect)(() => {
+    const normalized = normalizeActiveAlerts(initialActiveAlerts);
+    setActiveAlertIds((prev) => {
+      if (prev.length === normalized.length && prev.every((id, idx) => id === normalized[idx])) {
+        return prev;
+      }
+      return normalized;
+    });
+    const normalizedSet = new Set(normalized);
+    setStatusMap((prev) => {
+      const next = {};
+      alerts.forEach(({ id }) => {
+        if (normalizedSet.has(id)) {
+          next[id] = "sent";
+        } else {
+          const previousState = prev[id];
+          if (previousState === "sending" || previousState === "error") {
+            next[id] = previousState;
+          } else {
+            next[id] = "idle";
+          }
+        }
+      });
+      return next;
+    });
+    setErrorMap((prev) => {
+      const next = {};
+      alerts.forEach(({ id }) => {
+        if (prev[id]) {
+          next[id] = prev[id];
+        }
+      });
+      return next;
+    });
+    if (onActiveAlertsChange) {
+      if (normalized.length !== initialActiveAlerts.length || normalized.some((id, idx) => id !== initialActiveAlerts[idx])) {
+        onActiveAlertsChange(normalized);
+      }
+    }
+  }, [alerts, initialActiveAlerts, normalizeActiveAlerts, onActiveAlertsChange]);
+  (0, import_react2.useEffect)(() => {
+    setServiceError(null);
+  }, [symbol]);
+  const activeAlertSet = (0, import_react2.useMemo)(() => new Set(activeAlertIds), [activeAlertIds]);
+  const uppercaseSymbol = (0, import_react2.useMemo)(() => symbol ? symbol.toUpperCase() : void 0, [symbol]);
+  const payloadLatestPrice = (0, import_react2.useMemo)(() => Number.isFinite(latestPrice) ? Number(latestPrice) : void 0, [latestPrice]);
+  const queueAlertEmail = (0, import_react2.useCallback)(
+    async (alert) => {
+      const currentStatus = statusMap[alert.id];
+      if (currentStatus === "sending" || currentStatus === "sent") {
+        return;
+      }
+      setServiceError(null);
+      setStatusMap((prev) => ({ ...prev, [alert.id]: "sending" }));
+      setErrorMap((prev) => {
+        const { [alert.id]: _removed, ...rest } = prev;
+        return rest;
+      });
+      try {
+        const response = await fetch("/api/alerts/email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            alertId: alert.id,
+            label: alert.label,
+            description: alert.description,
+            symbol: uppercaseSymbol,
+            latestPrice: payloadLatestPrice
+          })
+        });
+        if (!response.ok) {
+          let detail;
+          try {
+            const data = await response.json();
+            if (data && typeof data.detail === "string") {
+              detail = data.detail;
+            }
+          } catch (error) {
+          }
+          if (response.status === 503) {
+            setServiceError(detail ?? "Email alerts are currently unavailable.");
+          }
+          throw new Error(detail ?? `Failed to send alert email (status ${response.status}).`);
+        }
+        setStatusMap((prev) => ({ ...prev, [alert.id]: "sent" }));
+        setActiveAlertIds((prev) => {
+          if (prev.includes(alert.id)) {
+            return prev;
+          }
+          const next = [...prev, alert.id];
+          if (onActiveAlertsChange) {
+            onActiveAlertsChange(next);
+          }
+          return next;
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to send alert email.";
+        setStatusMap((prev) => ({ ...prev, [alert.id]: "error" }));
+        setErrorMap((prev) => ({ ...prev, [alert.id]: message }));
+      }
+    },
+    [onActiveAlertsChange, payloadLatestPrice, statusMap, uppercaseSymbol]
+  );
+  const deactivateAlert = (0, import_react2.useCallback)((alertId) => {
+    setStatusMap((prev) => ({ ...prev, [alertId]: "idle" }));
+    setErrorMap((prev) => {
+      const { [alertId]: _removed, ...rest } = prev;
+      return rest;
+    });
+    setActiveAlertIds((prev) => {
+      if (!prev.includes(alertId)) {
+        return prev;
+      }
+      const next = prev.filter((id) => id !== alertId);
+      if (onActiveAlertsChange) {
+        onActiveAlertsChange(next);
+      }
+      return next;
+    });
+  }, [onActiveAlertsChange]);
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm", children: [
     /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("header", { className: "mb-6 flex flex-col gap-1", children: [
       /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h2", { className: "text-lg font-semibold text-slate-50", children: "Alert Checklist" }),
       /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-slate-400", children: "Codify reactions so execution stays systematic" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ul", { className: "flex flex-col gap-4", children: alerts.map((alert) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-      "li",
-      {
-        className: "flex flex-col gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-5 shadow-sm md:flex-row md:items-center md:justify-between",
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm font-semibold text-slate-100", children: alert.label }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-slate-400", children: alert.description })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-            "button",
-            {
-              type: "button",
-              className: "inline-flex items-center justify-center rounded-full border border-indigo-500/40 bg-indigo-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-indigo-300 transition hover:border-indigo-400 hover:bg-indigo-500/20",
-              children: "Create alert"
-            }
-          )
-        ]
-      },
-      alert.id
-    )) })
+    serviceError ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "mb-4 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100", children: serviceError }) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("ul", { className: "flex flex-col gap-4", children: alerts.map((alert) => {
+      const state = statusMap[alert.id] ?? "idle";
+      const isActive = activeAlertSet.has(alert.id);
+      const isSending = state === "sending";
+      const cardTone = isActive ? "border-indigo-400/60 bg-indigo-900/40 shadow-lg shadow-indigo-500/10" : "border-slate-800/80 bg-slate-950/60";
+      const errorMessage = errorMap[alert.id];
+      return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+        "li",
+        {
+          className: `flex flex-col gap-3 rounded-2xl p-5 shadow-sm transition-colors md:flex-row md:items-center md:justify-between ${cardTone}`,
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm font-semibold text-slate-100", children: alert.label }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-slate-400", children: alert.description }),
+              errorMessage ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "mt-2 text-xs text-rose-300", children: errorMessage }) : null
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col items-stretch gap-2 md:flex-row md:items-center md:gap-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: `inline-flex items-center justify-center rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${isActive ? "border border-emerald-400/50 bg-emerald-500/15 text-emerald-100 hover:border-emerald-300" : isSending ? "border border-indigo-400/40 bg-indigo-500/20 text-indigo-100" : "border border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:border-indigo-400 hover:bg-indigo-500/20"}`,
+                  onClick: () => {
+                    if (isActive) {
+                      deactivateAlert(alert.id);
+                    } else if (!isSending) {
+                      queueAlertEmail(alert);
+                    }
+                  },
+                  disabled: isSending,
+                  children: isSending ? "Sending..." : isActive ? "Alert active" : "Create alert"
+                }
+              ),
+              isActive ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "text-xs font-semibold uppercase tracking-wide text-slate-400 transition hover:text-slate-200",
+                  onClick: () => deactivateAlert(alert.id),
+                  children: "Deselect"
+                }
+              ) : null,
+              state === "error" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "text-xs font-semibold uppercase tracking-wide text-rose-300 transition hover:text-rose-200",
+                  onClick: () => queueAlertEmail(alert),
+                  children: "Retry"
+                }
+              ) : null
+            ] })
+          ]
+        },
+        alert.id
+      );
+    }) })
   ] });
 }
 
@@ -25778,9 +26364,9 @@ function TrendHeatmap({ consensus }) {
       /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm text-slate-500", children: "Refresh the plan when you have updated breadth and momentum inputs to light up this view." })
     ] });
   }
-  const confidencePct = clamp((CONFIDENCE_VALUE[consensus.confidence] ?? 0) * 100, 0, 100);
+  const confidencePct = clamp2((CONFIDENCE_VALUE[consensus.confidence] ?? 0) * 100, 0, 100);
   const strengthRaw = typeof consensus.strength === "number" ? consensus.strength : 0;
-  const strengthPct = clamp(strengthRaw * 100, 0, 100);
+  const strengthPct = clamp2(strengthRaw * 100, 0, 100);
   return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm", children: [
     /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("header", { className: "mb-6 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
@@ -25825,7 +26411,7 @@ function MetricCard({ title, description, percent }) {
     /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-2 w-full rounded-full bg-slate-800", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-2 rounded-full bg-indigo-500", style: { width: `${percent}%` } }) })
   ] });
 }
-function clamp(value, min, max) {
+function clamp2(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
@@ -25861,16 +26447,28 @@ function PlanSwitcher({ options, activeSymbol, onSelect }) {
 // action_center2/components/ActionSummary.tsx
 var import_jsx_runtime9 = __toESM(require_jsx_runtime());
 function ActionSummaryPanel({ summary }) {
-  const badgeClass = summary.status === "bullish" ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/40" : summary.status === "bearish" ? "bg-rose-500/15 text-rose-200 border border-rose-400/40" : "bg-slate-500/15 text-slate-200 border border-slate-400/40";
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-sm", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col gap-5 md:flex-row md:items-start md:justify-between", children: [
+  const palette = summary.status === "bullish" ? {
+    panel: "border-emerald-500/30 bg-slate-900/80 ring-1 ring-emerald-500/15",
+    badge: "bg-emerald-500/20 text-emerald-100 border border-emerald-400/40",
+    bullet: "text-emerald-300"
+  } : summary.status === "bearish" ? {
+    panel: "border-rose-500/30 bg-slate-900/80 ring-1 ring-rose-500/15",
+    badge: "bg-rose-500/20 text-rose-100 border border-rose-400/40",
+    bullet: "text-rose-300"
+  } : {
+    panel: "border-slate-700 bg-slate-900/80",
+    badge: "bg-slate-500/20 text-slate-100 border border-slate-400/30",
+    bullet: "text-slate-300"
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("section", { className: `rounded-3xl border p-6 shadow-sm transition-colors ${palette.panel}`, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col gap-5 md:flex-row md:items-start md:justify-between", children: [
     /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col gap-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: `inline-flex w-max items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: `inline-flex w-max items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${palette.badge}`, children: [
         /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "h-2 w-2 rounded-full bg-current" }),
         summary.title
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "max-w-3xl text-sm leading-relaxed text-slate-300", children: summary.subtitle }),
       /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("ul", { className: "flex flex-col gap-1 text-sm text-slate-200", children: summary.narrative.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("li", { className: "flex items-center gap-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "text-slate-500", children: "\u2022" }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: palette.bullet, children: "\u2022" }),
         /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { children: line })
       ] }, index)) })
     ] }),
@@ -25918,8 +26516,95 @@ function IntentSelector({ selected, onSelect }) {
 // action_center2/components/ActionCenterPage.tsx
 var import_jsx_runtime11 = __toESM(require_jsx_runtime());
 var DEFAULT_STRATEGY = "day_trading";
+var STRATEGY_KEYS = ["day_trading", "swing_trading", "longterm_trading"];
+var STORAGE_KEY = "volatilx:action-center:selections";
+var isStrategyKey = (value) => typeof value === "string" && STRATEGY_KEYS.includes(value);
+var isTradeIntent = (value) => value === "buy" || value === "sell" || value === "both";
+function readPersistedSelections() {
+  if (typeof window === "undefined") {
+    return { perSymbol: {} };
+  }
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return { perSymbol: {} };
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return { perSymbol: {} };
+    }
+    const activeSymbol = typeof parsed.activeSymbol === "string" ? parsed.activeSymbol : void 0;
+    const perSymbolInput = parsed.perSymbol && typeof parsed.perSymbol === "object" ? parsed.perSymbol : {};
+    const perSymbol = {};
+    Object.entries(perSymbolInput).forEach(([symbol, prefs]) => {
+      if (!prefs || typeof prefs !== "object") {
+        return;
+      }
+      const strategyValue = prefs.strategy;
+      const strategy = isStrategyKey(strategyValue) ? strategyValue : void 0;
+      const intent = isTradeIntent(prefs.intent) ? prefs.intent : void 0;
+      const alertsRaw = Array.isArray(prefs.alerts) ? prefs.alerts.filter((value) => typeof value === "string") : [];
+      const alerts = alertsRaw.length ? Array.from(new Set(alertsRaw)) : void 0;
+      if (strategy || intent || alerts) {
+        perSymbol[symbol] = {
+          ...strategy ? { strategy } : {},
+          ...intent ? { intent } : {},
+          ...alerts ? { alerts } : {}
+        };
+      }
+    });
+    return {
+      ...activeSymbol ? { activeSymbol } : {},
+      perSymbol
+    };
+  } catch (error) {
+    return { perSymbol: {} };
+  }
+}
+function writePersistedSelections(selections) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const payload = { perSymbol: {} };
+    if (selections.activeSymbol && typeof selections.activeSymbol === "string") {
+      payload.activeSymbol = selections.activeSymbol;
+    }
+    if (selections.perSymbol && typeof selections.perSymbol === "object") {
+      const sanitized = {};
+      Object.entries(selections.perSymbol).forEach(([symbol, prefs]) => {
+        if (!prefs || typeof prefs !== "object") {
+          return;
+        }
+        const entry = {};
+        if (isStrategyKey(prefs.strategy)) {
+          entry.strategy = prefs.strategy;
+        }
+        if (isTradeIntent(prefs.intent)) {
+          entry.intent = prefs.intent;
+        }
+        if (Array.isArray(prefs.alerts)) {
+          const alerts = prefs.alerts.filter((value) => typeof value === "string");
+          if (alerts.length) {
+            entry.alerts = Array.from(new Set(alerts));
+          }
+        }
+        if (entry.strategy || entry.intent || entry.alerts && entry.alerts.length) {
+          sanitized[symbol] = entry;
+        }
+      });
+      payload.perSymbol = sanitized;
+    }
+    if (!payload.activeSymbol && !Object.keys(payload.perSymbol).length) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (error) {
+  }
+}
 function ActionCenterPage({ plan, initialStrategy, planOptions = [] }) {
-  const normalizedOptions = (0, import_react.useMemo)(() => {
+  const normalizedOptions = (0, import_react3.useMemo)(() => {
     const seen = /* @__PURE__ */ new Set();
     const list = [];
     function pushOption(option) {
@@ -25949,43 +26634,159 @@ function ActionCenterPage({ plan, initialStrategy, planOptions = [] }) {
     }
     return list;
   }, [plan, planOptions]);
-  const [activeSymbol, setActiveSymbol] = (0, import_react.useState)(plan.symbol);
-  (0, import_react.useEffect)(() => {
-    setActiveSymbol(plan.symbol);
-  }, [plan.symbol]);
-  (0, import_react.useEffect)(() => {
-    if (!normalizedOptions.some((option) => option.symbol === activeSymbol)) {
-      setActiveSymbol(plan.symbol);
+  const initialSelectionsRef = (0, import_react3.useRef)(null);
+  if (initialSelectionsRef.current === null) {
+    initialSelectionsRef.current = readPersistedSelections();
+  }
+  const initialSelections = initialSelectionsRef.current ?? { perSymbol: {} };
+  const [activeSymbol, setActiveSymbol] = (0, import_react3.useState)(initialSelections.activeSymbol || plan.symbol);
+  const [symbolPrefs, setSymbolPrefs] = (0, import_react3.useState)(initialSelections.perSymbol);
+  const handleAlertsChange = (0, import_react3.useCallback)(
+    (symbolKey, activeAlerts) => {
+      const deduped = Array.from(new Set(activeAlerts.filter((id) => typeof id === "string")));
+      setSymbolPrefs((prev) => {
+        const existing = prev[symbolKey] ?? {};
+        const currentAlerts = existing.alerts ?? [];
+        if (currentAlerts.length === deduped.length && currentAlerts.every((id, idx) => id === deduped[idx])) {
+          return prev;
+        }
+        const nextPrefs = { ...existing };
+        if (deduped.length) {
+          nextPrefs.alerts = deduped;
+        } else {
+          delete nextPrefs.alerts;
+        }
+        if (!nextPrefs.strategy && !nextPrefs.intent && (!nextPrefs.alerts || nextPrefs.alerts.length === 0)) {
+          const { [symbolKey]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return {
+          ...prev,
+          [symbolKey]: nextPrefs
+        };
+      });
+    },
+    [setSymbolPrefs]
+  );
+  (0, import_react3.useEffect)(() => {
+    const availableSymbols = normalizedOptions.map((option) => option.symbol);
+    if (availableSymbols.includes(activeSymbol)) {
+      return;
+    }
+    const persistedSymbol = initialSelectionsRef.current?.activeSymbol;
+    if (persistedSymbol && availableSymbols.includes(persistedSymbol)) {
+      setActiveSymbol(persistedSymbol);
+      return;
+    }
+    const fallback = availableSymbols[0] ?? plan.symbol;
+    if (fallback && fallback !== activeSymbol) {
+      setActiveSymbol(fallback);
     }
   }, [activeSymbol, normalizedOptions, plan.symbol]);
-  const activeOption = (0, import_react.useMemo)(
+  const activeOption = (0, import_react3.useMemo)(
     () => normalizedOptions.find((option) => option.symbol === activeSymbol) ?? normalizedOptions[0],
     [activeSymbol, normalizedOptions]
   );
   const activePlan = activeOption?.plan ?? plan;
-  const [selectedStrategy, setSelectedStrategy] = (0, import_react.useState)(initialStrategy ?? DEFAULT_STRATEGY);
-  const [selectedIntent, setSelectedIntent] = (0, import_react.useState)("buy");
-  (0, import_react.useEffect)(() => {
-    if (!activePlan.strategies[selectedStrategy]) {
-      setSelectedStrategy(DEFAULT_STRATEGY);
+  const activePrefs = symbolPrefs[activeSymbol] ?? {};
+  const [selectedStrategy, setSelectedStrategy] = (0, import_react3.useState)(() => {
+    if (activePrefs.strategy && activePlan.strategies[activePrefs.strategy]) {
+      return activePrefs.strategy;
     }
-  }, [activePlan, selectedStrategy]);
-  (0, import_react.useEffect)(() => {
-    setSelectedIntent("buy");
-  }, [activePlan.symbol]);
+    if (initialStrategy && activePlan.strategies[initialStrategy]) {
+      return initialStrategy;
+    }
+    if (activePlan.strategies[DEFAULT_STRATEGY]) {
+      return DEFAULT_STRATEGY;
+    }
+    const availableKeys = Object.keys(activePlan.strategies ?? {});
+    return availableKeys[0] ?? DEFAULT_STRATEGY;
+  });
+  const [selectedIntent, setSelectedIntent] = (0, import_react3.useState)(() => {
+    return activePrefs.intent && isTradeIntent(activePrefs.intent) ? activePrefs.intent : "buy";
+  });
+  (0, import_react3.useEffect)(() => {
+    if (activePlan.strategies[selectedStrategy]) {
+      return;
+    }
+    const available = activePlan.strategies ?? {};
+    const fallback = (() => {
+      if (initialStrategy && available[initialStrategy]) {
+        return initialStrategy;
+      }
+      if (available[DEFAULT_STRATEGY]) {
+        return DEFAULT_STRATEGY;
+      }
+      const keys = Object.keys(available);
+      return keys[0] ?? DEFAULT_STRATEGY;
+    })();
+    if (fallback !== selectedStrategy) {
+      setSelectedStrategy(fallback);
+    }
+  }, [activePlan, initialStrategy, selectedStrategy]);
+  const previousSymbolRef = (0, import_react3.useRef)(activeSymbol);
+  (0, import_react3.useEffect)(() => {
+    const previousSymbol = previousSymbolRef.current;
+    if (activeSymbol === previousSymbol) {
+      return;
+    }
+    previousSymbolRef.current = activeSymbol;
+    const prefs = symbolPrefs[activeSymbol] ?? {};
+    const available = activePlan.strategies ?? {};
+    let nextStrategy;
+    if (prefs.strategy && available[prefs.strategy]) {
+      nextStrategy = prefs.strategy;
+    } else if (initialStrategy && available[initialStrategy]) {
+      nextStrategy = initialStrategy;
+    } else if (available[DEFAULT_STRATEGY]) {
+      nextStrategy = DEFAULT_STRATEGY;
+    } else {
+      const keys = Object.keys(available);
+      nextStrategy = keys[0] ?? selectedStrategy;
+    }
+    if (nextStrategy && nextStrategy !== selectedStrategy) {
+      setSelectedStrategy(nextStrategy);
+    }
+    const nextIntent = prefs.intent && isTradeIntent(prefs.intent) ? prefs.intent : "buy";
+    if (nextIntent !== selectedIntent) {
+      setSelectedIntent(nextIntent);
+    }
+  }, [activePlan, activeSymbol, initialStrategy, selectedIntent, selectedStrategy, symbolPrefs]);
+  (0, import_react3.useEffect)(() => {
+    if (!activeSymbol) {
+      return;
+    }
+    setSymbolPrefs((prev) => {
+      const existing = prev[activeSymbol] ?? {};
+      if (existing.strategy === selectedStrategy && existing.intent === selectedIntent) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [activeSymbol]: {
+          ...existing,
+          strategy: selectedStrategy,
+          intent: selectedIntent
+        }
+      };
+    });
+  }, [activeSymbol, selectedIntent, selectedStrategy]);
+  (0, import_react3.useEffect)(() => {
+    writePersistedSelections({ activeSymbol, perSymbol: symbolPrefs });
+  }, [activeSymbol, symbolPrefs]);
   const strategyPlan = activePlan.strategies[selectedStrategy] ?? activePlan.strategies[DEFAULT_STRATEGY];
-  const tradeState = (0, import_react.useMemo)(
+  const tradeState = (0, import_react3.useMemo)(
     () => deriveTradeState({
       plan: strategyPlan,
       latestPrice: activePlan.latest_price
     }),
     [activePlan.latest_price, strategyPlan]
   );
-  const alertSuggestions = (0, import_react.useMemo)(
+  const alertSuggestions = (0, import_react3.useMemo)(
     () => buildAlertSuggestions(activePlan.latest_price, strategyPlan),
     [activePlan.latest_price, strategyPlan]
   );
-  const actionSummary = (0, import_react.useMemo)(
+  const actionSummary = (0, import_react3.useMemo)(
     () => deriveActionSummary({
       strategy: strategyPlan,
       tradeState,
@@ -26031,7 +26832,16 @@ function ActionCenterPage({ plan, initialStrategy, planOptions = [] }) {
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ScenarioCards, { plan: strategyPlan }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(PnLPreview, { plan: strategyPlan, latestPrice: activePlan.latest_price }),
     /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid gap-6 xl:grid-cols-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AlertsList, { alerts: alertSuggestions }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        AlertsList,
+        {
+          alerts: alertSuggestions,
+          symbol: activeSymbol,
+          latestPrice: activePlan.latest_price,
+          initialActiveAlerts: activePrefs.alerts ?? [],
+          onActiveAlertsChange: (ids) => handleAlertsChange(activeSymbol, ids)
+        }
+      ),
       /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(TrendHeatmap, { consensus: activePlan.technical_consensus })
     ] })
   ] }) });
@@ -26082,7 +26892,7 @@ function bootstrapActionCenterPage(options = {}) {
     root = (0, import_client.createRoot)(mountNode);
   }
   root.render(
-    import_react2.default.createElement(ActionCenterPage, {
+    import_react4.default.createElement(ActionCenterPage, {
       plan: resolvedPlan,
       initialStrategy: strategy,
       planOptions: availablePlans

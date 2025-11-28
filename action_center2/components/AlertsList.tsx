@@ -1,18 +1,94 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertSuggestion } from "../utils/planMath";
 
 export type AlertsListProps = {
   alerts: AlertSuggestion[];
   symbol?: string;
   latestPrice?: number;
+  initialActiveAlerts?: string[];
+  onActiveAlertsChange?: (activeAlerts: string[]) => void;
 };
 
 type AlertSendState = "idle" | "sending" | "sent" | "error";
 
-export function AlertsList({ alerts, symbol, latestPrice }: AlertsListProps) {
+export function AlertsList({ alerts, symbol, latestPrice, initialActiveAlerts = [], onActiveAlertsChange }: AlertsListProps) {
+  const normalizeActiveAlerts = useCallback(
+    (candidates: string[]) => {
+      const available = new Set(alerts.map((alert) => alert.id));
+      const filtered: string[] = [];
+      candidates.forEach((id) => {
+        if (typeof id !== "string") {
+          return;
+        }
+        if (!available.has(id)) {
+          return;
+        }
+        if (!filtered.includes(id)) {
+          filtered.push(id);
+        }
+      });
+      return filtered;
+    },
+    [alerts],
+  );
+
+  const [activeAlertIds, setActiveAlertIds] = useState<string[]>(() => normalizeActiveAlerts(initialActiveAlerts));
   const [statusMap, setStatusMap] = useState<Record<string, AlertSendState>>({});
   const [errorMap, setErrorMap] = useState<Record<string, string>>({});
   const [serviceError, setServiceError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const normalized = normalizeActiveAlerts(initialActiveAlerts);
+    setActiveAlertIds((prev) => {
+      if (prev.length === normalized.length && prev.every((id, idx) => id === normalized[idx])) {
+        return prev;
+      }
+      return normalized;
+    });
+
+    const normalizedSet = new Set(normalized);
+    setStatusMap((prev) => {
+      const next: Record<string, AlertSendState> = {};
+      alerts.forEach(({ id }) => {
+        if (normalizedSet.has(id)) {
+          next[id] = "sent";
+        } else {
+          const previousState = prev[id];
+          if (previousState === "sending" || previousState === "error") {
+            next[id] = previousState;
+          } else {
+            next[id] = "idle";
+          }
+        }
+      });
+      return next;
+    });
+
+    setErrorMap((prev) => {
+      const next: Record<string, string> = {};
+      alerts.forEach(({ id }) => {
+        if (prev[id]) {
+          next[id] = prev[id];
+        }
+      });
+      return next;
+    });
+
+    if (onActiveAlertsChange) {
+      if (
+        normalized.length !== initialActiveAlerts.length ||
+        normalized.some((id, idx) => id !== initialActiveAlerts[idx])
+      ) {
+        onActiveAlertsChange(normalized);
+      }
+    }
+  }, [alerts, initialActiveAlerts, normalizeActiveAlerts, onActiveAlertsChange]);
+
+  useEffect(() => {
+    setServiceError(null);
+  }, [symbol]);
+
+  const activeAlertSet = useMemo(() => new Set(activeAlertIds), [activeAlertIds]);
 
   const uppercaseSymbol = useMemo(() => (symbol ? symbol.toUpperCase() : undefined), [symbol]);
   const payloadLatestPrice = useMemo(() => (Number.isFinite(latestPrice) ? Number(latestPrice) : undefined), [latestPrice]);
@@ -64,13 +140,23 @@ export function AlertsList({ alerts, symbol, latestPrice }: AlertsListProps) {
         }
 
         setStatusMap((prev) => ({ ...prev, [alert.id]: "sent" }));
+        setActiveAlertIds((prev) => {
+          if (prev.includes(alert.id)) {
+            return prev;
+          }
+          const next = [...prev, alert.id];
+          if (onActiveAlertsChange) {
+            onActiveAlertsChange(next);
+          }
+          return next;
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to send alert email.";
         setStatusMap((prev) => ({ ...prev, [alert.id]: "error" }));
         setErrorMap((prev) => ({ ...prev, [alert.id]: message }));
       }
     },
-    [payloadLatestPrice, statusMap, uppercaseSymbol],
+    [onActiveAlertsChange, payloadLatestPrice, statusMap, uppercaseSymbol],
   );
 
   const deactivateAlert = useCallback((alertId: string) => {
@@ -79,7 +165,17 @@ export function AlertsList({ alerts, symbol, latestPrice }: AlertsListProps) {
       const { [alertId]: _removed, ...rest } = prev;
       return rest;
     });
-  }, []);
+    setActiveAlertIds((prev) => {
+      if (!prev.includes(alertId)) {
+        return prev;
+      }
+      const next = prev.filter((id) => id !== alertId);
+      if (onActiveAlertsChange) {
+        onActiveAlertsChange(next);
+      }
+      return next;
+    });
+  }, [onActiveAlertsChange]);
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-sm">
@@ -97,7 +193,7 @@ export function AlertsList({ alerts, symbol, latestPrice }: AlertsListProps) {
       <ul className="flex flex-col gap-4">
         {alerts.map((alert) => {
           const state = statusMap[alert.id] ?? "idle";
-          const isActive = state === "sent";
+          const isActive = activeAlertSet.has(alert.id);
           const isSending = state === "sending";
           const cardTone = isActive
             ? "border-indigo-400/60 bg-indigo-900/40 shadow-lg shadow-indigo-500/10"

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PrincipalPlan, PrincipalPlanOption, StrategyKey, StrategyPlan, TradeIntent } from "../types";
 import { deriveTradeState, buildAlertSuggestions, deriveActionSummary } from "../utils/planMath";
 import { TradeStateHeader } from "./TradeStateHeader";
@@ -24,6 +24,7 @@ const STRATEGY_KEYS: StrategyKey[] = ["day_trading", "swing_trading", "longterm_
 type PersistedSymbolPrefs = {
   strategy?: StrategyKey;
   intent?: TradeIntent;
+  alerts?: string[];
 };
 
 type PersistedSelections = {
@@ -64,10 +65,15 @@ function readPersistedSelections(): PersistedSelections {
       const strategyValue = (prefs as PersistedSymbolPrefs).strategy;
       const strategy = isStrategyKey(strategyValue) ? strategyValue : undefined;
       const intent = isTradeIntent((prefs as PersistedSymbolPrefs).intent) ? (prefs as PersistedSymbolPrefs).intent : undefined;
-      if (strategy || intent) {
+      const alertsRaw = Array.isArray((prefs as PersistedSymbolPrefs).alerts)
+        ? (prefs as PersistedSymbolPrefs).alerts.filter((value): value is string => typeof value === "string")
+        : [];
+      const alerts = alertsRaw.length ? Array.from(new Set(alertsRaw)) : undefined;
+      if (strategy || intent || alerts) {
         perSymbol[symbol] = {
           ...(strategy ? { strategy: strategy as StrategyKey } : {}),
           ...(intent ? { intent } : {}),
+          ...(alerts ? { alerts } : {}),
         };
       }
     });
@@ -105,7 +111,13 @@ function writePersistedSelections(selections: PersistedSelections): void {
         if (isTradeIntent(prefs.intent)) {
           entry.intent = prefs.intent;
         }
-        if (entry.strategy || entry.intent) {
+        if (Array.isArray(prefs.alerts)) {
+          const alerts = prefs.alerts.filter((value): value is string => typeof value === "string");
+          if (alerts.length) {
+            entry.alerts = Array.from(new Set(alerts));
+          }
+        }
+        if (entry.strategy || entry.intent || (entry.alerts && entry.alerts.length)) {
           sanitized[symbol] = entry;
         }
       });
@@ -168,6 +180,37 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
   const [activeSymbol, setActiveSymbol] = useState<string>(initialSelections.activeSymbol || plan.symbol);
   const [symbolPrefs, setSymbolPrefs] = useState<Record<string, PersistedSymbolPrefs>>(initialSelections.perSymbol);
 
+  const handleAlertsChange = useCallback(
+    (symbolKey: string, activeAlerts: string[]) => {
+      const deduped = Array.from(new Set(activeAlerts.filter((id): id is string => typeof id === "string")));
+      setSymbolPrefs((prev) => {
+        const existing = prev[symbolKey] ?? {};
+        const currentAlerts = existing.alerts ?? [];
+        if (currentAlerts.length === deduped.length && currentAlerts.every((id, idx) => id === deduped[idx])) {
+          return prev;
+        }
+
+        const nextPrefs: PersistedSymbolPrefs = { ...existing };
+        if (deduped.length) {
+          nextPrefs.alerts = deduped;
+        } else {
+          delete nextPrefs.alerts;
+        }
+
+        if (!nextPrefs.strategy && !nextPrefs.intent && (!nextPrefs.alerts || nextPrefs.alerts.length === 0)) {
+          const { [symbolKey]: _removed, ...rest } = prev;
+          return rest;
+        }
+
+        return {
+          ...prev,
+          [symbolKey]: nextPrefs,
+        };
+      });
+    },
+    [setSymbolPrefs],
+  );
+
   useEffect(() => {
     const availableSymbols = normalizedOptions.map((option) => option.symbol);
     if (availableSymbols.includes(activeSymbol)) {
@@ -192,11 +235,11 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
   );
 
   const activePlan = activeOption?.plan ?? plan;
+  const activePrefs = symbolPrefs[activeSymbol] ?? {};
 
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyKey>(() => {
-    const prefs = symbolPrefs[activeSymbol];
-    if (prefs?.strategy && activePlan.strategies[prefs.strategy]) {
-      return prefs.strategy;
+    if (activePrefs.strategy && activePlan.strategies[activePrefs.strategy]) {
+      return activePrefs.strategy;
     }
     if (initialStrategy && activePlan.strategies[initialStrategy]) {
       return initialStrategy;
@@ -208,8 +251,7 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     return availableKeys[0] ?? DEFAULT_STRATEGY;
   });
   const [selectedIntent, setSelectedIntent] = useState<TradeIntent>(() => {
-    const prefs = symbolPrefs[activeSymbol];
-    return prefs?.intent && isTradeIntent(prefs.intent) ? prefs.intent : "buy";
+    return activePrefs.intent && isTradeIntent(activePrefs.intent) ? activePrefs.intent : "buy";
   });
 
   useEffect(() => {
@@ -241,11 +283,11 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     }
     previousSymbolRef.current = activeSymbol;
 
-    const prefs = symbolPrefs[activeSymbol];
+    const prefs = symbolPrefs[activeSymbol] ?? {};
     const available = activePlan.strategies ?? {};
 
     let nextStrategy: StrategyKey | undefined;
-    if (prefs?.strategy && available[prefs.strategy]) {
+    if (prefs.strategy && available[prefs.strategy]) {
       nextStrategy = prefs.strategy;
     } else if (initialStrategy && available[initialStrategy]) {
       nextStrategy = initialStrategy;
@@ -260,7 +302,7 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
       setSelectedStrategy(nextStrategy);
     }
 
-    const nextIntent = prefs?.intent && isTradeIntent(prefs.intent) ? prefs.intent : "buy";
+    const nextIntent = prefs.intent && isTradeIntent(prefs.intent) ? prefs.intent : "buy";
     if (nextIntent !== selectedIntent) {
       setSelectedIntent(nextIntent);
     }
@@ -349,8 +391,10 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
         <div className="grid gap-6 xl:grid-cols-2">
           <AlertsList
             alerts={alertSuggestions}
-            symbol={activeOption?.symbol ?? activePlan.symbol}
+            symbol={activeSymbol}
             latestPrice={activePlan.latest_price}
+            initialActiveAlerts={activePrefs.alerts ?? []}
+            onActiveAlertsChange={(ids) => handleAlertsChange(activeSymbol, ids)}
           />
           <TrendHeatmap consensus={activePlan.technical_consensus} />
         </div>
