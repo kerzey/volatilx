@@ -15,6 +15,10 @@ type LongStats = {
   progressToTarget1: number;
   progressToTarget2?: number;
   progressToStop: number;
+  entryTriggered: boolean;
+  entryDistanceValue: number;
+  entryDistancePct: number;
+  entryProximityPct: number;
 };
 
 type ShortStats = {
@@ -26,6 +30,10 @@ type ShortStats = {
   progressToTarget1: number;
   progressToTarget2?: number;
   progressToStop: number;
+  entryTriggered: boolean;
+  entryDistanceValue: number;
+  entryDistancePct: number;
+  entryProximityPct: number;
 };
 
 export function PnLPreview({ plan, latestPrice }: PnLPreviewProps) {
@@ -66,6 +74,9 @@ function SideCard({ tone, title, stats, latestPrice }: SideCardProps) {
   const signedMove = formatPercent(stats.moveFromEntryPct, 1);
   const target2Copy = typeof stats.progressToTarget2 === "number" ? `${Math.round(clampToRange(stats.progressToTarget2))}% of the way to Target 2, ` : "";
   const stopDistance = 100 - Math.round(clampToRange(stats.progressToStop));
+  const entryDistanceCopy = stats.entryTriggered
+    ? "Entry tagged — monitoring targets."
+    : `Need ${formatPrice(stats.entryDistanceValue)} (${formatPercent(stats.entryDistancePct, 1)}) to trigger entry.`;
 
   const entryPrice = formatPrice(stats.entry);
   const targetOne = formatPrice(stats.target1);
@@ -83,6 +94,13 @@ function SideCard({ tone, title, stats, latestPrice }: SideCardProps) {
       </header>
       <p className={`text-sm leading-relaxed ${accent}`}>{narrative}</p>
       <div className="space-y-4 text-xs font-medium text-slate-300">
+        <DistanceMeter
+          label="Price → Entry"
+          percent={stats.entryProximityPct}
+          toneClass={barTone}
+          entryTriggered={stats.entryTriggered}
+          helper={entryDistanceCopy}
+        />
         <ProgressBar label="Entry → Target 1" percent={clampToRange(stats.progressToTarget1)} toneClass={barTone} />
         {typeof stats.progressToTarget2 === "number" ? (
           <ProgressBar label="Entry → Target 2" percent={clampToRange(stats.progressToTarget2)} toneClass={barTone} subtle />
@@ -122,6 +140,35 @@ function ProgressBar({ label, percent, toneClass, subtle }: ProgressBarProps) {
   );
 }
 
+type DistanceMeterProps = {
+  label: string;
+  percent: number;
+  toneClass: string;
+  helper: string;
+  entryTriggered: boolean;
+};
+
+function DistanceMeter({ label, percent, toneClass, helper, entryTriggered }: DistanceMeterProps) {
+  const width = clampToRange(percent);
+  const progressClass = `${toneClass} ${entryTriggered ? "opacity-40" : ""}`.trim();
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500">
+        <span>{label}</span>
+        <span>{Math.round(width)}%</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-slate-900">
+        <div
+          className={`h-2 rounded-full ${progressClass}`}
+          style={{ width: `${width}%` }}
+        />
+      </div>
+      <p className="text-[11px] font-medium text-slate-400">{helper}</p>
+    </div>
+  );
+}
+
 function computeLongStats(plan: StrategyPlan, latestPrice: number): LongStats | undefined {
   const entry = safeNumber(plan.buy_setup?.entry);
   const stop = safeNumber(plan.buy_setup?.stop);
@@ -137,6 +184,14 @@ function computeLongStats(plan: StrategyPlan, latestPrice: number): LongStats | 
   const progressToTarget1 = ((latestPrice - entry) / (target1 - entry)) * 100;
   const progressToTarget2 = Number.isFinite(target2) && target2 !== entry ? ((latestPrice - entry) / (target2 - entry)) * 100 : undefined;
   const progressToStop = ((entry - latestPrice) / (entry - stop)) * 100;
+  const entryTriggered = latestPrice >= entry;
+  const entryDistanceValue = entryTriggered ? 0 : Math.max(0, entry - latestPrice);
+  const entryBase = Math.abs(entry);
+  const rawEntryDistancePct = entryTriggered || !entryBase
+    ? 0
+    : ((entry - latestPrice) / entryBase) * 100;
+  const safeEntryDistancePct = Number.isFinite(rawEntryDistancePct) ? Math.max(0, rawEntryDistancePct) : 0;
+  const entryProximityPct = clampToRange(entryTriggered ? 100 : 100 - safeEntryDistancePct);
 
   return {
     entry,
@@ -147,6 +202,10 @@ function computeLongStats(plan: StrategyPlan, latestPrice: number): LongStats | 
     progressToTarget1,
     progressToTarget2,
     progressToStop,
+    entryTriggered,
+    entryDistanceValue,
+    entryDistancePct: safeEntryDistancePct,
+    entryProximityPct,
   };
 }
 
@@ -165,6 +224,14 @@ function computeShortStats(plan: StrategyPlan, latestPrice: number): ShortStats 
   const progressToTarget1 = ((entry - latestPrice) / (entry - target1)) * 100;
   const progressToTarget2 = Number.isFinite(target2) && target2 !== entry ? ((entry - latestPrice) / (entry - target2)) * 100 : undefined;
   const progressToStop = ((latestPrice - entry) / (stop - entry)) * 100;
+  const entryTriggered = latestPrice <= entry;
+  const entryDistanceValue = entryTriggered ? 0 : Math.max(0, latestPrice - entry);
+  const entryBase = Math.abs(entry);
+  const rawEntryDistancePct = entryTriggered || !entryBase
+    ? 0
+    : ((latestPrice - entry) / entryBase) * 100;
+  const safeEntryDistancePct = Number.isFinite(rawEntryDistancePct) ? Math.max(0, rawEntryDistancePct) : 0;
+  const entryProximityPct = clampToRange(entryTriggered ? 100 : 100 - safeEntryDistancePct);
 
   return {
     entry,
@@ -175,6 +242,10 @@ function computeShortStats(plan: StrategyPlan, latestPrice: number): ShortStats 
     progressToTarget1,
     progressToTarget2,
     progressToStop,
+    entryTriggered,
+    entryDistanceValue,
+    entryDistancePct: safeEntryDistancePct,
+    entryProximityPct,
   };
 }
 
