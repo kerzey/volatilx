@@ -2861,7 +2861,7 @@ var require_react_dom_development = __commonJS({
           );
         });
         var CAMELIZE = /[\-\:]([a-z])/g;
-        var capitalize = function(token) {
+        var capitalize2 = function(token) {
           return token[1].toUpperCase();
         };
         [
@@ -2942,7 +2942,7 @@ var require_react_dom_development = __commonJS({
           // you'll need to set attributeName to name.toLowerCase()
           // instead in the assignment below.
         ].forEach(function(attributeName) {
-          var name = attributeName.replace(CAMELIZE, capitalize);
+          var name = attributeName.replace(CAMELIZE, capitalize2);
           properties[name] = new PropertyInfoRecord(
             name,
             STRING,
@@ -2967,7 +2967,7 @@ var require_react_dom_development = __commonJS({
           // you'll need to set attributeName to name.toLowerCase()
           // instead in the assignment below.
         ].forEach(function(attributeName) {
-          var name = attributeName.replace(CAMELIZE, capitalize);
+          var name = attributeName.replace(CAMELIZE, capitalize2);
           properties[name] = new PropertyInfoRecord(
             name,
             STRING,
@@ -2988,7 +2988,7 @@ var require_react_dom_development = __commonJS({
           // you'll need to set attributeName to name.toLowerCase()
           // instead in the assignment below.
         ].forEach(function(attributeName) {
-          var name = attributeName.replace(CAMELIZE, capitalize);
+          var name = attributeName.replace(CAMELIZE, capitalize2);
           properties[name] = new PropertyInfoRecord(
             name,
             STRING,
@@ -25029,7 +25029,7 @@ function TechnicalPanel({ analysis }) {
   }
   const consensus = readRecord(symbolData, "consensus");
   const decisions = readRecord(symbolData, "decisions");
-  const reasoning = readArray(consensus, "reasoning");
+  const reasoning = readArray(consensus, "reasoning")?.slice(0, 4);
   const latestPrice = readNumber(consensus, "latest_price") ?? readNumber(symbolData, "latest_price");
   const overall = readString(consensus, "overall_recommendation") ?? "N/A";
   const confidence = readString(consensus, "confidence") ?? "N/A";
@@ -25062,60 +25062,64 @@ function TechnicalPanel({ analysis }) {
     };
   }).filter(Boolean) : [];
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-6", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-inner shadow-black/30", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-inner shadow-black/40", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { className: "text-xl font-semibold text-white", children: [
             analysis.symbol,
-            " consensus"
+            " \xB7 Technical consensus"
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-300", children: overall })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-3 text-sm text-slate-200 sm:grid-cols-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Price", value: formatPrice(latestPrice) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Confidence", value: confidence }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Strength", value: formatPercent(strength) })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Spot price", value: formatPrice(latestPrice), variant: "solid" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Confidence", value: confidence, variant: "solid" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Strength", value: formatPercent(strength), variant: "solid" })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-4 grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400 sm:grid-cols-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-6 grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300 sm:grid-cols-3", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Buy signals", value: formatCount(buySignals), compact: true }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Sell signals", value: formatCount(sellSignals), compact: true }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Hold signals", value: formatCount(holdSignals), compact: true })
       ] })
     ] }),
-    reasoning && reasoning.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-5", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Why the agents agree" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-3 space-y-2 text-sm leading-relaxed text-slate-200", children: reasoning.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex items-start gap-3", children: [
+    reasoning && reasoning.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Key takeaways" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-4 grid gap-3 text-sm leading-relaxed text-slate-200 sm:grid-cols-2", children: reasoning.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-2 w-2 rounded-full bg-sky-400", "aria-hidden": "true" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: String(item) })
       ] }, index)) })
     ] }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Timeframe breakdown" }),
-      decisionRows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "overflow-x-auto", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", { className: "min-w-full divide-y divide-slate-800 text-sm text-slate-200", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", { className: "bg-slate-900/70 text-xs uppercase tracking-wide text-slate-400", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Timeframe" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Signal" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Confidence" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Strength" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Entry" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Stop" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Target" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "R/R" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", { className: "px-3 py-2 text-left", children: "Reasoning" })
-        ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { className: "divide-y divide-slate-800", children: decisionRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { className: "hover:bg-slate-900/50", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2 font-semibold text-white", children: formatTimeframeLabel(row?.timeframe ?? "") }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2 font-semibold text-sky-200", children: row?.recommendation ?? "N/A" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2", children: String(row?.confidence ?? "N/A") }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2", children: formatPercent(row?.strength) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2", children: formatPrice(row?.entryPrice) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2", children: formatPrice(row?.stop) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2", children: formatPrice(row?.target) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2", children: formatNumber(row?.ratio, 2) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", { className: "px-3 py-2", children: row?.reasoning?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "space-y-1 text-xs text-slate-300", children: row.reasoning.map((reason, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: String(reason) }, idx)) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: "No notes" }) })
-        ] }, row?.timeframe)) })
-      ] }) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyState, { title: "No timeframe diagnostics", description: "Strategists did not return per-timeframe metrics." })
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "space-y-4", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Timeframe breakdown" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: "Signals across horizon" })
+      ] }),
+      decisionRows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-4 lg:grid-cols-2", children: decisionRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-inner shadow-black/30", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex items-center justify-between gap-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-400", children: formatTimeframeLabel(row?.timeframe ?? "") }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-semibold text-white", children: row?.recommendation ?? "N/A" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-2 text-xs text-slate-200", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Confidence", value: String(row?.confidence ?? "N/A") }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Strength", value: formatPercent(row?.strength) })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-4 grid gap-3 text-sm text-slate-200 sm:grid-cols-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Entry", value: formatPrice(row?.entryPrice), compact: true }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Stop", value: formatPrice(row?.stop), compact: true }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Target", value: formatPrice(row?.target), compact: true })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-4 flex items-center justify-between text-xs text-slate-400", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Risk / Reward" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-semibold text-slate-200", children: formatNumber(row?.ratio, 2) })
+        ] }),
+        row?.reasoning?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-3 space-y-2 text-xs leading-relaxed text-slate-300", children: row.reasoning.slice(0, 3).map((reason, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-1.5 w-1.5 rounded-full bg-slate-500", "aria-hidden": "true" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: String(reason) })
+        ] }, idx)) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-3 text-xs text-slate-500", children: "No supplemental notes." })
+      ] }, row?.timeframe)) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyState, { title: "No timeframe diagnostics", description: "Strategists did not return per-timeframe metrics." })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LegalNote, {})
   ] });
@@ -25133,29 +25137,56 @@ function PriceActionPanel({ analysis }) {
   const perTimeframe = readRecord(priceAction, "per_timeframe");
   const errors = readArray(priceAction, "errors");
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-6", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-2", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { className: "text-lg font-semibold text-white", children: [
           analysis.symbol,
-          " price action"
+          " \xB7 Price action"
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-300", children: summaryMessage })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-3", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Generated", value: formatDateTime(generatedAt) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Latest price", value: formatPrice(latestPrice) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Status", value: success ? "Ready" : "Issue" })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-3 text-sm text-slate-200 sm:grid-cols-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Generated", value: formatDateTime(generatedAt), variant: "solid" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Spot price", value: formatPrice(latestPrice), variant: "solid" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Pipeline", value: success ? "Ready" : "Issue", variant: success ? "solid" : "warning" })
       ] })
-    ] }),
-    overview ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Multi-timeframe alignment" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-4 text-sm leading-relaxed text-slate-200", children: renderValue(overview) })
+    ] }) }),
+    overview ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "grid gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Trend alignment" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-200", children: renderValue(overview.trend_alignment ?? "No dominant trend highlighted.") }),
+        Array.isArray(overview.recent_patterns) && overview.recent_patterns.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: "Recent patterns" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-3 space-y-2 text-sm text-slate-200", children: overview.recent_patterns.slice(0, 4).map((pattern, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex items-start gap-3 rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 inline-flex h-2 w-2 rounded-full bg-sky-400", "aria-hidden": "true" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: renderValue(pattern) })
+          ] }, index)) })
+        ] }) : null
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: "Key levels" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 md:grid-cols-2", children: Array.isArray(overview.key_levels) && overview.key_levels.length ? overview.key_levels.slice(0, 6).map((level, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-200", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-400", children: formatTimeframeLabel(level?.timeframe) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-sm font-semibold text-white", children: formatPrice(level?.price) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-xs text-slate-400", children: capitalize(level?.type || "level") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "mt-2 text-xs text-slate-500", children: [
+            formatPercent(level?.distance_pct),
+            " from spot"
+          ] })
+        ] }, index)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-400", children: "No shared support or resistance levels detected." }) })
+      ] })
     ] }) : null,
-    perTimeframe ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-4", children: Object.entries(perTimeframe).map(([timeframe, data]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: formatTimeframeLabel(timeframe) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-3 space-y-4 text-sm leading-relaxed text-slate-200", children: renderValue(data) })
+    perTimeframe ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { className: "grid gap-4 lg:grid-cols-2", children: Object.entries(perTimeframe).map(([timeframe, data]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex items-center justify-between", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-400", children: formatTimeframeLabel(timeframe) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-semibold text-white", children: "Structure snapshot" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Trend", value: readString(readRecord(data, "trend"), "direction") ?? "Mixed" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3 text-sm text-slate-200", children: renderValue(data) })
     ] }, timeframe)) }) : null,
-    errors && errors.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-100", children: [
+    errors && errors.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-100", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "font-semibold uppercase tracking-wide", children: "Data warnings" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-2 space-y-1 text-xs", children: errors.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: String(item) }, index)) })
     ] }) : null,
@@ -25178,13 +25209,7 @@ function IntelligencePanel({
   }
   if (!hasAi && !hasPlan) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-6", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        EmptyState,
-        {
-          title: "No additional intelligence",
-          description: "Enable AI summary or the multi-agent plan to populate this tab."
-        }
-      ),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyState, { title: "No additional intelligence", description: "Enable AI summary or the multi-agent plan to populate this tab." }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LegalNote, {})
     ] });
   }
@@ -25214,28 +25239,28 @@ function AiSummaryCard({ aiAnalysis }) {
     { key: "action_items", label: "Action items" },
     { key: "summary", label: "Summary" }
   ];
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-inner shadow-black/30", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-2", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-lg font-semibold text-white", children: "AI investment strategy" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-300", children: "Generative summary stitched from agent telemetry." })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-300", children: "Generative briefing stitched from cross-agent telemetry." })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400 sm:grid-cols-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Latest price", value: formatPrice(latestPrice), compact: true }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Tokens", value: tokens !== void 0 ? tokens.toString() : "N/A", compact: true })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300 sm:grid-cols-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Spot price", value: formatPrice(latestPrice), compact: true, variant: "solid" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Tokens", value: tokens !== void 0 ? tokens.toString() : "N/A", compact: true, variant: "solid" })
       ] })
     ] }),
-    analysisBody ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-5 space-y-5", children: narrativeSections.map(({ key, label }) => {
+    analysisBody ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-6 divide-y divide-slate-800/80 rounded-3xl border border-slate-800/60 bg-slate-950/40", children: narrativeSections.map(({ key, label }) => {
       const value = analysisBody[key];
       if (!value) {
         return null;
       }
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-slate-800 bg-slate-900/70 p-4", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: label }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-2 text-sm leading-relaxed text-slate-200", children: renderValue(value) })
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "space-y-2 px-5 py-4 first:rounded-t-3xl last:rounded-b-3xl", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: label }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-sm leading-relaxed text-slate-200", children: renderValue(value) })
       ] }, key);
-    }) }) : null,
-    !analysisBody && aiAnalysis.raw_response ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-200", children: String(aiAnalysis.raw_response) }) : null
+    }).filter(Boolean) }) : null,
+    !analysisBody && aiAnalysis.raw_response ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-6 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 text-sm text-slate-200", children: String(aiAnalysis.raw_response) }) : null
   ] });
 }
 function PrincipalPlanCard({ plan, includeRaw }) {
@@ -25270,16 +25295,18 @@ function PrincipalPlanCard({ plan, includeRaw }) {
     { key: "swing_trading", label: "Swing trading" },
     { key: "longterm_trading", label: "Long-term" }
   ];
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6 space-y-6", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "space-y-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-lg font-semibold text-white", children: "Multi-agent trading strategy" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-sm text-slate-300", children: [
-        "Principal agent synthesis tailored to ",
-        symbol,
-        "."
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "space-y-6 rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-inner shadow-black/30", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("header", { className: "space-y-4", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "text-lg font-semibold text-white", children: "Multi-agent trading strategy" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-sm text-slate-300", children: [
+          "Principal agent synthesis tailored to ",
+          symbol,
+          "."
+        ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400 sm:grid-cols-2 lg:grid-cols-4", children: summaryCells.map((cell) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: cell.label, value: cell.value, compact: true }, cell.label)) })
-    ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300 sm:grid-cols-2 lg:grid-cols-4", children: summaryCells.map((cell) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: cell.label, value: cell.value, compact: true, variant: "solid" }, cell.label)) })
+    ] }) }),
     strategies ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-4", children: strategyOrder.map(({ key, label }) => {
       const strategy = readRecord(strategies, key);
       if (!strategy) {
@@ -25294,19 +25321,24 @@ function PrincipalPlanCard({ plan, includeRaw }) {
       if (!summary && !buySetup && !sellSetup && !noTrade && !keyLevels && !nextActions) {
         return null;
       }
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: label }),
-        summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-3 text-sm leading-relaxed text-slate-200", children: renderValue(summary) }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-4 grid gap-4 md:grid-cols-2", children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/50 p-5", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: label }),
+          strategy.bias ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Bias", value: String(strategy.bias) }) : null
+        ] }),
+        summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-sm leading-relaxed text-slate-200", children: renderValue(summary) }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-4 md:grid-cols-2", children: [
           buySetup ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Buy setup", value: buySetup }) : null,
           sellSetup ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Sell setup", value: sellSetup }) : null
         ] }),
-        noTrade && noTrade.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "No-trade zone", value: noTrade }) : null,
-        keyLevels ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Key levels", value: keyLevels }) : null,
-        nextActions ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Next actions", value: nextActions }) : null
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-4 md:grid-cols-2", children: [
+          noTrade && noTrade.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "No-trade zone", value: noTrade }) : null,
+          keyLevels ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Key levels", value: keyLevels }) : null,
+          nextActions ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Next actions", value: nextActions }) : null
+        ] })
       ] }, key);
     }) }) : null,
-    context ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5", children: [
+    context ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-3xl border border-slate-800/80 bg-slate-950/50 p-5", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Portfolio context" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-3 text-sm leading-relaxed text-slate-200", children: renderValue(context) })
     ] }) : null,
@@ -25334,14 +25366,13 @@ function ExpertDiagnostics({ outputs, includeRaw }) {
     }
     return null;
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-3", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "space-y-4", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Expert diagnostics" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-3", children: entries.map(([key, value]) => {
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-4", children: entries.map(([key, value]) => {
       const record = value;
       const agentName = readString(record, "agent") ?? humanizeKey(key);
       const isSuccess = record.success !== false;
       const statusLabel = isSuccess ? "Ready" : "Issue";
-      const statusTone = isSuccess ? "text-emerald-300" : "text-rose-300";
       const metaItems = [];
       const metaSymbol = readString(record, "symbol");
       if (metaSymbol) {
@@ -25360,14 +25391,17 @@ function ExpertDiagnostics({ outputs, includeRaw }) {
       const renderedOutput = renderValue(output);
       const fallback = includeRaw && record.raw_text ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { className: "mt-3 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400", children: String(record.raw_text) }) : null;
       const errorMessage = !isSuccess && record.error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-xs text-rose-200", children: String(record.error) }) : null;
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-4", open: isSuccess, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("summary", { className: "flex cursor-pointer list-none items-center justify-between gap-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-sm font-semibold text-white", children: agentName }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold uppercase tracking-wide ${statusTone}`, children: statusLabel })
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "space-y-4 rounded-3xl border border-slate-800 bg-slate-900/50 p-5", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-semibold text-white", children: agentName }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs text-slate-400", children: "Specialist diagnostic" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Status", value: statusLabel, variant: isSuccess ? "success" : "warning" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-3 space-y-3 text-sm leading-relaxed text-slate-200", children: [
-          metaItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex flex-wrap gap-2 text-xs text-slate-400", children: metaItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1", children: item }, item)) }) : null,
-          errorMessage,
+        metaItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex flex-wrap gap-2 text-xs text-slate-400", children: metaItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1", children: item }, item)) }) : null,
+        errorMessage,
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-3 text-sm leading-relaxed text-slate-200", children: [
           renderedOutput,
           fallback
         ] })
@@ -25381,10 +25415,54 @@ function EmptyState({ title, description }) {
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-sm text-slate-400", children: description })
   ] });
 }
-function MetricTile({ label, value, compact }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-1 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: label }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-sm font-semibold text-slate-100 ${compact ? "" : "lg:text-base"}`, children: value ?? "N/A" })
+function MetricChip({ label, value, variant = "default" }) {
+  const chipStyles = {
+    default: {
+      container: "border border-slate-700 bg-slate-900/70",
+      label: "text-slate-400",
+      value: "text-slate-100"
+    },
+    success: {
+      container: "border border-emerald-500/40 bg-emerald-500/10",
+      label: "text-emerald-200",
+      value: "text-emerald-100"
+    },
+    warning: {
+      container: "border border-amber-500/40 bg-amber-500/10",
+      label: "text-amber-200",
+      value: "text-amber-100"
+    }
+  };
+  const style = chipStyles[variant];
+  const displayValue = value ?? "N/A";
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `inline-flex items-center gap-2 rounded-full px-3 py-1 ${style.container}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-[0.65rem] uppercase tracking-wide ${style.label}`, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold ${style.value}`, children: displayValue })
+  ] });
+}
+function MetricTile({ label, value, compact, variant = "default" }) {
+  const tileStyles = {
+    default: {
+      container: "border border-slate-800 bg-slate-950/70",
+      label: "text-slate-500",
+      value: "text-slate-100"
+    },
+    solid: {
+      container: "border border-slate-700 bg-slate-800/80",
+      label: "text-slate-200",
+      value: "text-white"
+    },
+    warning: {
+      container: "border border-amber-500/40 bg-amber-500/10",
+      label: "text-amber-200",
+      value: "text-amber-100"
+    }
+  };
+  const style = tileStyles[variant];
+  const displayValue = value ?? "N/A";
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `flex flex-col gap-1 rounded-2xl px-4 py-3 ${style.container}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs uppercase tracking-wide ${style.label}`, children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-sm font-semibold ${style.value} ${compact ? "" : "lg:text-base"}`, children: displayValue })
   ] });
 }
 function ToggleRow({

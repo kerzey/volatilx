@@ -672,7 +672,7 @@ function TechnicalPanel({ analysis }: { analysis: AnalyzeState }) {
 
   const consensus = readRecord(symbolData, "consensus");
   const decisions = readRecord(symbolData, "decisions");
-  const reasoning = readArray(consensus, "reasoning");
+  const reasoning = readArray(consensus, "reasoning")?.slice(0, 4);
 
   const latestPrice = readNumber(consensus, "latest_price") ?? readNumber(symbolData, "latest_price");
   const overall = readString(consensus, "overall_recommendation") ?? "N/A";
@@ -713,88 +713,86 @@ function TechnicalPanel({ analysis }: { analysis: AnalyzeState }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-inner shadow-black/30">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-inner shadow-black/40">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
-            <h3 className="text-xl font-semibold text-white">{analysis.symbol} consensus</h3>
+            <h3 className="text-xl font-semibold text-white">{analysis.symbol} · Technical consensus</h3>
             <p className="text-sm text-slate-300">{overall}</p>
           </div>
           <div className="grid gap-3 text-sm text-slate-200 sm:grid-cols-3">
-            <MetricTile label="Price" value={formatPrice(latestPrice)} />
-            <MetricTile label="Confidence" value={confidence} />
-            <MetricTile label="Strength" value={formatPercent(strength)} />
+            <MetricTile label="Spot price" value={formatPrice(latestPrice)} variant="solid" />
+            <MetricTile label="Confidence" value={confidence} variant="solid" />
+            <MetricTile label="Strength" value={formatPercent(strength)} variant="solid" />
           </div>
         </div>
-        <div className="mt-4 grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400 sm:grid-cols-3">
+        <div className="mt-6 grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300 sm:grid-cols-3">
           <MetricTile label="Buy signals" value={formatCount(buySignals)} compact />
           <MetricTile label="Sell signals" value={formatCount(sellSignals)} compact />
           <MetricTile label="Hold signals" value={formatCount(holdSignals)} compact />
         </div>
-      </div>
+      </section>
 
       {reasoning && reasoning.length ? (
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Why the agents agree</h4>
-          <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-200">
+        <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Key takeaways</h4>
+          <ul className="mt-4 grid gap-3 text-sm leading-relaxed text-slate-200 sm:grid-cols-2">
             {reasoning.map((item, index) => (
-              <li key={index} className="flex items-start gap-3">
+              <li key={index} className="flex items-start gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4">
                 <span className="mt-1 h-2 w-2 rounded-full bg-sky-400" aria-hidden="true" />
                 <span>{String(item)}</span>
               </li>
             ))}
           </ul>
-        </div>
+        </section>
       ) : null}
 
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Timeframe breakdown</h4>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Timeframe breakdown</h4>
+          <span className="text-xs text-slate-500">Signals across horizon</span>
+        </div>
         {decisionRows.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-800 text-sm text-slate-200">
-              <thead className="bg-slate-900/70 text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-3 py-2 text-left">Timeframe</th>
-                  <th className="px-3 py-2 text-left">Signal</th>
-                  <th className="px-3 py-2 text-left">Confidence</th>
-                  <th className="px-3 py-2 text-left">Strength</th>
-                  <th className="px-3 py-2 text-left">Entry</th>
-                  <th className="px-3 py-2 text-left">Stop</th>
-                  <th className="px-3 py-2 text-left">Target</th>
-                  <th className="px-3 py-2 text-left">R/R</th>
-                  <th className="px-3 py-2 text-left">Reasoning</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {decisionRows.map((row) => (
-                  <tr key={row?.timeframe as string} className="hover:bg-slate-900/50">
-                    <td className="px-3 py-2 font-semibold text-white">{formatTimeframeLabel(row?.timeframe ?? "")}</td>
-                    <td className="px-3 py-2 font-semibold text-sky-200">{row?.recommendation ?? "N/A"}</td>
-                    <td className="px-3 py-2">{String(row?.confidence ?? "N/A")}</td>
-                    <td className="px-3 py-2">{formatPercent(row?.strength)}</td>
-                    <td className="px-3 py-2">{formatPrice(row?.entryPrice)}</td>
-                    <td className="px-3 py-2">{formatPrice(row?.stop)}</td>
-                    <td className="px-3 py-2">{formatPrice(row?.target)}</td>
-                    <td className="px-3 py-2">{formatNumber(row?.ratio, 2)}</td>
-                    <td className="px-3 py-2">
-                      {row?.reasoning?.length ? (
-                        <ul className="space-y-1 text-xs text-slate-300">
-                          {row.reasoning.map((reason, idx) => (
-                            <li key={idx}>{String(reason)}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className="text-xs text-slate-500">No notes</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {decisionRows.map((row) => (
+              <article key={row?.timeframe as string} className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-inner shadow-black/30">
+                <header className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">{formatTimeframeLabel(row?.timeframe ?? "")}</p>
+                    <p className="text-sm font-semibold text-white">{row?.recommendation ?? "N/A"}</p>
+                  </div>
+                  <div className="grid gap-2 text-xs text-slate-200">
+                    <MetricChip label="Confidence" value={String(row?.confidence ?? "N/A")} />
+                    <MetricChip label="Strength" value={formatPercent(row?.strength)} />
+                  </div>
+                </header>
+                <div className="mt-4 grid gap-3 text-sm text-slate-200 sm:grid-cols-3">
+                  <MetricTile label="Entry" value={formatPrice(row?.entryPrice)} compact />
+                  <MetricTile label="Stop" value={formatPrice(row?.stop)} compact />
+                  <MetricTile label="Target" value={formatPrice(row?.target)} compact />
+                </div>
+                <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+                  <span>Risk / Reward</span>
+                  <span className="font-semibold text-slate-200">{formatNumber(row?.ratio, 2)}</span>
+                </div>
+                {row?.reasoning?.length ? (
+                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-300">
+                    {row.reasoning.slice(0, 3).map((reason, idx) => (
+                      <li key={idx} className="flex gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-500" aria-hidden="true" />
+                        <span>{String(reason)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">No supplemental notes.</p>
+                )}
+              </article>
+            ))}
           </div>
         ) : (
           <EmptyState title="No timeframe diagnostics" description="Strategists did not return per-timeframe metrics." />
         )}
-      </div>
+      </section>
 
       <LegalNote />
     </div>
@@ -822,47 +820,87 @@ function PriceActionPanel({ analysis }: { analysis: AnalyzeState }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-white">{analysis.symbol} price action</h3>
-          <p className="text-sm text-slate-300">{summaryMessage}</p>
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-white">{analysis.symbol} · Price action</h3>
+            <p className="text-sm text-slate-300">{summaryMessage}</p>
+          </div>
+          <div className="grid gap-3 text-sm text-slate-200 sm:grid-cols-3">
+            <MetricTile label="Generated" value={formatDateTime(generatedAt)} variant="solid" />
+            <MetricTile label="Spot price" value={formatPrice(latestPrice)} variant="solid" />
+            <MetricTile label="Pipeline" value={success ? "Ready" : "Issue"} variant={success ? "solid" : "warning"} />
+          </div>
         </div>
-        <div className="mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-3">
-          <MetricTile label="Generated" value={formatDateTime(generatedAt)} />
-          <MetricTile label="Latest price" value={formatPrice(latestPrice)} />
-          <MetricTile label="Status" value={success ? "Ready" : "Issue"} />
-        </div>
-      </div>
+      </section>
 
       {overview ? (
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Multi-timeframe alignment</h4>
-          <div className="mt-4 space-y-4 text-sm leading-relaxed text-slate-200">{renderValue(overview)}</div>
-        </div>
+        <section className="grid gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Trend alignment</h4>
+            <div className="rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-200">
+              {renderValue(overview.trend_alignment ?? "No dominant trend highlighted.")}
+            </div>
+            {Array.isArray(overview.recent_patterns) && overview.recent_patterns.length ? (
+              <div>
+                <h5 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Recent patterns</h5>
+                <ul className="mt-3 space-y-2 text-sm text-slate-200">
+                  {overview.recent_patterns.slice(0, 4).map((pattern, index) => (
+                    <li key={index} className="flex items-start gap-3 rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3">
+                      <span className="mt-1 inline-flex h-2 w-2 rounded-full bg-sky-400" aria-hidden="true" />
+                      <span>{renderValue(pattern)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+          <div className="space-y-4">
+            <h5 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Key levels</h5>
+            <div className="grid gap-3 md:grid-cols-2">
+              {Array.isArray(overview.key_levels) && overview.key_levels.length ? (
+                overview.key_levels.slice(0, 6).map((level, index) => (
+                  <div key={index} className="rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-200">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">{formatTimeframeLabel(level?.timeframe)}</p>
+                    <p className="mt-1 text-sm font-semibold text-white">{formatPrice(level?.price)}</p>
+                    <p className="mt-1 text-xs text-slate-400">{capitalize(level?.type || "level")}</p>
+                    <p className="mt-2 text-xs text-slate-500">{formatPercent(level?.distance_pct)} from spot</p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-400">No shared support or resistance levels detected.</div>
+              )}
+            </div>
+          </div>
+        </section>
       ) : null}
 
       {perTimeframe ? (
-        <div className="space-y-4">
+        <section className="grid gap-4 lg:grid-cols-2">
           {Object.entries(perTimeframe).map(([timeframe, data]) => (
-            <div key={timeframe} className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5">
-              <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
-                {formatTimeframeLabel(timeframe)}
-              </h5>
-              <div className="mt-3 space-y-4 text-sm leading-relaxed text-slate-200">{renderValue(data)}</div>
-            </div>
+            <article key={timeframe} className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30">
+              <header className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">{formatTimeframeLabel(timeframe)}</p>
+                  <p className="text-sm font-semibold text-white">Structure snapshot</p>
+                </div>
+                <MetricChip label="Trend" value={readString(readRecord(data as Record<string, unknown>, "trend"), "direction") ?? "Mixed"} />
+              </header>
+              <div className="mt-4 space-y-3 text-sm text-slate-200">{renderValue(data)}</div>
+            </article>
           ))}
-        </div>
+        </section>
       ) : null}
 
       {errors && errors.length ? (
-        <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-100">
+        <section className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-100">
           <h4 className="font-semibold uppercase tracking-wide">Data warnings</h4>
           <ul className="mt-2 space-y-1 text-xs">
             {errors.map((item, index) => (
               <li key={index}>{String(item)}</li>
             ))}
           </ul>
-        </div>
+        </section>
       ) : null}
 
       <LegalNote />
@@ -896,10 +934,7 @@ function IntelligencePanel({
   if (!hasAi && !hasPlan) {
     return (
       <div className="space-y-6">
-        <EmptyState
-          title="No additional intelligence"
-          description="Enable AI summary or the multi-agent plan to populate this tab."
-        />
+        <EmptyState title="No additional intelligence" description="Enable AI summary or the multi-agent plan to populate this tab." />
         <LegalNote />
       </div>
     );
@@ -940,41 +975,43 @@ function AiSummaryCard({ aiAnalysis }: { aiAnalysis: Record<string, unknown> }) 
   ];
 
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-inner shadow-black/30">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <h4 className="text-lg font-semibold text-white">AI investment strategy</h4>
-          <p className="text-sm text-slate-300">Generative summary stitched from agent telemetry.</p>
+          <p className="text-sm text-slate-300">Generative briefing stitched from cross-agent telemetry.</p>
         </div>
-        <div className="grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400 sm:grid-cols-2">
-          <MetricTile label="Latest price" value={formatPrice(latestPrice)} compact />
-          <MetricTile label="Tokens" value={tokens !== undefined ? tokens.toString() : "N/A"} compact />
+        <div className="grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300 sm:grid-cols-2">
+          <MetricTile label="Spot price" value={formatPrice(latestPrice)} compact variant="solid" />
+          <MetricTile label="Tokens" value={tokens !== undefined ? tokens.toString() : "N/A"} compact variant="solid" />
         </div>
-      </div>
+      </header>
 
       {analysisBody ? (
-        <div className="mt-5 space-y-5">
-          {narrativeSections.map(({ key, label }) => {
-            const value = analysisBody[key];
-            if (!value) {
-              return null;
-            }
-            return (
-              <div key={key} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-                <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">{label}</h5>
-                <div className="mt-2 text-sm leading-relaxed text-slate-200">{renderValue(value)}</div>
-              </div>
-            );
-          })}
+        <div className="mt-6 divide-y divide-slate-800/80 rounded-3xl border border-slate-800/60 bg-slate-950/40">
+          {narrativeSections
+            .map(({ key, label }) => {
+              const value = analysisBody[key];
+              if (!value) {
+                return null;
+              }
+              return (
+                <section key={key} className="space-y-2 px-5 py-4 first:rounded-t-3xl last:rounded-b-3xl">
+                  <h5 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</h5>
+                  <div className="text-sm leading-relaxed text-slate-200">{renderValue(value)}</div>
+                </section>
+              );
+            })
+            .filter(Boolean)}
         </div>
       ) : null}
 
       {!analysisBody && aiAnalysis.raw_response ? (
-        <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-200">
+        <div className="mt-6 rounded-3xl border border-slate-800/70 bg-slate-950/60 p-5 text-sm text-slate-200">
           {String(aiAnalysis.raw_response)}
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }
 
@@ -1018,14 +1055,18 @@ function PrincipalPlanCard({ plan, includeRaw }: { plan: Record<string, unknown>
   ];
 
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6 space-y-6">
-      <header className="space-y-3">
-        <h4 className="text-lg font-semibold text-white">Multi-agent trading strategy</h4>
-        <p className="text-sm text-slate-300">Principal agent synthesis tailored to {symbol}.</p>
-        <div className="grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400 sm:grid-cols-2 lg:grid-cols-4">
-          {summaryCells.map((cell) => (
-            <MetricTile key={cell.label} label={cell.label} value={cell.value} compact />
-          ))}
+    <section className="space-y-6 rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-inner shadow-black/30">
+      <header className="space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h4 className="text-lg font-semibold text-white">Multi-agent trading strategy</h4>
+            <p className="text-sm text-slate-300">Principal agent synthesis tailored to {symbol}.</p>
+          </div>
+          <div className="grid gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+            {summaryCells.map((cell) => (
+              <MetricTile key={cell.label} label={cell.label} value={cell.value} compact variant="solid" />
+            ))}
+          </div>
         </div>
       </header>
 
@@ -1046,18 +1087,21 @@ function PrincipalPlanCard({ plan, includeRaw }: { plan: Record<string, unknown>
               return null;
             }
             return (
-              <article key={key} className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5">
-                <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">{label}</h5>
-                {summary ? (
-                  <div className="mt-3 text-sm leading-relaxed text-slate-200">{renderValue(summary)}</div>
-                ) : null}
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <article key={key} className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/50 p-5">
+                <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">{label}</h5>
+                  {strategy.bias ? <MetricChip label="Bias" value={String(strategy.bias)} /> : null}
+                </header>
+                {summary ? <div className="text-sm leading-relaxed text-slate-200">{renderValue(summary)}</div> : null}
+                <div className="grid gap-4 md:grid-cols-2">
                   {buySetup ? <PlanSubsection title="Buy setup" value={buySetup} /> : null}
                   {sellSetup ? <PlanSubsection title="Sell setup" value={sellSetup} /> : null}
                 </div>
-                {noTrade && noTrade.length ? <PlanSubsection title="No-trade zone" value={noTrade} /> : null}
-                {keyLevels ? <PlanSubsection title="Key levels" value={keyLevels} /> : null}
-                {nextActions ? <PlanSubsection title="Next actions" value={nextActions} /> : null}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {noTrade && noTrade.length ? <PlanSubsection title="No-trade zone" value={noTrade} /> : null}
+                  {keyLevels ? <PlanSubsection title="Key levels" value={keyLevels} /> : null}
+                  {nextActions ? <PlanSubsection title="Next actions" value={nextActions} /> : null}
+                </div>
               </article>
             );
           })}
@@ -1065,14 +1109,14 @@ function PrincipalPlanCard({ plan, includeRaw }: { plan: Record<string, unknown>
       ) : null}
 
       {context ? (
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5">
+        <section className="rounded-3xl border border-slate-800/80 bg-slate-950/50 p-5">
           <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Portfolio context</h5>
           <div className="mt-3 text-sm leading-relaxed text-slate-200">{renderValue(context)}</div>
-        </div>
+        </section>
       ) : null}
 
       {expertOutputs ? <ExpertDiagnostics outputs={expertOutputs} includeRaw={includeRaw} /> : null}
-    </div>
+    </section>
   );
 }
 
@@ -1106,15 +1150,14 @@ function ExpertDiagnostics({ outputs, includeRaw }: { outputs: Record<string, un
   }
 
   return (
-    <div className="space-y-3">
+    <section className="space-y-4">
       <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Expert diagnostics</h5>
-      <div className="space-y-3">
+      <div className="space-y-4">
         {entries.map(([key, value]) => {
           const record = value as Record<string, unknown>;
           const agentName = readString(record, "agent") ?? humanizeKey(key);
           const isSuccess = record.success !== false;
           const statusLabel = isSuccess ? "Ready" : "Issue";
-          const statusTone = isSuccess ? "text-emerald-300" : "text-rose-300";
           const metaItems: string[] = [];
           const metaSymbol = readString(record, "symbol");
           if (metaSymbol) {
@@ -1143,30 +1186,33 @@ function ExpertDiagnostics({ outputs, includeRaw }: { outputs: Record<string, un
           ) : null;
 
           return (
-            <details key={key} className="rounded-3xl border border-slate-800 bg-slate-900/50 p-4" open={isSuccess}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-white">{agentName}</span>
-                <span className={`text-xs font-semibold uppercase tracking-wide ${statusTone}`}>{statusLabel}</span>
-              </summary>
-              <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-200">
-                {metaItems.length ? (
-                  <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-                    {metaItems.map((item) => (
-                      <span key={item} className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {errorMessage}
+            <article key={key} className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/50 p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">{agentName}</p>
+                  <p className="text-xs text-slate-400">Specialist diagnostic</p>
+                </div>
+                <MetricChip label="Status" value={statusLabel} variant={isSuccess ? "success" : "warning"} />
+              </div>
+              {metaItems.length ? (
+                <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                  {metaItems.map((item) => (
+                    <span key={item} className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {errorMessage}
+              <div className="space-y-3 text-sm leading-relaxed text-slate-200">
                 {renderedOutput}
                 {fallback}
               </div>
-            </details>
+            </article>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -1179,11 +1225,66 @@ function EmptyState({ title, description }: { title: string; description: string
   );
 }
 
-function MetricTile({ label, value, compact }: { label: string; value: string | number | null | undefined; compact?: boolean }) {
+type MetricChipVariant = "default" | "success" | "warning";
+
+function MetricChip({ label, value, variant = "default" }: { label: string; value: string | number | null | undefined; variant?: MetricChipVariant }) {
+  const chipStyles: Record<MetricChipVariant, { container: string; label: string; value: string }> = {
+    default: {
+      container: "border border-slate-700 bg-slate-900/70",
+      label: "text-slate-400",
+      value: "text-slate-100",
+    },
+    success: {
+      container: "border border-emerald-500/40 bg-emerald-500/10",
+      label: "text-emerald-200",
+      value: "text-emerald-100",
+    },
+    warning: {
+      container: "border border-amber-500/40 bg-amber-500/10",
+      label: "text-amber-200",
+      value: "text-amber-100",
+    },
+  };
+
+  const style = chipStyles[variant];
+  const displayValue = value ?? "N/A";
+
   return (
-    <div className="flex flex-col gap-1 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-      <span className="text-xs uppercase tracking-wide text-slate-500">{label}</span>
-      <span className={`text-sm font-semibold text-slate-100 ${compact ? "" : "lg:text-base"}`}>{value ?? "N/A"}</span>
+    <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${style.container}`}>
+      <span className={`text-[0.65rem] uppercase tracking-wide ${style.label}`}>{label}</span>
+      <span className={`text-xs font-semibold ${style.value}`}>{displayValue}</span>
+    </div>
+  );
+}
+
+type MetricTileVariant = "default" | "solid" | "warning";
+
+function MetricTile({ label, value, compact, variant = "default" }: { label: string; value: string | number | null | undefined; compact?: boolean; variant?: MetricTileVariant }) {
+  const tileStyles: Record<MetricTileVariant, { container: string; label: string; value: string }> = {
+    default: {
+      container: "border border-slate-800 bg-slate-950/70",
+      label: "text-slate-500",
+      value: "text-slate-100",
+    },
+    solid: {
+      container: "border border-slate-700 bg-slate-800/80",
+      label: "text-slate-200",
+      value: "text-white",
+    },
+    warning: {
+      container: "border border-amber-500/40 bg-amber-500/10",
+      label: "text-amber-200",
+      value: "text-amber-100",
+    },
+  };
+
+  const style = tileStyles[variant];
+  const displayValue = value ?? "N/A";
+
+  return (
+    <div className={`flex flex-col gap-1 rounded-2xl px-4 py-3 ${style.container}`}>
+      <span className={`text-xs uppercase tracking-wide ${style.label}`}>{label}</span>
+      <span className={`text-sm font-semibold ${style.value} ${compact ? "" : "lg:text-base"}`}>{displayValue}</span>
     </div>
   );
 }
