@@ -217,7 +217,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const metaForKey = (key: string) => zoneMeta[key] ?? zoneMeta.neutral;
 
-  const decoratedSegments = mergedSegments
+  const segmentsWithWidth = mergedSegments
     .map((segment) => {
     const meta = metaForKey(segment.key);
       const span = Math.max(segment.end - segment.start, 0);
