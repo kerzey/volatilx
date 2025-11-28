@@ -217,8 +217,34 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const metaForKey = (key: string) => zoneMeta[key] ?? zoneMeta.neutral;
 
-  const decoratedSegments: Segment[] = mergedSegments.map((segment) => {
+  const decoratedSegments: Array<Segment & {
+    startNorm: number;
+    endNorm: number;
+    actualWidth: number;
+    share: number;
+  }> = mergedSegments.map((segment) => {
     const meta = metaForKey(segment.key);
+    const startNorm = (segment.start - minBound) / totalSpan;
+    const endNorm = (segment.end - minBound) / totalSpan;
+    const actualWidth = Math.max(endNorm - startNorm, 0);
+    const EPSILON = 1e-6;
+    const MIN_SHARE = 0.02;
+    let share = actualWidth;
+    if (segment.key === "shortEntry" || segment.key === "longEntry") {
+      share += 0.05;
+    }
+    if (segment.key === "neutral") {
+      share += 0.08;
+    }
+    if (segment.key === "shortTarget2" || segment.key === "longTarget2") {
+      share += 0.03;
+    }
+    if (share < MIN_SHARE) {
+      share = MIN_SHARE;
+    }
+    if (actualWidth < EPSILON) {
+      share = Math.max(share, MIN_SHARE);
+    }
     return {
       key: segment.key,
       label: meta.label,
@@ -227,54 +253,44 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       start: segment.start,
       end: segment.end,
       width: 0,
+      startNorm,
+      endNorm,
+      actualWidth: Math.max(actualWidth, EPSILON),
+      share,
     };
   });
 
-  const MIN_WIDTH = 0.06;
-  const ENTRY_BONUS = 0.05;
-  const NEUTRAL_BONUS = 0.08;
-  const OUTER_TARGET_BONUS = 0.03;
+  const totalShare = decoratedSegments.reduce((sum, segment) => sum + segment.share, 0) || 1;
 
-  let weightSum = 0;
-  const weightedSegments = decoratedSegments.map((segment) => {
-    const span = Math.max(segment.end - segment.start, 1e-6);
-    let weight = span / totalSpan;
-    if (segment.key === "shortEntry" || segment.key === "longEntry") {
-      weight += ENTRY_BONUS;
-    }
-    if (segment.key === "neutral") {
-      weight += NEUTRAL_BONUS;
-    }
-    if (segment.key === "shortTarget2" || segment.key === "longTarget2") {
-      weight += OUTER_TARGET_BONUS;
-    }
-    weight = Math.max(weight, MIN_WIDTH);
-    weightSum += weight;
-    return { ...segment, span, weight };
-  });
-
-  const segmentsWithWidth: Segment[] = weightedSegments.map((segment) => ({
+  const segmentsWithWidth: Segment[] = decoratedSegments.map((segment) => ({
     key: segment.key,
     label: segment.label,
     value: segment.value,
     className: segment.className,
     start: segment.start,
     end: segment.end,
-    width: (segment.weight / weightSum) * 100,
+    width: (segment.share / totalShare) * 100,
   }));
 
   const pointer = (() => {
-    let cumulative = 0;
-    for (const segment of segmentsWithWidth) {
-      const withinSegment = latestPrice >= segment.start && latestPrice <= segment.end;
-      if (withinSegment) {
-        const denominator = Math.max(segment.end - segment.start, 1e-6);
-        const ratio = clamp((latestPrice - segment.start) / denominator, 0, 1);
-        return clamp(cumulative + segment.width * ratio, 0, 100);
+    const ratio = clamp((latestPrice - minBound) / totalSpan, 0, 1);
+    let cumulativeDisplay = 0;
+
+    for (const segment of decoratedSegments) {
+      const segmentEnd = segment.endNorm;
+      const segmentStart = segment.startNorm;
+      const displayShare = segment.share / totalShare;
+
+      if (ratio <= segmentEnd || segment === decoratedSegments[decoratedSegments.length - 1]) {
+        const relative = clamp((ratio - segmentStart) / segment.actualWidth, 0, 1);
+        const pointerDisplay = cumulativeDisplay + displayShare * relative;
+        return clamp(pointerDisplay * 100, 0, 100);
       }
-      cumulative += segment.width;
+
+      cumulativeDisplay += displayShare;
     }
-    return latestPrice < minBound ? 0 : 100;
+
+    return ratio < 0.5 ? 0 : 100;
   })();
 
   return (
