@@ -7,33 +7,70 @@
     <link rel="stylesheet" href="/static/css/report-center2.css">
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans antialiased">
-    <nav class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-        <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-            <a class="flex items-center gap-3 text-lg font-semibold text-slate-100" href="/report-center">
-                <img class="h-8 w-auto" src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
-                <span>VolatilX</span>
-            </a>
-            <div class="flex flex-wrap items-center gap-4 text-sm text-slate-300">
-                <a href="/analyze" class="transition hover:text-white">AI Insights</a>
-                <a href="/action-center" class="transition hover:text-white">Action Center</a>
-                <a href="/report-center" class="text-white">Report Center</a>
-                <a href="/subscribe" class="transition hover:text-white">Plans</a>
-                <a href="/settings" class="transition hover:text-white">Settings</a>
-                <span class="hidden border-l border-slate-700 pl-4 md:inline">{{ user.email }}</span>
-                <a href="/logout" class="rounded-full border border-slate-700 px-3 py-1 transition hover:border-slate-500 hover:text-white">Logout</a>
+    <header class="relative overflow-hidden border-b border-slate-800">
+            <div class="pointer-events-none absolute inset-0">
+                <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" aria-hidden="true"></div>
+                <div class="absolute -top-40 -left-32 h-96 w-96 rounded-full bg-sky-500/15 blur-3xl" aria-hidden="true"></div>
+                <div class="absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" aria-hidden="true"></div>
             </div>
-        </div>
-    </nav>
+            <div class="relative">
+                <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+                    <a class="flex items-center gap-3 text-lg font-semibold text-white" href="/report-center">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 shadow-inner shadow-black/30">
+                            <img class="h-6 w-auto" src="/static/VolatilX_Logo.PNG" alt="VolatilX Logo">
+                        </span>
+                        <span class="tracking-tight">VolatilX</span>
+                    </a>
+                    <div class="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-200">
+                        <a href="/analyze" class="rounded-full px-3 py-1 transition hover:bg-white/10 hover:text-white">AI Insights</a>
+                        <a href="/action-center" class="rounded-full px-3 py-1 transition hover:bg-white/10 hover:text-white">Action Center</a>
+                        <a href="/report-center" class="rounded-full bg-white/15 px-3 py-1 text-white shadow-sm shadow-black/30">Report Center</a>
+                        <a href="/subscribe" class="rounded-full px-3 py-1 transition hover:bg-white/10 hover:text-white">Plans</a>
+                        <a href="/settings" class="rounded-full px-3 py-1 transition hover:bg-white/10 hover:text-white">Settings</a>
+                        <span class="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-wide text-slate-200/80 md:inline-flex">
+                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
+                            {{ user.email }}
+                        </span>
+                        <a href="/logout" class="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white transition hover:border-white/30 hover:bg-white/20">
+                            <span class="h-1.5 w-1.5 rounded-full bg-rose-400" aria-hidden="true"></span>
+                            Logout
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mx-auto max-w-7xl px-6 pb-14">
+                    <div class="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+                        <div class="flex flex-col gap-4">
+                            <span class="inline-flex w-max items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-white/80">
+                                <span class="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true"></span>
+                                Report Center
+                            </span>
+                            <h1 class="text-4xl font-semibold tracking-tight text-white">Shared AI Report Center</h1>
+                            <p class="max-w-2xl text-sm leading-relaxed text-slate-200">
+                                Multi-agent principal plans distilled into actionable snapshots. Tap a symbol to pivot, or dial in a custom query below.
+                            </p>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-3 text-sm">
+                            <div class="rounded-2xl border border-white/15 bg-slate-950/50 px-4 py-3 text-slate-200">
+                                <p class="text-xs uppercase tracking-wide text-slate-400">Date window</p>
+                                <p class="mt-2 text-lg font-semibold text-white">{{ selected_date_label }}</p>
+                            </div>
+                            <div class="rounded-2xl border border-white/15 bg-slate-950/50 px-4 py-3 text-slate-200">
+                                <p class="text-xs uppercase tracking-wide text-slate-400">Focus symbol</p>
+                                <p class="mt-2 text-lg font-semibold text-white">{{ selected_symbol or 'All' }}</p>
+                            </div>
+                            <div class="rounded-2xl border border-white/15 bg-slate-950/50 px-4 py-3 text-slate-200">
+                                <p class="text-xs uppercase tracking-wide text-slate-400">Reports cached</p>
+                                <p class="mt-2 text-lg font-semibold text-white">{{ report_count }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
 
     <main class="mx-auto max-w-7xl px-6 py-10">
         <div class="space-y-8">
-            <header class="space-y-3">
-                <h1 class="text-3xl font-semibold tracking-tight text-white">Shared AI Report Center</h1>
-                <p class="text-sm text-slate-300">
-                    Viewing cached multi-agent strategies for <strong>{{ selected_date_label }}</strong>{% if selected_symbol %} focused on <strong>{{ selected_symbol }}</strong>{% endif %}.
-                </p>
-            </header>
-
             <section class="rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-inner shadow-black/30">
                 <form class="grid gap-4 md:grid-cols-[repeat(3,minmax(0,1fr))] md:items-end" method="get" action="/report-center">
                     <div class="flex flex-col gap-2">
