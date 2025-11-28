@@ -102,6 +102,36 @@ const buildMarkerGroups = (markers: Marker[], minBound: number, maxBound: number
   return groups;
 };
 
+const adjustMarkerGroupPercents = (groups: MarkerGroup[], minSpacingPercent: number): MarkerGroup[] => {
+  if (groups.length <= 1) {
+    return groups;
+  }
+
+  const adjusted = groups.map((group) => ({ ...group }));
+
+  adjusted[0].percent = clamp(adjusted[0].percent, 0, 100);
+  for (let i = 1; i < adjusted.length; i++) {
+    adjusted[i].percent = clamp(adjusted[i].percent, 0, 100);
+    if (adjusted[i].percent - adjusted[i - 1].percent < minSpacingPercent) {
+      adjusted[i].percent = Math.min(100, adjusted[i - 1].percent + minSpacingPercent);
+    }
+  }
+
+  for (let i = adjusted.length - 2; i >= 0; i--) {
+    if (adjusted[i + 1].percent - adjusted[i].percent < minSpacingPercent) {
+      adjusted[i].percent = Math.max(0, adjusted[i + 1].percent - minSpacingPercent);
+    }
+  }
+
+  for (let i = 1; i < adjusted.length; i++) {
+    if (adjusted[i].percent - adjusted[i - 1].percent < minSpacingPercent) {
+      adjusted[i].percent = Math.min(100, adjusted[i - 1].percent + minSpacingPercent);
+    }
+  }
+
+  return adjusted;
+};
+
 export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
   const normalizedSellTargets = Array.isArray(sellSetup?.targets)
     ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
@@ -265,6 +295,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   const pointerPercent = clamp(((latestPrice - minBound) / totalSpan) * 100, 0, 100);
 
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
+  const spacedMarkerGroups = adjustMarkerGroupPercents(markerGroups, 3);
 
   const priceChipClass =
     "rounded-lg border border-slate-700/70 bg-slate-950/90 px-2.5 py-1 text-xs font-semibold text-slate-100 shadow-inner shadow-black/20 backdrop-blur-sm";
@@ -324,7 +355,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
           )}
         </div>
 
-        {markerGroups.map((group) => {
+        {spacedMarkerGroups.map((group) => {
           const bottomMarkers = group.markers.filter((marker) => marker.align === "bottom");
           const dominantTone = group.markers[0]?.tone ?? "neutral";
           const tone = toneStyles[dominantTone];
@@ -371,7 +402,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       </div>
 
       {legendItemsSorted.length > 0 && (
-        <div className="mt-60 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-300">
+        <div className="mt-25 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-300">
           {legendItemsSorted.map((item) => {
             const tone = toneStyles[item.tone];
             return (
