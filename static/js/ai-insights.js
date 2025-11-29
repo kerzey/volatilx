@@ -25419,10 +25419,17 @@ function PrincipalPlanCard({ plan, includeRaw }) {
       const summary = strategy.summary ?? strategy.overview;
       const buySetup = readRecord(strategy, "buy_setup");
       const sellSetup = readRecord(strategy, "sell_setup");
-      const noTrade = readArray(strategy, "no_trade_zone");
+      let noTrade = strategy.no_trade_zone ?? strategy.noTradeZone ?? null;
+      if (!noTrade) {
+        const extracted = readArray(strategy, "no_trade_zone");
+        if (extracted) {
+          noTrade = extracted;
+        }
+      }
+      const hasNoTrade = Array.isArray(noTrade) ? noTrade.length > 0 : Boolean(noTrade);
       const keyLevels = strategy.key_levels;
       const nextActions = strategy.next_actions;
-      if (!summary && !buySetup && !sellSetup && !noTrade && !keyLevels && !nextActions) {
+      if (!summary && !buySetup && !sellSetup && !hasNoTrade && !keyLevels && !nextActions) {
         return null;
       }
       return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/50 p-5", children: [
@@ -25432,11 +25439,11 @@ function PrincipalPlanCard({ plan, includeRaw }) {
         ] }),
         summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-sm leading-relaxed text-slate-200", children: renderValue(summary) }) : null,
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-4 md:grid-cols-2", children: [
-          buySetup ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Buy setup", value: buySetup }) : null,
-          sellSetup ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Sell setup", value: sellSetup }) : null
+          buySetup ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TradeSetupCard, { title: "Buy setup", tone: "bullish", setup: buySetup }) : null,
+          sellSetup ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TradeSetupCard, { title: "Sell setup", tone: "bearish", setup: sellSetup }) : null
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-4 md:grid-cols-2", children: [
-          noTrade && noTrade.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "No-trade zone", value: noTrade }) : null,
+          hasNoTrade ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NoTradeCard, { zone: noTrade }) : null,
           keyLevels ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Key levels", value: keyLevels }) : null,
           nextActions ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "Next actions", value: nextActions }) : null
         ] })
@@ -25457,6 +25464,151 @@ function PlanSubsection({ title, value }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-slate-800 bg-slate-900/60 p-4", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: "text-xs font-semibold uppercase tracking-wide text-slate-300", children: title }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-2 text-sm leading-relaxed text-slate-200", children: rendered })
+  ] });
+}
+function TradeSetupCard({ title, tone, setup }) {
+  const palette = tone === "bullish" ? {
+    container: "border-emerald-500/40 bg-emerald-500/10",
+    header: "text-emerald-200",
+    label: "text-emerald-200",
+    value: "text-emerald-100",
+    detailBorder: "border-emerald-500/40",
+    detailBg: "bg-emerald-500/20",
+    bullet: "bg-emerald-400",
+    text: "text-emerald-100"
+  } : {
+    container: "border-rose-500/40 bg-rose-500/10",
+    header: "text-rose-200",
+    label: "text-rose-200",
+    value: "text-rose-100",
+    detailBorder: "border-rose-500/40",
+    detailBg: "bg-rose-500/20",
+    bullet: "bg-rose-400",
+    text: "text-rose-100"
+  };
+  const entry = readNumber(setup, "entry") ?? readNumber(setup, "entry_price") ?? toNumber(setup.entry ?? setup.entry_price);
+  const stop = readNumber(setup, "stop") ?? readNumber(setup, "stop_loss") ?? readNumber(setup, "stopLoss") ?? toNumber(setup.stop ?? setup.stop_loss);
+  const riskReward = readNumber(setup, "risk_reward_ratio") ?? readNumber(setup, "riskReward") ?? readNumber(setup, "rrr") ?? toNumber(setup.risk_reward_ratio ?? setup.riskReward);
+  const targets = extractTradeTargets(setup);
+  const rows = [];
+  if (entry !== void 0) {
+    rows.push({ key: "entry", label: "Entry", value: formatPrice(entry) });
+  }
+  if (targets[0] !== void 0) {
+    rows.push({ key: "target-0", label: `${formatOrdinal(0)} target`, value: formatPrice(targets[0]) });
+  }
+  if (stop !== void 0) {
+    rows.push({ key: "stop", label: "Stop", value: formatPrice(stop) });
+  }
+  if (targets[1] !== void 0) {
+    rows.push({ key: "target-1", label: `${formatOrdinal(1)} target`, value: formatPrice(targets[1]) });
+  }
+  if (riskReward !== void 0) {
+    rows.push({ key: "risk-reward", label: "Risk / Reward", value: formatNumber(riskReward, 2) });
+  }
+  const extraTargets = targets.slice(2);
+  const notes = [];
+  if (extraTargets.length) {
+    notes.push(`Additional targets: ${extraTargets.map((value, index) => `${formatOrdinal(index + 2)} target ${formatPrice(value)}`).join(" \xB7 ")}`);
+  }
+  const narrativeKeys = ["trigger", "notes", "context", "summary", "comment", "bias_override"];
+  for (const key of narrativeKeys) {
+    const value = setup[key];
+    if (!value) {
+      continue;
+    }
+    const formatted = formatInsightValue(value);
+    if (formatted) {
+      notes.push(formatted);
+    }
+  }
+  const noteItems = Array.from(new Set(notes.filter(Boolean)));
+  if (!rows.length && !noteItems.length) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title, value: setup });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: `space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: `text-xs font-semibold uppercase tracking-wide ${palette.header}`, children: title }),
+    rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 sm:grid-cols-2", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs uppercase tracking-wide ${palette.label}`, children: row.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-sm font-semibold ${palette.value}`, children: row.value })
+    ] }, row.key)) }) : null,
+    noteItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `mt-2 space-y-2 text-sm ${palette.text}`, children: noteItems.map((note, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`, "aria-hidden": "true" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: note })
+    ] }, index)) }) : null
+  ] });
+}
+function NoTradeCard({ zone }) {
+  const palette = {
+    container: "border-amber-500/40 bg-amber-500/10",
+    label: "text-amber-200",
+    value: "text-amber-100",
+    detailBorder: "border-amber-500/40",
+    detailBg: "bg-amber-500/20",
+    bullet: "bg-amber-400",
+    text: "text-amber-100"
+  };
+  let minValue;
+  let maxValue;
+  const notes = [];
+  if (isRecord(zone)) {
+    minValue = readNumber(zone, "min") ?? readNumber(zone, "lower") ?? readNumber(zone, "low") ?? readNumber(zone, "floor");
+    maxValue = readNumber(zone, "max") ?? readNumber(zone, "upper") ?? readNumber(zone, "high") ?? readNumber(zone, "ceiling");
+    if (minValue === void 0 || maxValue === void 0) {
+      const numericValues = Object.values(zone).map((value) => toNumber(value)).filter((value) => value !== void 0);
+      if (numericValues.length) {
+        if (minValue === void 0) {
+          minValue = Math.min(...numericValues);
+        }
+        if (maxValue === void 0) {
+          maxValue = Math.max(...numericValues);
+        }
+      }
+    }
+    const narrativeKeys = ["description", "notes", "comment", "summary"];
+    for (const key of narrativeKeys) {
+      const value = zone[key];
+      if (!value) {
+        continue;
+      }
+      const formatted = formatInsightValue(value);
+      if (formatted) {
+        notes.push(formatted);
+      }
+    }
+  } else if (Array.isArray(zone)) {
+    const numericValues = zone.map((item) => toNumber(item)).filter((value) => value !== void 0);
+    if (numericValues.length) {
+      minValue = Math.min(...numericValues);
+      maxValue = Math.max(...numericValues);
+    }
+    const textValues = zone.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+    notes.push(...textValues);
+  } else if (typeof zone === "string") {
+    notes.push(zone);
+  }
+  const noteItems = Array.from(new Set(notes.filter(Boolean)));
+  const hasRange = minValue !== void 0 || maxValue !== void 0;
+  if (!hasRange && !noteItems.length) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "No-trade zone", value: zone });
+  }
+  const rows = [];
+  if (minValue !== void 0) {
+    rows.push({ key: "min", label: "Min", value: formatPrice(minValue) });
+  }
+  if (maxValue !== void 0) {
+    rows.push({ key: "max", label: "Max", value: formatPrice(maxValue) });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: `space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: `text-xs font-semibold uppercase tracking-wide ${palette.label}`, children: "No-trade zone" }),
+    rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 sm:grid-cols-2", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs uppercase tracking-wide ${palette.label}`, children: row.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-sm font-semibold ${palette.value}`, children: row.value })
+    ] }, row.key)) }) : null,
+    noteItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `space-y-2 text-sm ${palette.text}`, children: noteItems.map((note, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`, "aria-hidden": "true" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: note })
+    ] }, index)) }) : null
   ] });
 }
 function ExpertDiagnostics({ outputs, includeRaw }) {
@@ -25711,6 +25863,73 @@ function formatNumber(value, digits = 2) {
     return "N/A";
   }
   return value.toFixed(digits);
+}
+function toNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const sanitized = value.replace(/[$,%]/g, "").replace(/\s+/g, "").replace(/,/g, "");
+    const parsed = Number(sanitized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return void 0;
+}
+function formatOrdinal(index) {
+  const words = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"];
+  if (index >= 0 && index < words.length) {
+    return words[index];
+  }
+  const value = index + 1;
+  const remainder = value % 10;
+  const teen = value % 100;
+  let suffix = "th";
+  if (teen < 11 || teen > 13) {
+    if (remainder === 1) suffix = "st";
+    else if (remainder === 2) suffix = "nd";
+    else if (remainder === 3) suffix = "rd";
+  }
+  return `${value}${suffix}`;
+}
+function extractTradeTargets(setup) {
+  const targets = [];
+  const seen = /* @__PURE__ */ new Set();
+  const addTarget = (raw) => {
+    const numeric = toNumber(raw);
+    if (numeric === void 0 || seen.has(numeric)) {
+      return;
+    }
+    seen.add(numeric);
+    targets.push(numeric);
+  };
+  const targetArray = readArray(setup, "targets");
+  if (targetArray) {
+    for (const entry of targetArray) {
+      if (isRecord(entry)) {
+        const price = readNumber(entry, "price") ?? readNumber(entry, "value") ?? readNumber(entry, "target");
+        if (price !== void 0) {
+          addTarget(price);
+          continue;
+        }
+        for (const value of Object.values(entry)) {
+          addTarget(value);
+        }
+      } else {
+        addTarget(entry);
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(setup)) {
+    if (key === "targets") {
+      continue;
+    }
+    if (/target/i.test(key)) {
+      addTarget(value);
+    }
+  }
+  return targets;
 }
 function formatPrice(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {

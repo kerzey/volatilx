@@ -1222,10 +1222,17 @@ function PrincipalPlanCard({ plan, includeRaw }: { plan: Record<string, unknown>
             const summary = strategy.summary ?? strategy.overview;
             const buySetup = readRecord(strategy, "buy_setup");
             const sellSetup = readRecord(strategy, "sell_setup");
-            const noTrade = readArray(strategy, "no_trade_zone");
+            let noTrade: unknown = strategy.no_trade_zone ?? (strategy as Record<string, unknown>).noTradeZone ?? null;
+            if (!noTrade) {
+              const extracted = readArray(strategy, "no_trade_zone");
+              if (extracted) {
+                noTrade = extracted;
+              }
+            }
+            const hasNoTrade = Array.isArray(noTrade) ? noTrade.length > 0 : Boolean(noTrade);
             const keyLevels = strategy.key_levels;
             const nextActions = strategy.next_actions;
-            if (!summary && !buySetup && !sellSetup && !noTrade && !keyLevels && !nextActions) {
+            if (!summary && !buySetup && !sellSetup && !hasNoTrade && !keyLevels && !nextActions) {
               return null;
             }
             return (
@@ -1236,11 +1243,11 @@ function PrincipalPlanCard({ plan, includeRaw }: { plan: Record<string, unknown>
                 </header>
                 {summary ? <div className="text-sm leading-relaxed text-slate-200">{renderValue(summary)}</div> : null}
                 <div className="grid gap-4 md:grid-cols-2">
-                  {buySetup ? <PlanSubsection title="Buy setup" value={buySetup} /> : null}
-                  {sellSetup ? <PlanSubsection title="Sell setup" value={sellSetup} /> : null}
+                  {buySetup ? <TradeSetupCard title="Buy setup" tone="bullish" setup={buySetup} /> : null}
+                  {sellSetup ? <TradeSetupCard title="Sell setup" tone="bearish" setup={sellSetup} /> : null}
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  {noTrade && noTrade.length ? <PlanSubsection title="No-trade zone" value={noTrade} /> : null}
+                  {hasNoTrade ? <NoTradeCard zone={noTrade} /> : null}
                   {keyLevels ? <PlanSubsection title="Key levels" value={keyLevels} /> : null}
                   {nextActions ? <PlanSubsection title="Next actions" value={nextActions} /> : null}
                 </div>
@@ -1272,6 +1279,215 @@ function PlanSubsection({ title, value }: { title: string; value: unknown }) {
       <h6 className="text-xs font-semibold uppercase tracking-wide text-slate-300">{title}</h6>
       <div className="mt-2 text-sm leading-relaxed text-slate-200">{rendered}</div>
     </div>
+  );
+}
+
+type TradeTone = "bullish" | "bearish";
+
+function TradeSetupCard({ title, tone, setup }: { title: string; tone: TradeTone; setup: Record<string, unknown> }) {
+  const palette = tone === "bullish"
+    ? {
+        container: "border-emerald-500/40 bg-emerald-500/10",
+        header: "text-emerald-200",
+        label: "text-emerald-200",
+        value: "text-emerald-100",
+        detailBorder: "border-emerald-500/40",
+        detailBg: "bg-emerald-500/20",
+        bullet: "bg-emerald-400",
+        text: "text-emerald-100",
+      }
+    : {
+        container: "border-rose-500/40 bg-rose-500/10",
+        header: "text-rose-200",
+        label: "text-rose-200",
+        value: "text-rose-100",
+        detailBorder: "border-rose-500/40",
+        detailBg: "bg-rose-500/20",
+        bullet: "bg-rose-400",
+        text: "text-rose-100",
+      };
+
+  const entry =
+    readNumber(setup, "entry") ??
+    readNumber(setup, "entry_price") ??
+    toNumber((setup as Record<string, unknown>).entry ?? (setup as Record<string, unknown>).entry_price);
+  const stop =
+    readNumber(setup, "stop") ??
+    readNumber(setup, "stop_loss") ??
+    readNumber(setup, "stopLoss") ??
+    toNumber((setup as Record<string, unknown>).stop ?? (setup as Record<string, unknown>).stop_loss);
+  const riskReward =
+    readNumber(setup, "risk_reward_ratio") ??
+    readNumber(setup, "riskReward") ??
+    readNumber(setup, "rrr") ??
+    toNumber((setup as Record<string, unknown>).risk_reward_ratio ?? (setup as Record<string, unknown>).riskReward);
+  const targets = extractTradeTargets(setup);
+
+  const rows: { key: string; label: string; value: string }[] = [];
+  if (entry !== undefined) {
+    rows.push({ key: "entry", label: "Entry", value: formatPrice(entry) });
+  }
+  if (targets[0] !== undefined) {
+    rows.push({ key: "target-0", label: `${formatOrdinal(0)} target`, value: formatPrice(targets[0]) });
+  }
+  if (stop !== undefined) {
+    rows.push({ key: "stop", label: "Stop", value: formatPrice(stop) });
+  }
+  if (targets[1] !== undefined) {
+    rows.push({ key: "target-1", label: `${formatOrdinal(1)} target`, value: formatPrice(targets[1]) });
+  }
+  if (riskReward !== undefined) {
+    rows.push({ key: "risk-reward", label: "Risk / Reward", value: formatNumber(riskReward, 2) });
+  }
+
+  const extraTargets = targets.slice(2);
+  const notes: string[] = [];
+  if (extraTargets.length) {
+    notes.push(`Additional targets: ${extraTargets
+      .map((value, index) => `${formatOrdinal(index + 2)} target ${formatPrice(value)}`)
+      .join(" · ")}`);
+  }
+
+  const narrativeKeys = ["trigger", "notes", "context", "summary", "comment", "bias_override"];
+  for (const key of narrativeKeys) {
+    const value = (setup as Record<string, unknown>)[key];
+    if (!value) {
+      continue;
+    }
+    const formatted = formatInsightValue(value);
+    if (formatted) {
+      notes.push(formatted);
+    }
+  }
+
+  const noteItems = Array.from(new Set(notes.filter(Boolean)));
+
+  if (!rows.length && !noteItems.length) {
+    return <PlanSubsection title={title} value={setup} />;
+  }
+
+  return (
+    <section className={`space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`}>
+      <h6 className={`text-xs font-semibold uppercase tracking-wide ${palette.header}`}>{title}</h6>
+      {rows.length ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {rows.map((row) => (
+            <div key={row.key} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`}>
+              <span className={`text-xs uppercase tracking-wide ${palette.label}`}>{row.label}</span>
+              <span className={`text-sm font-semibold ${palette.value}`}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {noteItems.length ? (
+        <ul className={`mt-2 space-y-2 text-sm ${palette.text}`}>
+          {noteItems.map((note, index) => (
+            <li key={index} className="flex gap-2">
+              <span className={`mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`} aria-hidden="true" />
+              <span>{note}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
+function NoTradeCard({ zone }: { zone: unknown }) {
+  const palette = {
+    container: "border-amber-500/40 bg-amber-500/10",
+    label: "text-amber-200",
+    value: "text-amber-100",
+    detailBorder: "border-amber-500/40",
+    detailBg: "bg-amber-500/20",
+    bullet: "bg-amber-400",
+    text: "text-amber-100",
+  };
+
+  let minValue: number | undefined;
+  let maxValue: number | undefined;
+  const notes: string[] = [];
+
+  if (isRecord(zone)) {
+    minValue = readNumber(zone, "min") ?? readNumber(zone, "lower") ?? readNumber(zone, "low") ?? readNumber(zone, "floor");
+    maxValue = readNumber(zone, "max") ?? readNumber(zone, "upper") ?? readNumber(zone, "high") ?? readNumber(zone, "ceiling");
+
+    if (minValue === undefined || maxValue === undefined) {
+      const numericValues = Object.values(zone)
+        .map((value) => toNumber(value))
+        .filter((value): value is number => value !== undefined);
+      if (numericValues.length) {
+        if (minValue === undefined) {
+          minValue = Math.min(...numericValues);
+        }
+        if (maxValue === undefined) {
+          maxValue = Math.max(...numericValues);
+        }
+      }
+    }
+
+    const narrativeKeys = ["description", "notes", "comment", "summary"];
+    for (const key of narrativeKeys) {
+      const value = zone[key];
+      if (!value) {
+        continue;
+      }
+      const formatted = formatInsightValue(value);
+      if (formatted) {
+        notes.push(formatted);
+      }
+    }
+  } else if (Array.isArray(zone)) {
+    const numericValues = zone.map((item) => toNumber(item)).filter((value): value is number => value !== undefined);
+    if (numericValues.length) {
+      minValue = Math.min(...numericValues);
+      maxValue = Math.max(...numericValues);
+    }
+    const textValues = zone.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+    notes.push(...textValues);
+  } else if (typeof zone === "string") {
+    notes.push(zone);
+  }
+
+  const noteItems = Array.from(new Set(notes.filter(Boolean)));
+
+  const hasRange = minValue !== undefined || maxValue !== undefined;
+  if (!hasRange && !noteItems.length) {
+    return <PlanSubsection title="No-trade zone" value={zone} />;
+  }
+
+  const rows: { key: string; label: string; value: string }[] = [];
+  if (minValue !== undefined) {
+    rows.push({ key: "min", label: "Min", value: formatPrice(minValue) });
+  }
+  if (maxValue !== undefined) {
+    rows.push({ key: "max", label: "Max", value: formatPrice(maxValue) });
+  }
+
+  return (
+    <section className={`space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`}>
+      <h6 className={`text-xs font-semibold uppercase tracking-wide ${palette.label}`}>No-trade zone</h6>
+      {rows.length ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {rows.map((row) => (
+            <div key={row.key} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`}>
+              <span className={`text-xs uppercase tracking-wide ${palette.label}`}>{row.label}</span>
+              <span className={`text-sm font-semibold ${palette.value}`}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {noteItems.length ? (
+        <ul className={`space-y-2 text-sm ${palette.text}`}>
+          {noteItems.map((note, index) => (
+            <li key={index} className="flex gap-2">
+              <span className={`mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`} aria-hidden="true" />
+              <span>{note}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }
 
@@ -1588,6 +1804,80 @@ function formatNumber(value: unknown, digits = 2): string {
     return "N/A";
   }
   return value.toFixed(digits);
+}
+
+function toNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const sanitized = value.replace(/[$,%]/g, "").replace(/\s+/g, "").replace(/,/g, "");
+    const parsed = Number(sanitized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
+function formatOrdinal(index: number): string {
+  const words = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"];
+  if (index >= 0 && index < words.length) {
+    return words[index];
+  }
+  const value = index + 1;
+  const remainder = value % 10;
+  const teen = value % 100;
+  let suffix = "th";
+  if (teen < 11 || teen > 13) {
+    if (remainder === 1) suffix = "st";
+    else if (remainder === 2) suffix = "nd";
+    else if (remainder === 3) suffix = "rd";
+  }
+  return `${value}${suffix}`;
+}
+
+function extractTradeTargets(setup: Record<string, unknown>): number[] {
+  const targets: number[] = [];
+  const seen = new Set<number>();
+
+  const addTarget = (raw: unknown) => {
+    const numeric = toNumber(raw);
+    if (numeric === undefined || seen.has(numeric)) {
+      return;
+    }
+    seen.add(numeric);
+    targets.push(numeric);
+  };
+
+  const targetArray = readArray(setup, "targets");
+  if (targetArray) {
+    for (const entry of targetArray) {
+      if (isRecord(entry)) {
+        const price = readNumber(entry, "price") ?? readNumber(entry, "value") ?? readNumber(entry, "target");
+        if (price !== undefined) {
+          addTarget(price);
+          continue;
+        }
+        for (const value of Object.values(entry)) {
+          addTarget(value);
+        }
+      } else {
+        addTarget(entry);
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(setup)) {
+    if (key === "targets") {
+      continue;
+    }
+    if (/target/i.test(key)) {
+      addTarget(value);
+    }
+  }
+
+  return targets;
 }
 
 function formatPrice(value: unknown): string {
