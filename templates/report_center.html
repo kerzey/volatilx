@@ -12,14 +12,9 @@
     {% set header_user_email = user.email if user else None %}
     {{ render_header(
         page='report-center',
-        title='Shared AI Report Center',
+        title='Shared AI Briefings',
         subtitle='Multi-agent principal plans distilled into actionable snapshots. Tap a symbol to pivot, or dial in a custom query below.',
-        badge='Report Center',
-        stats=[
-            {'label': 'Date window', 'value': selected_date_label},
-            {'label': 'Focus symbol', 'value': selected_symbol or 'All'},
-            {'label': 'Reports cached', 'value': report_count}
-        ],
+        badge='Signal Cache',
         user_email=header_user_email
     ) }}
 
