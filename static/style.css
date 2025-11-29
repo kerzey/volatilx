@@ -2252,7 +2252,7 @@ tbody tr:nth-child(even) { background: #f8f8fc;}
 
 /* ACTION CENTER ------------------------------------------------------------ */
 .action-center-page {
-  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 60%);
+  background: radial-gradient(120% 140% at 50% 0%, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.96) 45%, #020617 100%);
   color: #1f2937;
 }
 
