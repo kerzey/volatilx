@@ -186,21 +186,21 @@
 .rc-hero__body {
     display: flex;
     flex-direction: column;
-    gap: 1.35rem;
+    gap: 1rem;
     z-index: 5;
 }
 
 .rc-hero__body--with-stats {
-    gap: 1.5rem;
+    gap: 1.2rem;
 }
 
 .rc-hero__copy {
     max-width: 100%;
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    row-gap: 0.6rem;
-    column-gap: 1.5rem;
+    align-items: center;
+    row-gap: 0.3rem;
+    column-gap: 0.65rem;
 }
 
 .rc-hero__pill {
@@ -209,10 +209,10 @@
     gap: 0.35rem;
     padding: 0.35rem 0.95rem;
     border-radius: 999px;
-    font-size: 0.72rem;
+    font-size: 0.92rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
     color: rgba(226, 232, 240, 0.88);
     border: 1px solid rgba(148, 163, 184, 0.35);
     background: rgba(148, 163, 184, 0.12);
@@ -227,20 +227,21 @@
     background: rgba(56, 189, 248, 0.9);
 }
 
+
 .rc-hero__title {
-    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-size: 0.92rem;
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     margin: 0;
-    flex: 1 1 auto;
+    flex: 0 1 auto;
 }
 
 .rc-hero__description {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     line-height: 1.55;
     color: rgba(226, 232, 240, 0.82);
     margin: 0;
-    flex: 1 1 40ch;
+    flex: 1 1 auto;
 }
 
 .rc-hero__stats {
