@@ -223,7 +223,7 @@
     <script id="subscriptionBootstrap" type="application/json">
         {{ {'currentSubscription': None} | tojson | safe }}
     </script>
-    <script type="module" src="/static/js/subscription.js"></script>
+    <script type="module" src="{{ asset_url('subscription.js') }}"></script>
     {% include "_contact_widget.html" %}
 </body>
 </html>

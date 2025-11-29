@@ -37,10 +37,10 @@ jobs:
           source antenv/bin/activate
           pip install -r requirements.txt
 
-      - name: Install Node dependencies and build Action Center bundle
+      - name: Install Node dependencies and build web assets
         run: |
           npm install
-          npm run build:action-center2
+          npm run build:web
 
       - name: Prepare deployment package
         run: |

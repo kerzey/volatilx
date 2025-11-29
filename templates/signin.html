@@ -44,7 +44,7 @@
             "videoEmbedUrl": "https://www.youtube.com/embed/HZUbGpUUXL4"
         } | tojson | safe }}
     </script>
-    <script type="module" src="/static/js/signin.js"></script>
+    <script type="module" src="{{ asset_url('signin.js') }}"></script>
     {% include "_contact_widget.html" %}
 </body>
 </html>

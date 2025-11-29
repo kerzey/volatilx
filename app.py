@@ -30,6 +30,7 @@ from starlette.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
+from threading import Lock
 
 # Import user-related components - UPDATED to include get_user_manager
 from user import (
@@ -106,6 +107,11 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+ASSET_MANIFEST_PATH = os.path.join(STATIC_DIR, "js", "manifest.json")
+
+_asset_manifest_cache: Dict[str, str] = {}
+_asset_manifest_mtime: Optional[float] = None
+_asset_manifest_lock = Lock()
 
 logging.basicConfig(
     level=logging.INFO,  # bump to DEBUG if you want everything noisy
@@ -116,6 +122,76 @@ logging.getLogger("ai_agents.principal_agent").setLevel(logging.DEBUG)
 
 
 logger = logging.getLogger(__name__)
+
+
+def _looks_like_hashed_asset(path_value: str) -> bool:
+    filename = os.path.basename(path_value)
+    stem, _, _ = filename.partition(".")
+    last_dash = stem.rfind("-")
+    if last_dash == -1:
+        return False
+    hash_candidate = stem[last_dash + 1 :]
+    return len(hash_candidate) >= 6
+
+
+def _load_asset_manifest_locked() -> Dict[str, str]:
+    global _asset_manifest_cache, _asset_manifest_mtime
+    try:
+        stat_result = os.stat(ASSET_MANIFEST_PATH)
+    except FileNotFoundError:
+        _asset_manifest_cache = {}
+        _asset_manifest_mtime = None
+        return _asset_manifest_cache
+    except OSError as exc:
+        logger.debug("Asset manifest unavailable: %s", exc)
+        return _asset_manifest_cache
+
+    mtime = stat_result.st_mtime
+    if _asset_manifest_mtime == mtime:
+        return _asset_manifest_cache
+
+    try:
+        with open(ASSET_MANIFEST_PATH, "r", encoding="utf-8") as manifest_file:
+            payload = json.load(manifest_file)
+            if isinstance(payload, dict):
+                _asset_manifest_cache = {str(key): str(value) for key, value in payload.items()}
+            else:
+                _asset_manifest_cache = {}
+    except Exception as exc:  # noqa: BLE001 - defensive manifest parsing
+        logger.warning("Failed to parse asset manifest: %s", exc)
+        _asset_manifest_cache = {}
+
+    _asset_manifest_mtime = mtime
+    return _asset_manifest_cache
+
+
+def _get_asset_manifest() -> Dict[str, str]:
+    with _asset_manifest_lock:
+        return _load_asset_manifest_locked()
+
+
+def asset_url(asset_key: str) -> str:
+    key = str(asset_key or "").strip()
+    if not key:
+        return "/static/js"
+    manifest = _get_asset_manifest()
+    mapped = manifest.get(key)
+    if mapped:
+        if mapped.startswith("http://") or mapped.startswith("https://") or mapped.startswith("//"):
+            return mapped
+        normalized = mapped.lstrip("/")
+        return f"/static/js/{normalized}"
+    return f"/static/js/{key}"
+
+
+class VolatilXStaticFiles(StaticFiles):
+    def set_response_headers(self, response, context):  # type: ignore[override]
+        super().set_response_headers(response, context)
+        relative_path = None
+        if isinstance(context, dict):
+            relative_path = context.get("path")
+        if isinstance(relative_path, str) and relative_path.startswith("js/") and _looks_like_hashed_asset(relative_path):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
 
 AI_ANALYSIS_TIMEOUT = float(os.getenv("AI_ANALYSIS_TIMEOUT_SECONDS", "45"))
 
@@ -1225,8 +1301,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", VolatilXStaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+templates.env.globals["asset_url"] = asset_url
 
 # Session middleware for OAuth
 app.add_middleware(

@@ -36,7 +36,7 @@
     <script id="aiInsightsBootstrap" type="application/json">
         {{ {'symbolCatalogs': symbol_catalogs or {}} | tojson | safe }}
     </script>
-    <script type="module" src="/static/js/ai-insights.js"></script>
+        <script type="module" src="{{ asset_url('ai-insights.js') }}"></script>
     {% include "_contact_widget.html" %}
 </body>
 </html>
