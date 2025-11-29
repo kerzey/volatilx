@@ -25585,8 +25585,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       key: "shortTarget",
       label: "Short Target",
       value,
-      tone: "short",
-      align: "bottom"
+      tone: "short"
     });
   } else if (uniqueShortTargets.length > 1) {
     const farTarget = uniqueShortTargets[0];
@@ -25596,8 +25595,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         key: "shortTarget2",
         label: "Short Target 2",
         value: farTarget,
-        tone: "short",
-        align: "bottom"
+        tone: "short"
       });
     }
     if (Number.isFinite(nearTarget) && Math.abs(nearTarget - farTarget) > 0) {
@@ -25605,8 +25603,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         key: "shortTarget1",
         label: "Short Target 1",
         value: nearTarget,
-        tone: "short",
-        align: "bottom"
+        tone: "short"
       });
     }
   }
@@ -25615,8 +25612,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       key: "shortEntry",
       label: "Short Entry",
       value: shortEntry,
-      tone: "short",
-      align: "bottom"
+      tone: "short"
     });
   }
   if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralLower <= neutralUpper) {
@@ -25624,16 +25620,14 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       key: "neutralLower",
       label: "No-Trade Min",
       value: neutralLower,
-      tone: "neutral",
-      align: "bottom"
+      tone: "neutral"
     });
     if (Math.abs(neutralUpper - neutralLower) > 0) {
       markers.push({
         key: "neutralUpper",
         label: "No-Trade Max",
         value: neutralUpper,
-        tone: "neutral",
-        align: "bottom"
+        tone: "neutral"
       });
     }
   }
@@ -25642,8 +25636,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       key: "longEntry",
       label: "Long Entry",
       value: longEntry,
-      tone: "long",
-      align: "bottom"
+      tone: "long"
     });
   }
   if (uniqueLongTargets.length === 1) {
@@ -25652,8 +25645,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       key: "longTarget",
       label: "Long Target",
       value,
-      tone: "long",
-      align: "bottom"
+      tone: "long"
     });
   } else if (uniqueLongTargets.length > 1) {
     const nearTarget = uniqueLongTargets[0];
@@ -25663,8 +25655,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         key: "longTarget1",
         label: "Long Target 1",
         value: nearTarget,
-        tone: "long",
-        align: "bottom"
+        tone: "long"
       });
     }
     if (Number.isFinite(farTarget) && Math.abs(farTarget - nearTarget) > 0) {
@@ -25672,15 +25663,10 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         key: "longTarget2",
         label: "Long Target 2",
         value: farTarget,
-        tone: "long",
-        align: "bottom"
+        tone: "long"
       });
     }
   }
-  const markersForAlignment = [...markers].sort((a, b) => a.value - b.value);
-  markersForAlignment.forEach((marker, index) => {
-    marker.align = index % 2 === 0 ? "top" : "bottom";
-  });
   const valuesForBounds = markers.map((marker) => marker.value).concat(Number.isFinite(latestPrice) ? [latestPrice] : []);
   let minValue = valuesForBounds.length ? Math.min(...valuesForBounds) : latestPrice;
   let maxValue = valuesForBounds.length ? Math.max(...valuesForBounds) : latestPrice;
@@ -25706,20 +25692,18 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const neutralStartPercent = hasNeutralZone ? clamp((neutralLower - minBound) / totalSpan * 100, 0, 100) : 0;
   const neutralEndPercent = hasNeutralZone ? clamp((neutralUpper - minBound) / totalSpan * 100, 0, 100) : 0;
   const neutralWidthPercent = Math.max(neutralEndPercent - neutralStartPercent, 0);
-  const renderMarkerLabel = (marker) => {
+  const renderLabelChip = (marker) => {
     const tone = toneStyles[marker.tone];
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
-      "div",
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+      "span",
       {
-        className: "flex flex-col items-center gap-1 text-[10px]",
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${tone.labelChip}`, children: marker.label }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `text-xs font-semibold ${tone.priceText}`, children: formatPrice(marker.value) })
-        ]
+        className: `rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${tone.labelChip}`,
+        children: marker.label
       },
-      `${marker.key}-${marker.value}-${marker.align}`
+      `${marker.key}-${marker.value}`
     );
   };
+  const priceChipClass = "rounded-lg border border-slate-700/70 bg-slate-950/90 px-2.5 py-1 text-xs font-semibold shadow-inner shadow-black/20 backdrop-blur-sm";
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "rounded-3xl border border-slate-800/70 bg-slate-950/80 p-8 shadow-lg shadow-indigo-500/5", children: [
     /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("header", { className: "flex flex-wrap items-start justify-between gap-3", children: [
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
@@ -25731,36 +25715,44 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-lg font-semibold text-slate-100", children: formatPrice(latestPrice) })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative mt-10", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative h-3 w-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 rounded-full ring-1 ring-white/5" }),
-        hasNeutralZone && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          "div",
-          {
-            className: "absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm",
-            style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
-          }
-        )
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative mt-10 min-h-[220px] pt-6 pb-16", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "space-y-12", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative h-3 w-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 rounded-full ring-1 ring-white/5" }),
+          hasNeutralZone && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            "div",
+            {
+              className: "absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm",
+              style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
+            }
+          )
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative h-3 w-full rounded-full bg-slate-900/70", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 rounded-full ring-1 ring-white/5" }),
+          hasNeutralZone && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            "div",
+            {
+              className: "absolute top-0 bottom-0 rounded-full bg-amber-200/15 ring-1 ring-amber-200/30",
+              style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
+            }
+          )
+        ] })
       ] }),
       spacedMarkerGroups.map((group) => {
-        const topMarkers = group.markers.filter((marker) => marker.align === "top");
-        const bottomMarkers = group.markers.filter((marker) => marker.align === "bottom");
         const dominantTone = group.markers[0]?.tone ?? "neutral";
         const tone = toneStyles[dominantTone];
-        return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+        return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
           "div",
           {
-            className: "absolute top-0 z-20 flex h-full w-0 -translate-x-1/2",
+            className: "pointer-events-none absolute inset-y-0 z-20 flex w-0 -translate-x-1/2 flex-col items-center",
             style: { left: `${group.percent}%` },
-            children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center gap-2", children: [
-              topMarkers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "-translate-y-5 flex flex-col items-center gap-2", children: topMarkers.map((marker) => renderMarkerLabel(marker)) }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center text-[10px]", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `mb-1 h-4 w-px ${tone.line}` }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `h-2 w-2 rounded-full ${tone.dot}` }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `mt-1 h-4 w-px ${tone.line}` })
-              ] }),
-              bottomMarkers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "translate-y-5 flex flex-col items-center gap-2", children: bottomMarkers.map((marker) => renderMarkerLabel(marker)) })
-            ] })
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `${priceChipClass} ${tone.priceText}`, children: formatPrice(group.value) }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `mt-2 h-8 w-[2px] rounded-full ${tone.line}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `h-3 w-3 rounded-full ${tone.dot}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `mt-1 h-8 w-[2px] rounded-full ${tone.line}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-3 flex flex-col items-center gap-1", children: group.markers.map((marker) => renderLabelChip(marker)) })
+            ]
           },
           `${group.value}-${dominantTone}`
         );
@@ -25768,12 +25760,13 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
         "div",
         {
-          className: "pointer-events-none absolute -top-12 z-30 flex -translate-x-1/2 flex-col items-center gap-2 text-xs text-indigo-100 transition-all duration-500",
+          className: "pointer-events-none absolute inset-y-0 z-30 flex w-0 -translate-x-1/2 flex-col items-center text-xs text-indigo-100 transition-all duration-500",
           style: { left: `${pointerPercent}%` },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30", children: formatPrice(latestPrice) }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block h-9 w-[2px] rounded-full bg-indigo-400" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-2 w-2 rounded-full border border-indigo-200/60 bg-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]" })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "flex-1 w-[2px] rounded-full bg-indigo-400/50" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "my-3 rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30", children: formatPrice(latestPrice) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "flex-1 w-[2px] rounded-full bg-indigo-400/50" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "mt-2 h-2 w-2 rounded-full border border-indigo-200/60 bg-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.15)]" })
           ]
         }
       ),
