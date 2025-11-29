@@ -392,57 +392,55 @@ export function AiInsightsApp({ bootstrap }: { bootstrap: AiInsightsBootstrap })
             </header>
 
             <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Market</span>
-                  <select
-                    className="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
-                    value={market}
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      setMarket(next === "crypto" ? "crypto" : "equity");
-                      setSuggestionsOpen(false);
-                    }}
-                  >
-                    <option value="equity">Stocks (Equities)</option>
-                    <option value="crypto">Crypto</option>
-                  </select>
-                </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Market</span>
+                <select
+                  className="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                  value={market}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setMarket(next === "crypto" ? "crypto" : "equity");
+                    setSuggestionsOpen(false);
+                  }}
+                >
+                  <option value="equity">Stocks (Equities)</option>
+                  <option value="crypto">Crypto</option>
+                </select>
+              </label>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400" htmlFor="aiInsightsSymbol">
-                    Symbol
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="aiInsightsSymbol"
-                      className="w-full rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-slate-100 placeholder:tracking-normal placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
-                      placeholder={market === "crypto" ? "Enter crypto pair (e.g., BTC/USD)" : "Enter stock symbol (e.g., AAPL)"}
-                      autoComplete="off"
-                      value={symbol}
-                      onChange={(event) => handleSymbolChange(event.target.value)}
-                      onFocus={() => {
-                        if (hideSuggestionsTimeout.current) {
-                          window.clearTimeout(hideSuggestionsTimeout.current);
-                          hideSuggestionsTimeout.current = null;
-                        }
-                        setSuggestionsOpen(true);
-                      }}
-                      onBlur={() => {
-                        hideSuggestionsTimeout.current = window.setTimeout(() => {
-                          setSuggestionsOpen(false);
-                        }, 120);
-                      }}
-                      onKeyDown={handleSymbolKeyDown}
-                    />
-                    <SymbolSuggestions
-                      suggestions={suggestions}
-                      visible={hasSuggestions}
-                      activeIndex={activeSuggestion}
-                      onSelect={(entry) => handleSuggestionSelect(entry)}
-                      onHighlight={(index) => setActiveSuggestion(index)}
-                    />
-                  </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-400" htmlFor="aiInsightsSymbol">
+                  Symbol
+                </label>
+                <div className="relative">
+                  <input
+                    id="aiInsightsSymbol"
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-slate-100 placeholder:tracking-normal placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                    placeholder={market === "crypto" ? "Enter crypto pair (e.g., BTC/USD)" : "Enter stock symbol (e.g., AAPL)"}
+                    autoComplete="off"
+                    value={symbol}
+                    onChange={(event) => handleSymbolChange(event.target.value)}
+                    onFocus={() => {
+                      if (hideSuggestionsTimeout.current) {
+                        window.clearTimeout(hideSuggestionsTimeout.current);
+                        hideSuggestionsTimeout.current = null;
+                      }
+                      setSuggestionsOpen(true);
+                    }}
+                    onBlur={() => {
+                      hideSuggestionsTimeout.current = window.setTimeout(() => {
+                        setSuggestionsOpen(false);
+                      }, 120);
+                    }}
+                    onKeyDown={handleSymbolKeyDown}
+                  />
+                  <SymbolSuggestions
+                    suggestions={suggestions}
+                    visible={hasSuggestions}
+                    activeIndex={activeSuggestion}
+                    onSelect={(entry) => handleSuggestionSelect(entry)}
+                    onHighlight={(index) => setActiveSuggestion(index)}
+                  />
                 </div>
               </div>
 
@@ -528,7 +526,7 @@ function SymbolSuggestions({
 
   return (
     <div
-      className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-700/70 bg-slate-900/95 p-2 shadow-xl shadow-black/40 backdrop-blur"
+      className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-800/80 bg-slate-950/95 p-2 shadow-xl shadow-black/50"
       role="listbox"
       aria-label="Ticker suggestions"
     >
@@ -542,7 +540,7 @@ function SymbolSuggestions({
               "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition " +
               (isActive
                 ? "border-sky-500/50 bg-sky-500/15 text-sky-100"
-                : "border-transparent text-slate-200 hover:border-slate-600 hover:bg-slate-800/60")
+                : "border-transparent text-slate-100 hover:border-slate-600 hover:bg-slate-800/70")
             }
             role="option"
             aria-selected={isActive}
@@ -550,7 +548,7 @@ function SymbolSuggestions({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onSelect(entry)}
           >
-            <span className="font-semibold tracking-tight text-slate-100">{entry.ticker.toUpperCase()}</span>
+            <span className="font-semibold tracking-tight text-slate-50">{entry.ticker.toUpperCase()}</span>
             <span className="text-xs text-slate-400">{entry.company}</span>
           </button>
         );
