@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/css/volatilx-header.css">
 </head>
-<body class="action-center-page{% if principal_plan_json or principal_plan_map_json %} action-center-page--react{% endif %}" data-live-price="{{ 'true' if live_price_enabled else 'false' }}" data-timeframe="{{ timeframe }}" data-intent="{{ intent }}">
+<body class="action-center-page report-center-body text-slate-100 font-sans antialiased{% if principal_plan_json or principal_plan_map_json %} action-center-page--react{% endif %}" data-live-price="{{ 'true' if live_price_enabled else 'false' }}" data-timeframe="{{ timeframe }}" data-intent="{{ intent }}">
     {% from "_header.html" import render_header %}
     {% set dashboards_count = dashboards|length if dashboards else 0 %}
     {% set header_timeframe = timeframe %}
