@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolatilX - Shared AI Report Center</title>
+    <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/css/report-center.css">
     <link rel="stylesheet" href="/static/css/volatilx-header.css">
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans antialiased">
+<body class="report-center-body text-slate-100 font-sans antialiased">
     {% from "_header.html" import render_header %}
     {% set header_user_email = user.email if user else None %}
     {{ render_header(
