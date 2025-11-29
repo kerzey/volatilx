@@ -25455,11 +25455,7 @@ function StrategySelector({ selected, onSelect }) {
 
 // action_center2/components/PriceGauge.tsx
 var import_jsx_runtime3 = __toESM(require_jsx_runtime());
-var pointerToneLines = {
-  short: "bg-rose-400/80",
-  neutral: "bg-amber-300/80",
-  long: "bg-emerald-400/80"
-};
+var pointerNeedleClass = "bg-indigo-500/80";
 var toneStyles = {
   short: {
     dot: "bg-rose-400 shadow-[0_0_0_3px_rgba(244,63,94,0.35)]",
@@ -25718,18 +25714,16 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp((neutralLower - minBound) / totalSpan * 100, 0, 100) : 0;
   const neutralEndPercent = hasNeutralZone ? clamp((neutralUpper - minBound) / totalSpan * 100, 0, 100) : 0;
-  const neutralWidthPercent = Math.max(neutralEndPercent - neutralStartPercent, 0);
   const layout = {
-    containerHeight: 280,
-    barY: 120,
-    barHeight: 16,
-    pointerRise: 70,
-    stackSpacing: 70
+    containerHeight: 240,
+    barY: 100,
+    barHeight: 14,
+    pointerRise: 60
   };
   const barTop = layout.barY;
   const pointerTop = Math.max(barTop - layout.pointerRise, 0);
   const pointerHeight = layout.pointerRise;
-  const stackTop = barTop + layout.barHeight + 8;
+  const stackTop = barTop + layout.barHeight + 6;
   const determineToneForPrice = () => {
     if (!Number.isFinite(latestPrice)) {
       return "neutral";
@@ -25752,7 +25746,6 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     return "neutral";
   };
   const priceTone = determineToneForPrice();
-  const pointerToneLine = pointerToneLines[priceTone];
   const defaultShortBoundary = 45;
   const defaultNeutralBoundary = 55;
   const shortZoneBoundary = hasNeutralZone ? mapToDisplayPercent(neutralStartPercent) : defaultShortBoundary;
@@ -25771,7 +25764,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       "span",
       {
-        className: `block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center leading-tight ${tone.labelChip} ${extraClass}`,
+        className: `inline-flex min-w-[70px] items-center justify-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center leading-tight ${tone.labelChip} ${extraClass}`,
         children: marker.label
       },
       `${marker.key}-${marker.value}`
@@ -25781,8 +25774,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     if (!markers2.length) {
       return null;
     }
-    const layoutClass = markers2.length >= 4 ? "mt-2 grid min-w-[200px] grid-cols-2 gap-1 text-center" : "mt-2 flex flex-col items-center gap-1";
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: layoutClass, children: markers2.map((marker) => renderLabelChip(marker)) });
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-2 flex flex-wrap justify-center gap-1 text-center", children: markers2.map((marker) => renderLabelChip(marker)) });
   };
   const priceChipClass = "rounded-lg border border-slate-700/70 bg-slate-950/90 px-2.5 py-1 text-xs font-semibold shadow-inner shadow-black/20 backdrop-blur-sm";
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "rounded-3xl border border-slate-800/70 bg-slate-950/80 p-8 shadow-lg shadow-indigo-500/5", children: [
@@ -25796,7 +25788,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-lg font-semibold text-slate-100", children: formatPrice(latestPrice) })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative mt-10", style: { height: `${layout.containerHeight}px` }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative mt-6", style: { height: `${layout.containerHeight}px` }, children: [
       /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
         "div",
         {
@@ -25824,11 +25816,12 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       displayMarkerGroups.map((group) => {
         const dominantTone = group.markers[0]?.tone ?? "neutral";
         const tone = toneStyles[dominantTone];
+        const stackPercent = clamp(group.percent, 4, 96);
         return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
           "div",
           {
-            className: "pointer-events-none absolute z-20 -translate-x-1/2",
-            style: { left: `${group.percent}%`, top: `${stackTop}px` },
+            className: "pointer-events-none absolute z-20 flex -translate-x-1/2 flex-col items-center text-center",
+            style: { left: `${stackPercent}%`, top: `${stackTop}px` },
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
                 "span",
@@ -25853,7 +25846,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
             /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
               "span",
               {
-                className: `mt-2 block w-[3px] rounded-full ${pointerToneLine}`,
+                className: `mt-2 block w-[3px] rounded-full ${pointerNeedleClass}`,
                 style: { height: `${pointerHeight}px` }
               }
             ),
@@ -25863,7 +25856,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
       ),
       !markerGroups.length && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "absolute inset-x-0 bottom-0 translate-y-full text-center text-sm text-slate-400", children: "Plan did not publish level targets for this symbol. The gauge will activate as soon as fresh levels arrive." })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-10 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-6 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300", children: [
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2", children: [
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-2 w-10 rounded-full bg-rose-500/60" }),
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: "Short Scenario" })

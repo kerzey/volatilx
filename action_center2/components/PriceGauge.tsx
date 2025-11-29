@@ -45,11 +45,7 @@ type ToneStyleMap = Record<
   }
 >;
 
-const pointerToneLines: Record<MarkerTone, string> = {
-  short: "bg-rose-400/80",
-  neutral: "bg-amber-300/80",
-  long: "bg-emerald-400/80",
-};
+const pointerNeedleClass = "bg-indigo-500/80";
 
 const toneStyles: ToneStyleMap = {
   short: {
@@ -353,20 +349,18 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp(((neutralLower - minBound) / totalSpan) * 100, 0, 100) : 0;
   const neutralEndPercent = hasNeutralZone ? clamp(((neutralUpper - minBound) / totalSpan) * 100, 0, 100) : 0;
-  const neutralWidthPercent = Math.max(neutralEndPercent - neutralStartPercent, 0);
 
   const layout = {
-    containerHeight: 280,
-    barY: 120,
-    barHeight: 16,
-    pointerRise: 70,
-    stackSpacing: 70,
+    containerHeight: 240,
+    barY: 100,
+    barHeight: 14,
+    pointerRise: 60,
   } as const;
 
   const barTop = layout.barY;
   const pointerTop = Math.max(barTop - layout.pointerRise, 0);
   const pointerHeight = layout.pointerRise;
-  const stackTop = barTop + layout.barHeight + 8;
+  const stackTop = barTop + layout.barHeight + 6;
 
   const determineToneForPrice = (): MarkerTone => {
     if (!Number.isFinite(latestPrice)) {
@@ -391,7 +385,6 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   };
 
   const priceTone = determineToneForPrice();
-  const pointerToneLine = pointerToneLines[priceTone];
 
   const defaultShortBoundary = 45;
   const defaultNeutralBoundary = 55;
@@ -413,7 +406,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     return (
       <span
         key={`${marker.key}-${marker.value}`}
-        className={`block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center leading-tight ${tone.labelChip} ${extraClass}`}
+        className={`inline-flex min-w-[70px] items-center justify-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center leading-tight ${tone.labelChip} ${extraClass}`}
       >
         {marker.label}
       </span>
@@ -424,12 +417,11 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     if (!markers.length) {
       return null;
     }
-    const layoutClass =
-      markers.length >= 4
-        ? "mt-2 grid min-w-[200px] grid-cols-2 gap-1 text-center"
-        : "mt-2 flex flex-col items-center gap-1";
-
-    return <div className={layoutClass}>{markers.map((marker) => renderLabelChip(marker))}</div>;
+    return (
+      <div className="mt-2 flex flex-wrap justify-center gap-1 text-center">
+        {markers.map((marker) => renderLabelChip(marker))}
+      </div>
+    );
   };
 
   const priceChipClass =
@@ -448,7 +440,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         </div>
       </header>
 
-      <div className="relative mt-10" style={{ height: `${layout.containerHeight}px` }}>
+      <div className="relative mt-6" style={{ height: `${layout.containerHeight}px` }}>
         <div
           className="absolute inset-x-0 z-10"
           style={{ top: `${barTop}px`, height: `${layout.barHeight}px` }}
@@ -470,11 +462,12 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         {displayMarkerGroups.map((group) => {
           const dominantTone = group.markers[0]?.tone ?? "neutral";
           const tone = toneStyles[dominantTone];
+          const stackPercent = clamp(group.percent, 4, 96);
           return (
             <div
               key={`stack-${group.value}-${dominantTone}`}
-              className="pointer-events-none absolute z-20 -translate-x-1/2"
-              style={{ left: `${group.percent}%`, top: `${stackTop}px` }}
+              className="pointer-events-none absolute z-20 flex -translate-x-1/2 flex-col items-center text-center"
+              style={{ left: `${stackPercent}%`, top: `${stackTop}px` }}
             >
               <span
                 className={`mb-1 block h-6 w-[2px] rounded-full ${tone.line}`}
@@ -493,7 +486,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
             {formatPrice(latestPrice)}
           </div>
           <span
-            className={`mt-2 block w-[3px] rounded-full ${pointerToneLine}`}
+            className={`mt-2 block w-[3px] rounded-full ${pointerNeedleClass}`}
             style={{ height: `${pointerHeight}px` }}
           />
           <span className="mt-1 block h-2 w-2 rounded-full border border-white/50 bg-indigo-500" />
@@ -506,7 +499,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
         )}
       </div>
 
-      <div className="mt-10 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300">
+      <div className="mt-6 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300">
         <div className="flex items-center gap-2">
           <span className="h-2 w-10 rounded-full bg-rose-500/60" />
           <span>Short Scenario</span>
