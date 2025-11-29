@@ -25560,6 +25560,35 @@ var spreadMarkerGroups = (groups) => {
     // leave 2% gutters on each side
   }));
 };
+var mapPercentToDisplay = (percent, source, target) => {
+  if (!source.length || source.length !== target.length) {
+    return clamp(percent, 0, 100);
+  }
+  const clamped = clamp(percent, 0, 100);
+  const sourcePercents = source.map((group) => group.percent);
+  const targetPercents = target.map((group) => group.percent);
+  if (clamped <= sourcePercents[0]) {
+    const firstSource = Math.max(sourcePercents[0], 1e-6);
+    const ratio2 = clamped / firstSource;
+    return clamp(targetPercents[0] * ratio2, 0, 100);
+  }
+  for (let i = 0; i < sourcePercents.length - 1; i++) {
+    const start = sourcePercents[i];
+    const end = sourcePercents[i + 1];
+    if (clamped >= start && clamped <= end) {
+      const span = Math.max(end - start, 1e-6);
+      const t = (clamped - start) / span;
+      const targetStart = targetPercents[i];
+      const targetEnd = targetPercents[i + 1];
+      return clamp(targetStart + (targetEnd - targetStart) * t, 0, 100);
+    }
+  }
+  const lastIndex = sourcePercents.length - 1;
+  const lastSource = sourcePercents[lastIndex];
+  const remainder = Math.max(100 - lastSource, 1e-6);
+  const ratio = (clamped - lastSource) / remainder;
+  return clamp(targetPercents[lastIndex] + (100 - targetPercents[lastIndex]) * ratio, 0, 100);
+};
 function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const normalizedSellTargets = Array.isArray(sellSetup?.targets) ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b) : [];
   const normalizedBuyTargets = Array.isArray(buySetup?.targets) ? [...buySetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b) : [];
@@ -25689,7 +25718,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const pointerPercentRaw = clamp((latestPrice - minBound) / totalSpan * 100, 0, 100);
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
   const displayMarkerGroups = spreadMarkerGroups(markerGroups);
-  const pointerPercent = pointerPercentRaw;
+  const pointerPercent = mapPercentToDisplay(pointerPercentRaw, markerGroups, displayMarkerGroups);
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp((neutralLower - minBound) / totalSpan * 100, 0, 100) : 0;
   const neutralEndPercent = hasNeutralZone ? clamp((neutralUpper - minBound) / totalSpan * 100, 0, 100) : 0;
@@ -25734,11 +25763,20 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const zoneGlowClass = zoneGlowStyles[priceTone];
   const renderLabelChip = (marker, extraClass = "") => {
     const tone = toneStyles[marker.tone];
+    const label = marker.label.trim();
+    const lower = label.toLowerCase();
+    const targetIndex = lower.indexOf("target");
+    let lines = [label];
+    if (targetIndex !== -1) {
+      const firstLine = label.slice(0, targetIndex + "target".length).trim();
+      const remainder = label.slice(targetIndex + "target".length).trim();
+      lines = remainder ? [firstLine, remainder] : [label];
+    }
     return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       "span",
       {
         className: `block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center ${tone.labelChip} ${extraClass}`,
-        children: marker.label
+        children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block leading-tight", children: line }, `${marker.key}-${marker.value}-line-${index}`))
       },
       `${marker.key}-${marker.value}`
     );
@@ -25768,7 +25806,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         {
           className: "absolute inset-x-0 z-10",
           style: { top: `${zoneTop}px`, bottom: `${zoneBottom}px` },
-          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `h-full rounded-2xl ring-1 transition-colors duration-500 ${zoneGlowClass}` })
+          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `h-full rounded-2xl transition-colors duration-500 ${zoneGlowClass}` })
         }
       ),
       /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(

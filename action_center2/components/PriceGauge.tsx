@@ -165,6 +165,40 @@ const spreadMarkerGroups = (groups: MarkerGroup[]): MarkerGroup[] => {
   }));
 };
 
+const mapPercentToDisplay = (percent: number, source: MarkerGroup[], target: MarkerGroup[]): number => {
+  if (!source.length || source.length !== target.length) {
+    return clamp(percent, 0, 100);
+  }
+
+  const clamped = clamp(percent, 0, 100);
+  const sourcePercents = source.map((group) => group.percent);
+  const targetPercents = target.map((group) => group.percent);
+
+  if (clamped <= sourcePercents[0]) {
+    const firstSource = Math.max(sourcePercents[0], 1e-6);
+    const ratio = clamped / firstSource;
+    return clamp(targetPercents[0] * ratio, 0, 100);
+  }
+
+  for (let i = 0; i < sourcePercents.length - 1; i++) {
+    const start = sourcePercents[i];
+    const end = sourcePercents[i + 1];
+    if (clamped >= start && clamped <= end) {
+      const span = Math.max(end - start, 1e-6);
+      const t = (clamped - start) / span;
+      const targetStart = targetPercents[i];
+      const targetEnd = targetPercents[i + 1];
+      return clamp(targetStart + (targetEnd - targetStart) * t, 0, 100);
+    }
+  }
+
+  const lastIndex = sourcePercents.length - 1;
+  const lastSource = sourcePercents[lastIndex];
+  const remainder = Math.max(100 - lastSource, 1e-6);
+  const ratio = (clamped - lastSource) / remainder;
+  return clamp(targetPercents[lastIndex] + (100 - targetPercents[lastIndex]) * ratio, 0, 100);
+};
+
 export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
   const normalizedSellTargets = Array.isArray(sellSetup?.targets)
     ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
@@ -319,7 +353,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
   const displayMarkerGroups = spreadMarkerGroups(markerGroups);
-  const pointerPercent = pointerPercentRaw;
+  const pointerPercent = mapPercentToDisplay(pointerPercentRaw, markerGroups, displayMarkerGroups);
 
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp(((neutralLower - minBound) / totalSpan) * 100, 0, 100) : 0;
@@ -370,12 +404,25 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const renderLabelChip = (marker: Marker, extraClass = "") => {
     const tone = toneStyles[marker.tone];
+    const label = marker.label.trim();
+    const lower = label.toLowerCase();
+    const targetIndex = lower.indexOf("target");
+    let lines: string[] = [label];
+    if (targetIndex !== -1) {
+      const firstLine = label.slice(0, targetIndex + "target".length).trim();
+      const remainder = label.slice(targetIndex + "target".length).trim();
+      lines = remainder ? [firstLine, remainder] : [label];
+    }
     return (
       <span
         key={`${marker.key}-${marker.value}`}
         className={`block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center ${tone.labelChip} ${extraClass}`}
       >
-        {marker.label}
+        {lines.map((line, index) => (
+          <span key={`${marker.key}-${marker.value}-line-${index}`} className="block leading-tight">
+            {line}
+          </span>
+        ))}
       </span>
     );
   };
@@ -413,7 +460,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
           className="absolute inset-x-0 z-10"
           style={{ top: `${zoneTop}px`, bottom: `${zoneBottom}px` }}
         >
-          <div className={`h-full rounded-2xl ring-1 transition-colors duration-500 ${zoneGlowClass}`} />
+          <div className={`h-full rounded-2xl transition-colors duration-500 ${zoneGlowClass}`} />
         </div>
 
         <div
