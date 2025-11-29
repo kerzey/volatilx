@@ -24515,6 +24515,67 @@ var STRATEGY_ORDER = [
 var METRIC_BADGE_BASE = "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200";
 var BULLISH_ACCENT = "text-emerald-300";
 var BEARISH_ACCENT = "text-rose-300";
+var PRICE_ACTION_CARD_LABEL = "Price action pulse";
+var CANDLE_GLOSSARY = [
+  {
+    pattern: /bullish\s+hammer|hammer/i,
+    explanation: "Long lower wick shows sellers lost control and buyers shoved price back up."
+  },
+  {
+    pattern: /shooting\s+star/i,
+    explanation: "Tall upper wick means buyers were rejected quickly, so supply is lurking overhead."
+  },
+  {
+    pattern: /doji/i,
+    explanation: "Open and close nearly match, signaling indecision after a tug-of-war between bulls and bears."
+  },
+  {
+    pattern: /bullish\s+engulfing/i,
+    explanation: "Fresh green candle swallowed the prior red body, often hinting at upside momentum returning."
+  },
+  {
+    pattern: /bearish\s+engulfing/i,
+    explanation: "New red candle ate the previous green body, showing sellers just overpowered buyers."
+  },
+  {
+    pattern: /inside\s+bar/i,
+    explanation: "Smaller candle trapped inside the prior range, usually a pause before price breaks out."
+  }
+];
+var explainCandlestickNote = (note) => {
+  if (!note) {
+    return null;
+  }
+  for (const entry of CANDLE_GLOSSARY) {
+    if (entry.pattern.test(note)) {
+      return entry.explanation;
+    }
+  }
+  return null;
+};
+var resolveBiasTone = (bias) => {
+  if (!bias) {
+    return "neutral";
+  }
+  const fingerprint = bias.toLowerCase();
+  if (/(bull|long|accum)/.test(fingerprint)) {
+    return "bullish";
+  }
+  if (/(bear|short|distrib)/.test(fingerprint)) {
+    return "bearish";
+  }
+  return "neutral";
+};
+var biasChipClass = (bias) => {
+  const tone = resolveBiasTone(bias);
+  if (tone === "bullish") {
+    return "border-emerald-500/50 bg-emerald-500/10 text-emerald-200";
+  }
+  if (tone === "bearish") {
+    return "border-rose-500/50 bg-rose-500/10 text-rose-200";
+  }
+  return "border-slate-600 bg-slate-800/70 text-slate-200";
+};
 var coerceNumber = (value) => {
   if (value === null || value === void 0) {
     return null;
@@ -24705,13 +24766,39 @@ var PriceActionPanel = ({ priceAction }) => {
   if (!priceAction) {
     return null;
   }
-  const { trend_alignment: trendAlignment, key_levels: keyLevels, recent_patterns: patterns } = priceAction;
-  if (!trendAlignment && !keyLevels?.length && !patterns?.length) {
+  const {
+    trend_alignment: trendAlignment,
+    key_levels: keyLevels,
+    recent_patterns: patterns,
+    candlestick_notes: candlestickNotesRaw,
+    immediate_bias: immediateBias
+  } = priceAction;
+  const candlestickNotes = Array.isArray(candlestickNotesRaw) ? candlestickNotesRaw : candlestickNotesRaw ? [candlestickNotesRaw] : [];
+  if (!trendAlignment && !keyLevels?.length && !patterns?.length && !candlestickNotes.length && !immediateBias) {
     return null;
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800 bg-slate-900/40 p-5", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Tape color" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: PRICE_ACTION_CARD_LABEL }),
+      immediateBias ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "span",
+        {
+          className: `inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${biasChipClass(immediateBias)}`,
+          children: immediateBias
+        }
+      ) : null
+    ] }),
     trendAlignment ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-3 text-sm leading-relaxed text-slate-300", children: trendAlignment }) : null,
+    candlestickNotes.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3", children: candlestickNotes.map((note, index) => {
+      const explainer = explainCandlestickNote(note);
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-slate-800/70 bg-slate-950/40 p-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-200", children: note }),
+        explainer ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "mt-1 text-xs text-slate-400", children: [
+          "Plain English: ",
+          explainer
+        ] }) : null
+      ] }, `candlestick-note-${index}`);
+    }) }) : null,
     keyLevels?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-3", children: keyLevels.map((level, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-xl border border-slate-800/70 bg-slate-950/40 p-4", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Level" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-lg font-semibold text-slate-100", children: formatPriceValue(level.price) }),

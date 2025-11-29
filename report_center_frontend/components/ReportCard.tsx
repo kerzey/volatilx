@@ -25,6 +25,72 @@ const METRIC_BADGE_BASE =
 const BULLISH_ACCENT = "text-emerald-300";
 const BEARISH_ACCENT = "text-rose-300";
 
+const PRICE_ACTION_CARD_LABEL = "Price action pulse";
+
+const CANDLE_GLOSSARY: Array<{ pattern: RegExp; explanation: string }> = [
+  {
+    pattern: /bullish\s+hammer|hammer/i,
+    explanation: "Long lower wick shows sellers lost control and buyers shoved price back up.",
+  },
+  {
+    pattern: /shooting\s+star/i,
+    explanation: "Tall upper wick means buyers were rejected quickly, so supply is lurking overhead.",
+  },
+  {
+    pattern: /doji/i,
+    explanation: "Open and close nearly match, signaling indecision after a tug-of-war between bulls and bears.",
+  },
+  {
+    pattern: /bullish\s+engulfing/i,
+    explanation: "Fresh green candle swallowed the prior red body, often hinting at upside momentum returning.",
+  },
+  {
+    pattern: /bearish\s+engulfing/i,
+    explanation: "New red candle ate the previous green body, showing sellers just overpowered buyers.",
+  },
+  {
+    pattern: /inside\s+bar/i,
+    explanation: "Smaller candle trapped inside the prior range, usually a pause before price breaks out.",
+  },
+];
+
+const explainCandlestickNote = (note?: string): string | null => {
+  if (!note) {
+    return null;
+  }
+  for (const entry of CANDLE_GLOSSARY) {
+    if (entry.pattern.test(note)) {
+      return entry.explanation;
+    }
+  }
+  return null;
+};
+
+const resolveBiasTone = (bias?: string): "bullish" | "bearish" | "neutral" => {
+  if (!bias) {
+    return "neutral";
+  }
+  const fingerprint = bias.toLowerCase();
+  if (/(bull|long|accum)/.test(fingerprint)) {
+    return "bullish";
+  }
+  if (/(bear|short|distrib)/.test(fingerprint)) {
+    return "bearish";
+  }
+  return "neutral";
+};
+
+const biasChipClass = (bias?: string): string => {
+  const tone = resolveBiasTone(bias);
+  if (tone === "bullish") {
+    return "border-emerald-500/50 bg-emerald-500/10 text-emerald-200";
+  }
+  if (tone === "bearish") {
+    return "border-rose-500/50 bg-rose-500/10 text-rose-200";
+  }
+  return "border-slate-600 bg-slate-800/70 text-slate-200";
+};
+
 const coerceNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) {
     return null;
@@ -264,17 +330,51 @@ const PriceActionPanel = ({ priceAction }: { priceAction?: ReportCenterPriceActi
     return null;
   }
 
-  const { trend_alignment: trendAlignment, key_levels: keyLevels, recent_patterns: patterns } = priceAction;
+  const {
+    trend_alignment: trendAlignment,
+    key_levels: keyLevels,
+    recent_patterns: patterns,
+    candlestick_notes: candlestickNotesRaw,
+    immediate_bias: immediateBias,
+  } = priceAction;
 
-  if (!trendAlignment && !keyLevels?.length && !patterns?.length) {
+  const candlestickNotes = Array.isArray(candlestickNotesRaw)
+    ? candlestickNotesRaw
+    : candlestickNotesRaw
+    ? [candlestickNotesRaw]
+    : [];
+
+  if (!trendAlignment && !keyLevels?.length && !patterns?.length && !candlestickNotes.length && !immediateBias) {
     return null;
   }
 
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-      <span className="text-xs uppercase tracking-wide text-slate-500">Tape color</span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-xs uppercase tracking-wide text-slate-500">{PRICE_ACTION_CARD_LABEL}</span>
+        {immediateBias ? (
+          <span
+            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${biasChipClass(immediateBias)}`}
+          >
+            {immediateBias}
+          </span>
+        ) : null}
+      </div>
       {trendAlignment ? (
         <p className="mt-3 text-sm leading-relaxed text-slate-300">{trendAlignment}</p>
+      ) : null}
+      {candlestickNotes.length ? (
+        <div className="mt-4 space-y-3">
+          {candlestickNotes.map((note, index) => {
+            const explainer = explainCandlestickNote(note);
+            return (
+              <div key={`candlestick-note-${index}`} className="rounded-2xl border border-slate-800/70 bg-slate-950/40 p-4">
+                <p className="text-sm text-slate-200">{note}</p>
+                {explainer ? <p className="mt-1 text-xs text-slate-400">Plain English: {explainer}</p> : null}
+              </div>
+            );
+          })}
+        </div>
       ) : null}
       {keyLevels?.length ? (
         <div className="mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-3">

@@ -522,6 +522,20 @@ def _extract_price_details(report: Dict[str, Any]) -> Tuple[Optional[Dict[str, A
                 if formatted_patterns:
                     price_action_summary["recent_patterns"] = formatted_patterns
 
+    expert_outputs = report.get("expert_outputs")
+    if isinstance(expert_outputs, dict):
+        price_action_output = expert_outputs.get("price_action")
+        if isinstance(price_action_output, dict):
+            agent_output = price_action_output.get("agent_output") or price_action_output.get("agent_result")
+            if isinstance(agent_output, dict):
+                immediate_bias = _clean_text_fragment(agent_output.get("immediate_bias"))
+                if immediate_bias:
+                    price_action_summary["immediate_bias"] = immediate_bias
+
+                candlestick_notes = _coerce_text_list(agent_output.get("candlestick_notes"), limit=3)
+                if candlestick_notes:
+                    price_action_summary["candlestick_notes"] = candlestick_notes
+
     return (price_info or None, price_action_summary or None)
 
 
@@ -552,6 +566,32 @@ def _clean_text_fragment(value: Any, *, max_items: Optional[int] = None) -> str:
     text = str(value)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def _coerce_text_list(value: Any, *, limit: Optional[int] = None) -> List[str]:
+    if value is None:
+        return []
+
+    items: List[str] = []
+    if isinstance(value, str):
+        cleaned = _clean_text_fragment(value)
+        return [cleaned] if cleaned else []
+
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            cleaned = _clean_text_fragment(item)
+            if cleaned:
+                items.append(cleaned)
+                if limit and len(items) >= limit:
+                    break
+        return items
+
+    if isinstance(value, dict):
+        cleaned = _clean_text_fragment(value)
+        return [cleaned] if cleaned else []
+
+    cleaned = _clean_text_fragment(value)
+    return [cleaned] if cleaned else []
 
 
 def _round_decimal(value: Any, places: int = 2) -> Any:

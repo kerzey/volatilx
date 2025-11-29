@@ -48,6 +48,8 @@ export type ReportCenterPriceAction = {
   trend_alignment?: string;
   key_levels?: ReportCenterKeyLevel[];
   recent_patterns?: string[];
+  immediate_bias?: string;
+  candlestick_notes?: string[];
 };
 
 export type ReportCenterEntry = {
