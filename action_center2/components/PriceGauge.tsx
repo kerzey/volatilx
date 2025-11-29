@@ -45,12 +45,6 @@ type ToneStyleMap = Record<
   }
 >;
 
-const zoneGlowStyles: Record<MarkerTone, string> = {
-  short: "bg-rose-500/12 ring-rose-400/30 shadow-[0_0_30px_rgba(244,63,94,0.25)]",
-  neutral: "bg-amber-300/12 ring-amber-300/30 shadow-[0_0_30px_rgba(252,211,77,0.25)]",
-  long: "bg-emerald-400/12 ring-emerald-400/30 shadow-[0_0_30px_rgba(16,185,129,0.25)]",
-};
-
 const pointerToneLines: Record<MarkerTone, string> = {
   short: "bg-rose-400/80",
   neutral: "bg-amber-300/80",
@@ -238,7 +232,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     const value = uniqueShortTargets[0];
     markers.push({
       key: "shortTarget",
-      label: "Short Target",
+      label: "Target",
       value,
       tone: "short",
     });
@@ -248,7 +242,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     if (Number.isFinite(farTarget)) {
       markers.push({
         key: "shortTarget2",
-        label: "Short Target 2",
+        label: "Target 2",
         value: farTarget,
         tone: "short",
       });
@@ -256,7 +250,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     if (Number.isFinite(nearTarget) && Math.abs(nearTarget - farTarget) > 0) {
       markers.push({
         key: "shortTarget1",
-        label: "Short Target 1",
+        label: "Target 1",
         value: nearTarget,
         tone: "short",
       });
@@ -266,7 +260,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   if (Number.isFinite(shortEntry)) {
     markers.push({
       key: "shortEntry",
-      label: "Short Entry",
+      label: "Entry",
       value: shortEntry,
       tone: "short",
     });
@@ -275,14 +269,14 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralLower <= neutralUpper) {
     markers.push({
       key: "neutralLower",
-      label: "No-Trade Min",
+      label: "Min",
       value: neutralLower,
       tone: "neutral",
     });
     if (Math.abs(neutralUpper - neutralLower) > 0) {
       markers.push({
         key: "neutralUpper",
-        label: "No-Trade Max",
+        label: "Max",
         value: neutralUpper,
         tone: "neutral",
       });
@@ -292,7 +286,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   if (Number.isFinite(longEntry)) {
     markers.push({
       key: "longEntry",
-      label: "Long Entry",
+      label: "Entry",
       value: longEntry,
       tone: "long",
     });
@@ -302,7 +296,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     const value = uniqueLongTargets[0];
     markers.push({
       key: "longTarget",
-      label: "Long Target",
+      label: "Target",
       value,
       tone: "long",
     });
@@ -312,7 +306,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     if (Number.isFinite(nearTarget)) {
       markers.push({
         key: "longTarget1",
-        label: "Long Target 1",
+        label: "Target 1",
         value: nearTarget,
         tone: "long",
       });
@@ -320,7 +314,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     if (Number.isFinite(farTarget) && Math.abs(farTarget - nearTarget) > 0) {
       markers.push({
         key: "longTarget2",
-        label: "Long Target 2",
+        label: "Target 2",
         value: farTarget,
         tone: "long",
       });
@@ -353,7 +347,8 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
   const displayMarkerGroups = spreadMarkerGroups(markerGroups);
-  const pointerPercent = mapPercentToDisplay(pointerPercentRaw, markerGroups, displayMarkerGroups);
+  const mapToDisplayPercent = (percent: number) => mapPercentToDisplay(percent, markerGroups, displayMarkerGroups);
+  const pointerPercent = mapToDisplayPercent(pointerPercentRaw);
 
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp(((neutralLower - minBound) / totalSpan) * 100, 0, 100) : 0;
@@ -365,6 +360,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
     channelPadding: 80,
     barHeight: 12,
     extensionLength: 14,
+    stackOffset: 64,
     pointerClearance: 14,
     highlightGap: 8,
   } as const;
@@ -400,7 +396,21 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const priceTone = determineToneForPrice();
   const pointerToneLine = pointerToneLines[priceTone];
-  const zoneGlowClass = zoneGlowStyles[priceTone];
+
+  const defaultShortBoundary = 45;
+  const defaultNeutralBoundary = 55;
+  const shortZoneBoundary = hasNeutralZone ? mapToDisplayPercent(neutralStartPercent) : defaultShortBoundary;
+  const neutralZoneBoundary = hasNeutralZone ? mapToDisplayPercent(neutralEndPercent) : defaultNeutralBoundary;
+  const shortBoundary = clamp(Math.min(shortZoneBoundary, neutralZoneBoundary), 0, 100);
+  const neutralBoundary = clamp(Math.max(shortZoneBoundary, neutralZoneBoundary), 0, 100);
+
+  const channelBackground = `linear-gradient(to right,
+    rgba(244,63,94,0.18) 0%,
+    rgba(244,63,94,0.18) ${shortBoundary}%,
+    rgba(251,191,36,0.18) ${shortBoundary}%,
+    rgba(251,191,36,0.18) ${neutralBoundary}%,
+    rgba(16,185,129,0.18) ${neutralBoundary}%,
+    rgba(16,185,129,0.18) 100%)`;
 
   const renderLabelChip = (marker: Marker, extraClass = "") => {
     const tone = toneStyles[marker.tone];
@@ -460,7 +470,10 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
           className="absolute inset-x-0 z-10"
           style={{ top: `${zoneTop}px`, bottom: `${zoneBottom}px` }}
         >
-          <div className={`h-full rounded-2xl transition-colors duration-500 ${zoneGlowClass}`} />
+          <div
+            className="h-full rounded-2xl shadow-[inset_0_0_35px_rgba(0,0,0,0.35)]"
+            style={{ background: channelBackground }}
+          />
         </div>
 
         <div
@@ -483,7 +496,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
                   <div
                     key={`top-${group.value}-${dominantTone}`}
                     className="absolute -translate-x-1/2"
-                    style={{ left: `${group.percent}%`, top: `${-layout.extensionLength - 32}px` }}
+                    style={{ left: `${group.percent}%`, top: `${-layout.stackOffset}px` }}
                   >
                     <div className="flex flex-col items-center gap-2">
                       <div className={`${priceChipClass} ${tone.priceText}`}>{formatPrice(group.value)}</div>
@@ -519,7 +532,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
                   <div
                     key={`bottom-${group.value}-${dominantTone}`}
                     className="absolute -translate-x-1/2"
-                    style={{ left: `${group.percent}%`, top: "0px" }}
+                    style={{ left: `${group.percent}%`, bottom: `${-layout.stackOffset}px` }}
                   >
                     <span
                       className={`block w-[2px] rounded-full ${tone.line}`}

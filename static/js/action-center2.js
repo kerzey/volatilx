@@ -25455,11 +25455,6 @@ function StrategySelector({ selected, onSelect }) {
 
 // action_center2/components/PriceGauge.tsx
 var import_jsx_runtime3 = __toESM(require_jsx_runtime());
-var zoneGlowStyles = {
-  short: "bg-rose-500/12 ring-rose-400/30 shadow-[0_0_30px_rgba(244,63,94,0.25)]",
-  neutral: "bg-amber-300/12 ring-amber-300/30 shadow-[0_0_30px_rgba(252,211,77,0.25)]",
-  long: "bg-emerald-400/12 ring-emerald-400/30 shadow-[0_0_30px_rgba(16,185,129,0.25)]"
-};
 var pointerToneLines = {
   short: "bg-rose-400/80",
   neutral: "bg-amber-300/80",
@@ -25614,7 +25609,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     const value = uniqueShortTargets[0];
     markers.push({
       key: "shortTarget",
-      label: "Short Target",
+      label: "Target",
       value,
       tone: "short"
     });
@@ -25624,7 +25619,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     if (Number.isFinite(farTarget)) {
       markers.push({
         key: "shortTarget2",
-        label: "Short Target 2",
+        label: "Target 2",
         value: farTarget,
         tone: "short"
       });
@@ -25632,7 +25627,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     if (Number.isFinite(nearTarget) && Math.abs(nearTarget - farTarget) > 0) {
       markers.push({
         key: "shortTarget1",
-        label: "Short Target 1",
+        label: "Target 1",
         value: nearTarget,
         tone: "short"
       });
@@ -25641,7 +25636,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   if (Number.isFinite(shortEntry)) {
     markers.push({
       key: "shortEntry",
-      label: "Short Entry",
+      label: "Entry",
       value: shortEntry,
       tone: "short"
     });
@@ -25649,14 +25644,14 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   if (Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralLower <= neutralUpper) {
     markers.push({
       key: "neutralLower",
-      label: "No-Trade Min",
+      label: "Min",
       value: neutralLower,
       tone: "neutral"
     });
     if (Math.abs(neutralUpper - neutralLower) > 0) {
       markers.push({
         key: "neutralUpper",
-        label: "No-Trade Max",
+        label: "Max",
         value: neutralUpper,
         tone: "neutral"
       });
@@ -25665,7 +25660,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   if (Number.isFinite(longEntry)) {
     markers.push({
       key: "longEntry",
-      label: "Long Entry",
+      label: "Entry",
       value: longEntry,
       tone: "long"
     });
@@ -25674,7 +25669,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     const value = uniqueLongTargets[0];
     markers.push({
       key: "longTarget",
-      label: "Long Target",
+      label: "Target",
       value,
       tone: "long"
     });
@@ -25684,7 +25679,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     if (Number.isFinite(nearTarget)) {
       markers.push({
         key: "longTarget1",
-        label: "Long Target 1",
+        label: "Target 1",
         value: nearTarget,
         tone: "long"
       });
@@ -25692,7 +25687,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     if (Number.isFinite(farTarget) && Math.abs(farTarget - nearTarget) > 0) {
       markers.push({
         key: "longTarget2",
-        label: "Long Target 2",
+        label: "Target 2",
         value: farTarget,
         tone: "long"
       });
@@ -25718,7 +25713,8 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const pointerPercentRaw = clamp((latestPrice - minBound) / totalSpan * 100, 0, 100);
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
   const displayMarkerGroups = spreadMarkerGroups(markerGroups);
-  const pointerPercent = mapPercentToDisplay(pointerPercentRaw, markerGroups, displayMarkerGroups);
+  const mapToDisplayPercent = (percent) => mapPercentToDisplay(percent, markerGroups, displayMarkerGroups);
+  const pointerPercent = mapToDisplayPercent(pointerPercentRaw);
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp((neutralLower - minBound) / totalSpan * 100, 0, 100) : 0;
   const neutralEndPercent = hasNeutralZone ? clamp((neutralUpper - minBound) / totalSpan * 100, 0, 100) : 0;
@@ -25728,6 +25724,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     channelPadding: 80,
     barHeight: 12,
     extensionLength: 14,
+    stackOffset: 64,
     pointerClearance: 14,
     highlightGap: 8
   };
@@ -25760,7 +25757,19 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   };
   const priceTone = determineToneForPrice();
   const pointerToneLine = pointerToneLines[priceTone];
-  const zoneGlowClass = zoneGlowStyles[priceTone];
+  const defaultShortBoundary = 45;
+  const defaultNeutralBoundary = 55;
+  const shortZoneBoundary = hasNeutralZone ? mapToDisplayPercent(neutralStartPercent) : defaultShortBoundary;
+  const neutralZoneBoundary = hasNeutralZone ? mapToDisplayPercent(neutralEndPercent) : defaultNeutralBoundary;
+  const shortBoundary = clamp(Math.min(shortZoneBoundary, neutralZoneBoundary), 0, 100);
+  const neutralBoundary = clamp(Math.max(shortZoneBoundary, neutralZoneBoundary), 0, 100);
+  const channelBackground = `linear-gradient(to right,
+    rgba(244,63,94,0.18) 0%,
+    rgba(244,63,94,0.18) ${shortBoundary}%,
+    rgba(251,191,36,0.18) ${shortBoundary}%,
+    rgba(251,191,36,0.18) ${neutralBoundary}%,
+    rgba(16,185,129,0.18) ${neutralBoundary}%,
+    rgba(16,185,129,0.18) 100%)`;
   const renderLabelChip = (marker, extraClass = "") => {
     const tone = toneStyles[marker.tone];
     const label = marker.label.trim();
@@ -25806,7 +25815,13 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         {
           className: "absolute inset-x-0 z-10",
           style: { top: `${zoneTop}px`, bottom: `${zoneBottom}px` },
-          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `h-full rounded-2xl transition-colors duration-500 ${zoneGlowClass}` })
+          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            "div",
+            {
+              className: "h-full rounded-2xl shadow-[inset_0_0_35px_rgba(0,0,0,0.35)]",
+              style: { background: channelBackground }
+            }
+          )
         }
       ),
       /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
@@ -25830,7 +25845,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
                 "div",
                 {
                   className: "absolute -translate-x-1/2",
-                  style: { left: `${group.percent}%`, top: `${-layout.extensionLength - 32}px` },
+                  style: { left: `${group.percent}%`, top: `${-layout.stackOffset}px` },
                   children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center gap-2", children: [
                     /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `${priceChipClass} ${tone.priceText}`, children: formatPrice(group.value) }),
                     /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
@@ -25869,7 +25884,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
                 "div",
                 {
                   className: "absolute -translate-x-1/2",
-                  style: { left: `${group.percent}%`, top: "0px" },
+                  style: { left: `${group.percent}%`, bottom: `${-layout.stackOffset}px` },
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
                       "span",
