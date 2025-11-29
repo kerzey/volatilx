@@ -25513,60 +25513,52 @@ var buildMarkerGroups = (markers, minBound, maxBound) => {
   });
   return groups;
 };
-var adjustMarkerGroupPercents = (groups, minSpacingPercent) => {
+var spreadMarkerGroups = (groups) => {
   if (groups.length <= 1) {
-    return groups;
+    return groups.map((group) => ({ ...group }));
   }
   const adjusted = groups.map((group) => ({ ...group }));
-  adjusted[0].percent = clamp(adjusted[0].percent, 0, 100);
+  const denseClusterThreshold = 4;
+  const baseSpacing = Math.max(5, 90 / Math.max(groups.length, 1));
+  const denseSpacing = baseSpacing + 4;
   for (let i = 1; i < adjusted.length; i++) {
-    adjusted[i].percent = clamp(adjusted[i].percent, 0, 100);
-    if (adjusted[i].percent - adjusted[i - 1].percent < minSpacingPercent) {
-      adjusted[i].percent = Math.min(100, adjusted[i - 1].percent + minSpacingPercent);
+    const prevOriginalPercent = groups[i - 1].percent;
+    const currentOriginalPercent = groups[i].percent;
+    const actualGap = currentOriginalPercent - prevOriginalPercent;
+    const requiredSpacing = actualGap < denseClusterThreshold ? denseSpacing : baseSpacing;
+    const previous = adjusted[i - 1];
+    const current = adjusted[i];
+    const diff = current.percent - previous.percent;
+    if (diff < requiredSpacing) {
+      const shift = requiredSpacing - diff;
+      for (let j = i; j < adjusted.length; j++) {
+        adjusted[j].percent = clamp(adjusted[j].percent + shift, 0, 100);
+      }
     }
   }
   for (let i = adjusted.length - 2; i >= 0; i--) {
-    if (adjusted[i + 1].percent - adjusted[i].percent < minSpacingPercent) {
-      adjusted[i].percent = Math.max(0, adjusted[i + 1].percent - minSpacingPercent);
+    const nextOriginalPercent = groups[i + 1].percent;
+    const currentOriginalPercent = groups[i].percent;
+    const actualGap = nextOriginalPercent - currentOriginalPercent;
+    const requiredSpacing = actualGap < denseClusterThreshold ? denseSpacing : baseSpacing;
+    const next = adjusted[i + 1];
+    const current = adjusted[i];
+    const diff = next.percent - current.percent;
+    if (diff < requiredSpacing) {
+      const shift = requiredSpacing - diff;
+      for (let j = i; j >= 0; j--) {
+        adjusted[j].percent = clamp(adjusted[j].percent - shift, 0, 100);
+      }
     }
   }
-  for (let i = 1; i < adjusted.length; i++) {
-    if (adjusted[i].percent - adjusted[i - 1].percent < minSpacingPercent) {
-      adjusted[i].percent = Math.min(100, adjusted[i - 1].percent + minSpacingPercent);
-    }
-  }
-  return adjusted;
-};
-var alignPointerPercentWithMarkers = (pointerPercent, groups, latestPrice) => {
-  if (!Number.isFinite(pointerPercent) || !Number.isFinite(latestPrice) || !groups.length) {
-    return clamp(pointerPercent, 0, 100);
-  }
-  const epsilon = 0.5;
-  let adjusted = clamp(pointerPercent, 0, 100);
-  const leftGroups = groups.filter((group) => Number.isFinite(group.value) && latestPrice >= group.value);
-  const rightGroups = groups.filter((group) => Number.isFinite(group.value) && latestPrice <= group.value);
-  if (leftGroups.length) {
-    const maxLeftPercent = Math.max(...leftGroups.map((group) => group.percent));
-    if (adjusted <= maxLeftPercent) {
-      adjusted = Math.min(100, maxLeftPercent + epsilon);
-    }
-  }
-  if (rightGroups.length) {
-    const minRightPercent = Math.min(...rightGroups.map((group) => group.percent));
-    if (adjusted >= minRightPercent) {
-      adjusted = Math.max(0, minRightPercent - epsilon);
-    }
-  }
-  if (leftGroups.length && rightGroups.length) {
-    const leftBound = Math.max(...leftGroups.map((group) => group.percent)) + epsilon;
-    const rightBound = Math.min(...rightGroups.map((group) => group.percent)) - epsilon;
-    if (leftBound > rightBound) {
-      adjusted = clamp((leftBound + rightBound) / 2, 0, 100);
-    } else {
-      adjusted = clamp(Math.min(Math.max(adjusted, leftBound), rightBound), 0, 100);
-    }
-  }
-  return clamp(adjusted, 0, 100);
+  const firstPercent = adjusted[0].percent;
+  const lastPercent = adjusted[adjusted.length - 1].percent;
+  const span = Math.max(lastPercent - firstPercent, 1);
+  return adjusted.map((group) => ({
+    ...group,
+    percent: (group.percent - firstPercent) / span * 96 + 2
+    // leave 2% gutters on each side
+  }));
 };
 function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const normalizedSellTargets = Array.isArray(sellSetup?.targets) ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b) : [];
@@ -25696,8 +25688,8 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const totalSpan = Math.max(maxBound - minBound, 1e-6);
   const pointerPercentRaw = clamp((latestPrice - minBound) / totalSpan * 100, 0, 100);
   const markerGroups = buildMarkerGroups(markers, minBound, maxBound);
-  const spacedMarkerGroups = adjustMarkerGroupPercents(markerGroups, 3);
-  const pointerPercent = alignPointerPercentWithMarkers(pointerPercentRaw, spacedMarkerGroups, latestPrice);
+  const displayMarkerGroups = spreadMarkerGroups(markerGroups);
+  const pointerPercent = pointerPercentRaw;
   const hasNeutralZone = Number.isFinite(neutralLower) && Number.isFinite(neutralUpper) && neutralUpper > neutralLower;
   const neutralStartPercent = hasNeutralZone ? clamp((neutralLower - minBound) / totalSpan * 100, 0, 100) : 0;
   const neutralEndPercent = hasNeutralZone ? clamp((neutralUpper - minBound) / totalSpan * 100, 0, 100) : 0;
@@ -25740,16 +25732,23 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const priceTone = determineToneForPrice();
   const pointerToneLine = pointerToneLines[priceTone];
   const zoneGlowClass = zoneGlowStyles[priceTone];
-  const renderLabelChip = (marker) => {
+  const renderLabelChip = (marker, extraClass = "") => {
     const tone = toneStyles[marker.tone];
     return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       "span",
       {
-        className: `rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${tone.labelChip}`,
+        className: `block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center ${tone.labelChip} ${extraClass}`,
         children: marker.label
       },
       `${marker.key}-${marker.value}`
     );
+  };
+  const renderDefinitionStack = (markers2) => {
+    if (!markers2.length) {
+      return null;
+    }
+    const layoutClass = markers2.length >= 4 ? "mt-2 grid min-w-[200px] grid-cols-2 gap-1 text-center" : "mt-2 flex flex-col items-center gap-1";
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: layoutClass, children: markers2.map((marker) => renderLabelChip(marker)) });
   };
   const priceChipClass = "rounded-lg border border-slate-700/70 bg-slate-950/90 px-2.5 py-1 text-xs font-semibold shadow-inner shadow-black/20 backdrop-blur-sm";
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "rounded-3xl border border-slate-800/70 bg-slate-950/80 p-8 shadow-lg shadow-indigo-500/5", children: [
@@ -25786,7 +25785,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
                 style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "pointer-events-none absolute inset-0", children: spacedMarkerGroups.map((group) => {
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "pointer-events-none absolute inset-0", children: displayMarkerGroups.map((group) => {
               const dominantTone = group.markers[0]?.tone ?? "neutral";
               const tone = toneStyles[dominantTone];
               return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
@@ -25825,7 +25824,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
                 style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "pointer-events-none absolute inset-0", children: spacedMarkerGroups.map((group) => {
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "pointer-events-none absolute inset-0", children: displayMarkerGroups.map((group) => {
               const dominantTone = group.markers[0]?.tone ?? "neutral";
               const tone = toneStyles[dominantTone];
               return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
@@ -25841,7 +25840,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
                         style: { height: `${layout.barHeight + layout.extensionLength}px` }
                       }
                     ),
-                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-2 flex flex-col items-center gap-1", children: group.markers.map((marker) => renderLabelChip(marker)) })
+                    renderDefinitionStack(group.markers)
                   ]
                 },
                 `bottom-${group.value}-${dominantTone}`
