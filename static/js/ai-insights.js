@@ -25610,13 +25610,13 @@ function TradeSetupCard({ title, tone, setup }) {
 }
 function NoTradeCard({ zone }) {
   const palette = {
-    container: "border-slate-600/60 bg-slate-950/70",
-    label: "text-slate-300",
-    value: "text-slate-100",
-    detailBorder: "border-slate-600/60",
-    detailBg: "bg-slate-900/70",
-    bullet: "bg-slate-400",
-    text: "text-slate-200"
+    container: "border-amber-500/40 bg-amber-500/10",
+    label: "text-amber-200",
+    value: "text-amber-100",
+    detailBorder: "border-amber-500/40",
+    detailBg: "bg-amber-500/20",
+    bullet: "bg-amber-400",
+    text: "text-amber-100"
   };
   let minValue;
   let maxValue;
@@ -25662,19 +25662,18 @@ function NoTradeCard({ zone }) {
   if (!hasRange && !noteItems.length) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "No-trade zone", value: zone });
   }
-  const rows = [];
-  if (minValue !== void 0) {
-    rows.push({ key: "min", label: "MIN.", value: formatPrice(minValue) });
-  }
-  if (maxValue !== void 0) {
-    rows.push({ key: "max", label: "MAX", value: formatPrice(maxValue) });
-  }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: `space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`, children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: `text-xs font-semibold uppercase tracking-wide ${palette.label}`, children: "No-trade zone" }),
-    rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid grid-cols-2 gap-6", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-1", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `block text-[11px] font-semibold uppercase tracking-wide ${palette.label}`, children: row.label }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `block text-lg font-semibold ${palette.value}`, children: row.value })
-    ] }, row.key)) }) }) : null,
+    minValue !== void 0 || maxValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid grid-cols-2 items-end gap-6", children: [
+        minValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold uppercase tracking-wide ${palette.label}`, children: "MIN." }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
+        maxValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold tracking-wide ${palette.label} text-right`, children: "Max" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {})
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-2 grid grid-cols-2 gap-6", children: [
+        minValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-lg font-semibold ${palette.value}`, children: formatPrice(minValue) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
+        maxValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-lg font-semibold ${palette.value} text-right`, children: formatPrice(maxValue) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {})
+      ] })
+    ] }) : null,
     noteItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `space-y-2 text-sm ${palette.text}`, children: noteItems.map((note, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`, "aria-hidden": "true" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: note })

@@ -1468,13 +1468,13 @@ function TradeSetupCard({ title, tone, setup }: { title: string; tone: TradeTone
 
 function NoTradeCard({ zone }: { zone: unknown }) {
   const palette = {
-    container: "border-slate-600/60 bg-slate-950/70",
-    label: "text-slate-300",
-    value: "text-slate-100",
-    detailBorder: "border-slate-600/60",
-    detailBg: "bg-slate-900/70",
-    bullet: "bg-slate-400",
-    text: "text-slate-200",
+    container: "border-amber-500/40 bg-amber-500/10",
+    label: "text-amber-200",
+    value: "text-amber-100",
+    detailBorder: "border-amber-500/40",
+    detailBg: "bg-amber-500/20",
+    bullet: "bg-amber-400",
+    text: "text-amber-100",
   };
 
   let minValue: number | undefined;
@@ -1529,26 +1529,34 @@ function NoTradeCard({ zone }: { zone: unknown }) {
     return <PlanSubsection title="No-trade zone" value={zone} />;
   }
 
-  const rows: { key: string; label: string; value: string }[] = [];
-  if (minValue !== undefined) {
-    rows.push({ key: "min", label: "MIN.", value: formatPrice(minValue) });
-  }
-  if (maxValue !== undefined) {
-    rows.push({ key: "max", label: "MAX", value: formatPrice(maxValue) });
-  }
-
   return (
     <section className={`space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`}>
       <h6 className={`text-xs font-semibold uppercase tracking-wide ${palette.label}`}>No-trade zone</h6>
-      {rows.length ? (
+      {minValue !== undefined || maxValue !== undefined ? (
         <div className={`rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`}>
-          <div className="grid grid-cols-2 gap-6">
-            {rows.map((row) => (
-              <div key={row.key} className="space-y-1">
-                <span className={`block text-[11px] font-semibold uppercase tracking-wide ${palette.label}`}>{row.label}</span>
-                <span className={`block text-lg font-semibold ${palette.value}`}>{row.value}</span>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 items-end gap-6">
+            {minValue !== undefined ? (
+              <span className={`text-xs font-semibold uppercase tracking-wide ${palette.label}`}>MIN.</span>
+            ) : (
+              <span />
+            )}
+            {maxValue !== undefined ? (
+              <span className={`text-xs font-semibold tracking-wide ${palette.label} text-right`}>Max</span>
+            ) : (
+              <span />
+            )}
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-6">
+            {minValue !== undefined ? (
+              <span className={`text-lg font-semibold ${palette.value}`}>{formatPrice(minValue)}</span>
+            ) : (
+              <span />
+            )}
+            {maxValue !== undefined ? (
+              <span className={`text-lg font-semibold ${palette.value} text-right`}>{formatPrice(maxValue)}</span>
+            ) : (
+              <span />
+            )}
           </div>
         </div>
       ) : null}
