@@ -392,10 +392,10 @@ export function AiInsightsApp({ bootstrap }: { bootstrap: AiInsightsBootstrap })
             </header>
 
             <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
-              <label className="flex flex-col gap-2">
+              <label className="flex flex-col gap-2 max-w-xs">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Market</span>
                 <select
-                  className="rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.12em] text-slate-100 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
                   value={market}
                   onChange={(event) => {
                     const next = event.target.value;
@@ -408,7 +408,7 @@ export function AiInsightsApp({ bootstrap }: { bootstrap: AiInsightsBootstrap })
                 </select>
               </label>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 max-w-xs">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-400" htmlFor="aiInsightsSymbol">
                   Symbol
                 </label>
@@ -526,7 +526,7 @@ function SymbolSuggestions({
 
   return (
     <div
-      className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-800/80 bg-slate-950/95 p-2 shadow-xl shadow-black/50"
+      className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-900 bg-slate-950 p-2 shadow-2xl shadow-black/60"
       role="listbox"
       aria-label="Ticker suggestions"
     >
@@ -540,7 +540,7 @@ function SymbolSuggestions({
               "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition " +
               (isActive
                 ? "border-sky-500/50 bg-sky-500/15 text-sky-100"
-                : "border-transparent text-slate-100 hover:border-slate-600 hover:bg-slate-800/70")
+                : "border-transparent text-slate-100 hover:border-slate-700 hover:bg-slate-900/70")
             }
             role="option"
             aria-selected={isActive}
