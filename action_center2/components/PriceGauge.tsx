@@ -356,21 +356,17 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
   const neutralWidthPercent = Math.max(neutralEndPercent - neutralStartPercent, 0);
 
   const layout = {
-    containerHeight: 320,
-    channelPadding: 80,
-    barHeight: 12,
-    extensionLength: 14,
-    stackOffset: 64,
-    pointerClearance: 14,
-    highlightGap: 8,
+    containerHeight: 280,
+    barY: 120,
+    barHeight: 16,
+    pointerRise: 70,
+    stackSpacing: 70,
   } as const;
 
-  const topBarY = layout.channelPadding;
-  const bottomBarY = layout.containerHeight - layout.channelPadding - layout.barHeight;
-  const pointerTop = topBarY + layout.barHeight + layout.pointerClearance;
-  const pointerBottom = layout.containerHeight - (bottomBarY - layout.pointerClearance);
-  const zoneTop = topBarY + layout.barHeight + layout.highlightGap;
-  const zoneBottom = layout.containerHeight - (bottomBarY - layout.highlightGap);
+  const barTop = layout.barY;
+  const pointerTop = Math.max(barTop - layout.pointerRise, 0);
+  const pointerHeight = layout.pointerRise;
+  const stackTop = barTop + layout.barHeight + 8;
 
   const determineToneForPrice = (): MarkerTone => {
     if (!Number.isFinite(latestPrice)) {
@@ -455,93 +451,52 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
       <div className="relative mt-10" style={{ height: `${layout.containerHeight}px` }}>
         <div
           className="absolute inset-x-0 z-10"
-          style={{ top: `${zoneTop}px`, bottom: `${zoneBottom}px` }}
+          style={{ top: `${barTop}px`, height: `${layout.barHeight}px` }}
         >
           <div
-            className="h-full rounded-2xl shadow-[inset_0_0_35px_rgba(0,0,0,0.35)]"
+            className="relative h-full rounded-full shadow-[0_10px_35px_rgba(2,6,23,0.55)]"
             style={{ background: channelBackground }}
-          />
-        </div>
-
-        <div
-          className="absolute inset-x-0 z-20"
-          style={{ top: `${topBarY}px`, height: `${layout.barHeight}px` }}
-        >
-          <div className="relative h-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60">
-            <div className="absolute inset-0 rounded-full ring-1 ring-white/5" />
+          >
+            <div className="absolute inset-0 rounded-full ring-1 ring-white/10" />
             {hasNeutralZone && (
               <div
-                className="absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm"
-                style={{ left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }}
+                className="absolute inset-y-[2px] rounded-full bg-amber-200/25 ring-1 ring-amber-200/30"
+                style={{ left: `${shortBoundary}%`, width: `${Math.max(neutralBoundary - shortBoundary, 0)}%` }}
               />
             )}
-            <div className="pointer-events-none absolute inset-0">
-              {displayMarkerGroups.map((group) => {
-                const dominantTone = group.markers[0]?.tone ?? "neutral";
-                const tone = toneStyles[dominantTone];
-                return (
-                  <div
-                    key={`top-${group.value}-${dominantTone}`}
-                    className="absolute -translate-x-1/2"
-                    style={{ left: `${group.percent}%`, top: `${-layout.stackOffset}px` }}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className={`${priceChipClass} ${tone.priceText}`}>{formatPrice(group.value)}</div>
-                      <span
-                        className={`block w-[2px] rounded-full ${tone.line}`}
-                        style={{ height: `${layout.stackOffset}px` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
 
-        <div
-          className="absolute inset-x-0 z-20"
-          style={{ top: `${bottomBarY}px`, height: `${layout.barHeight}px` }}
-        >
-          <div className="relative h-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60">
-            <div className="absolute inset-0 rounded-full ring-1 ring-white/5" />
-            {hasNeutralZone && (
-              <div
-                className="absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm"
-                style={{ left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }}
+        {displayMarkerGroups.map((group) => {
+          const dominantTone = group.markers[0]?.tone ?? "neutral";
+          const tone = toneStyles[dominantTone];
+          return (
+            <div
+              key={`stack-${group.value}-${dominantTone}`}
+              className="pointer-events-none absolute z-20 -translate-x-1/2"
+              style={{ left: `${group.percent}%`, top: `${stackTop}px` }}
+            >
+              <span
+                className={`mb-1 block h-6 w-[2px] rounded-full ${tone.line}`}
               />
-            )}
-            <div className="pointer-events-none absolute inset-0">
-              {displayMarkerGroups.map((group) => {
-                const dominantTone = group.markers[0]?.tone ?? "neutral";
-                const tone = toneStyles[dominantTone];
-                return (
-                  <div
-                    key={`bottom-${group.value}-${dominantTone}`}
-                    className="absolute -translate-x-1/2"
-                    style={{ left: `${group.percent}%`, top: `${layout.barHeight}px` }}
-                  >
-                    <span
-                      className={`block w-[2px] rounded-full ${tone.line}`}
-                      style={{ height: `${layout.stackOffset}px` }}
-                    />
-                    {renderDefinitionStack(group.markers)}
-                  </div>
-                );
-              })}
+              <div className={`${priceChipClass} ${tone.priceText}`}>{formatPrice(group.value)}</div>
+              {renderDefinitionStack(group.markers)}
             </div>
-          </div>
-        </div>
+          );
+        })}
 
         <div
-          className="pointer-events-none absolute z-30 flex w-0 -translate-x-1/2 flex-col items-center text-xs text-indigo-100 transition-all duration-500"
-          style={{ left: `${pointerPercent}%`, top: `${pointerTop}px`, bottom: `${pointerBottom}px` }}
+          className="pointer-events-none absolute z-30 flex -translate-x-1/2 flex-col items-center text-xs text-indigo-100 transition-all duration-500"
+          style={{ left: `${pointerPercent}%`, top: `${pointerTop}px` }}
         >
-          <span className={`flex-1 w-[2px] rounded-full ${pointerToneLine}`} />
-          <div className="my-2 rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30">
+          <div className="rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30">
             {formatPrice(latestPrice)}
           </div>
-          <span className={`flex-1 w-[2px] rounded-full ${pointerToneLine}`} />
+          <span
+            className={`mt-2 block w-[3px] rounded-full ${pointerToneLine}`}
+            style={{ height: `${pointerHeight}px` }}
+          />
+          <span className="mt-1 block h-2 w-2 rounded-full border border-white/50 bg-indigo-500" />
         </div>
 
         {!markerGroups.length && (
@@ -549,6 +504,21 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
             Plan did not publish level targets for this symbol. The gauge will activate as soon as fresh levels arrive.
           </p>
         )}
+      </div>
+
+      <div className="mt-10 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-10 rounded-full bg-rose-500/60" />
+          <span>Short Scenario</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-10 rounded-full bg-amber-300/70" />
+          <span>No-Trade Zone</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-10 rounded-full bg-emerald-400/70" />
+          <span>Long Scenario</span>
+        </div>
       </div>
     </section>
   );

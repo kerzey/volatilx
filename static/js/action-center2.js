@@ -25720,20 +25720,16 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
   const neutralEndPercent = hasNeutralZone ? clamp((neutralUpper - minBound) / totalSpan * 100, 0, 100) : 0;
   const neutralWidthPercent = Math.max(neutralEndPercent - neutralStartPercent, 0);
   const layout = {
-    containerHeight: 320,
-    channelPadding: 80,
-    barHeight: 12,
-    extensionLength: 14,
-    stackOffset: 64,
-    pointerClearance: 14,
-    highlightGap: 8
+    containerHeight: 280,
+    barY: 120,
+    barHeight: 16,
+    pointerRise: 70,
+    stackSpacing: 70
   };
-  const topBarY = layout.channelPadding;
-  const bottomBarY = layout.containerHeight - layout.channelPadding - layout.barHeight;
-  const pointerTop = topBarY + layout.barHeight + layout.pointerClearance;
-  const pointerBottom = layout.containerHeight - (bottomBarY - layout.pointerClearance);
-  const zoneTop = topBarY + layout.barHeight + layout.highlightGap;
-  const zoneBottom = layout.containerHeight - (bottomBarY - layout.highlightGap);
+  const barTop = layout.barY;
+  const pointerTop = Math.max(barTop - layout.pointerRise, 0);
+  const pointerHeight = layout.pointerRise;
+  const stackTop = barTop + layout.barHeight + 8;
   const determineToneForPrice = () => {
     if (!Number.isFinite(latestPrice)) {
       return "neutral";
@@ -25805,107 +25801,81 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
         "div",
         {
           className: "absolute inset-x-0 z-10",
-          style: { top: `${zoneTop}px`, bottom: `${zoneBottom}px` },
-          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          style: { top: `${barTop}px`, height: `${layout.barHeight}px` },
+          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
             "div",
             {
-              className: "h-full rounded-2xl shadow-[inset_0_0_35px_rgba(0,0,0,0.35)]",
-              style: { background: channelBackground }
+              className: "relative h-full rounded-full shadow-[0_10px_35px_rgba(2,6,23,0.55)]",
+              style: { background: channelBackground },
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 rounded-full ring-1 ring-white/10" }),
+                hasNeutralZone && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                  "div",
+                  {
+                    className: "absolute inset-y-[2px] rounded-full bg-amber-200/25 ring-1 ring-amber-200/30",
+                    style: { left: `${shortBoundary}%`, width: `${Math.max(neutralBoundary - shortBoundary, 0)}%` }
+                  }
+                )
+              ]
             }
           )
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-        "div",
-        {
-          className: "absolute inset-x-0 z-20",
-          style: { top: `${topBarY}px`, height: `${layout.barHeight}px` },
-          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative h-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 rounded-full ring-1 ring-white/5" }),
-            hasNeutralZone && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-              "div",
-              {
-                className: "absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm",
-                style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "pointer-events-none absolute inset-0", children: displayMarkerGroups.map((group) => {
-              const dominantTone = group.markers[0]?.tone ?? "neutral";
-              const tone = toneStyles[dominantTone];
-              return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                "div",
+      displayMarkerGroups.map((group) => {
+        const dominantTone = group.markers[0]?.tone ?? "neutral";
+        const tone = toneStyles[dominantTone];
+        return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+          "div",
+          {
+            className: "pointer-events-none absolute z-20 -translate-x-1/2",
+            style: { left: `${group.percent}%`, top: `${stackTop}px` },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                "span",
                 {
-                  className: "absolute -translate-x-1/2",
-                  style: { left: `${group.percent}%`, top: `${-layout.stackOffset}px` },
-                  children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center gap-2", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `${priceChipClass} ${tone.priceText}`, children: formatPrice(group.value) }),
-                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                      "span",
-                      {
-                        className: `block w-[2px] rounded-full ${tone.line}`,
-                        style: { height: `${layout.stackOffset}px` }
-                      }
-                    )
-                  ] })
-                },
-                `top-${group.value}-${dominantTone}`
-              );
-            }) })
-          ] })
-        }
-      ),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-        "div",
-        {
-          className: "absolute inset-x-0 z-20",
-          style: { top: `${bottomBarY}px`, height: `${layout.barHeight}px` },
-          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative h-full rounded-full bg-gradient-to-r from-rose-900/80 via-amber-500/25 to-emerald-500/60", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 rounded-full ring-1 ring-white/5" }),
-            hasNeutralZone && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-              "div",
-              {
-                className: "absolute top-0 bottom-0 rounded-full bg-amber-200/20 ring-1 ring-amber-200/40 backdrop-blur-sm",
-                style: { left: `${neutralStartPercent}%`, width: `${neutralWidthPercent}%` }
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "pointer-events-none absolute inset-0", children: displayMarkerGroups.map((group) => {
-              const dominantTone = group.markers[0]?.tone ?? "neutral";
-              const tone = toneStyles[dominantTone];
-              return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
-                "div",
-                {
-                  className: "absolute -translate-x-1/2",
-                  style: { left: `${group.percent}%`, top: `${layout.barHeight}px` },
-                  children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                      "span",
-                      {
-                        className: `block w-[2px] rounded-full ${tone.line}`,
-                        style: { height: `${layout.stackOffset}px` }
-                      }
-                    ),
-                    renderDefinitionStack(group.markers)
-                  ]
-                },
-                `bottom-${group.value}-${dominantTone}`
-              );
-            }) })
-          ] })
-        }
-      ),
+                  className: `mb-1 block h-6 w-[2px] rounded-full ${tone.line}`
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `${priceChipClass} ${tone.priceText}`, children: formatPrice(group.value) }),
+              renderDefinitionStack(group.markers)
+            ]
+          },
+          `stack-${group.value}-${dominantTone}`
+        );
+      }),
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
         "div",
         {
-          className: "pointer-events-none absolute z-30 flex w-0 -translate-x-1/2 flex-col items-center text-xs text-indigo-100 transition-all duration-500",
-          style: { left: `${pointerPercent}%`, top: `${pointerTop}px`, bottom: `${pointerBottom}px` },
+          className: "pointer-events-none absolute z-30 flex -translate-x-1/2 flex-col items-center text-xs text-indigo-100 transition-all duration-500",
+          style: { left: `${pointerPercent}%`, top: `${pointerTop}px` },
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `flex-1 w-[2px] rounded-full ${pointerToneLine}` }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "my-2 rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30", children: formatPrice(latestPrice) }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `flex-1 w-[2px] rounded-full ${pointerToneLine}` })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-semibold text-indigo-50 shadow-lg shadow-indigo-500/30", children: formatPrice(latestPrice) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              "span",
+              {
+                className: `mt-2 block w-[3px] rounded-full ${pointerToneLine}`,
+                style: { height: `${pointerHeight}px` }
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "mt-1 block h-2 w-2 rounded-full border border-white/50 bg-indigo-500" })
           ]
         }
       ),
       !markerGroups.length && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "absolute inset-x-0 bottom-0 translate-y-full text-center text-sm text-slate-400", children: "Plan did not publish level targets for this symbol. The gauge will activate as soon as fresh levels arrive." })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-10 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-slate-300", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-2 w-10 rounded-full bg-rose-500/60" }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: "Short Scenario" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-2 w-10 rounded-full bg-amber-300/70" }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: "No-Trade Zone" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "h-2 w-10 rounded-full bg-emerald-400/70" }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: "Long Scenario" })
+      ] })
     ] })
   ] });
 }
