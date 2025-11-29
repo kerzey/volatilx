@@ -25690,56 +25690,68 @@ function NoTradeCard({ zone }) {
 }
 function ExpertDiagnostics({ outputs, includeRaw }) {
   const entries = Object.entries(outputs).filter(([, value]) => isRecord(value));
-  if (!entries.length) {
-    if (includeRaw) {
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5 text-sm text-slate-200", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Expert diagnostics" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { className: "mt-3 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400", children: JSON.stringify(outputs, null, 2) })
-      ] });
-    }
+  const hasStructuredEntries = entries.length > 0;
+  const hasRawContent = includeRaw && Object.keys(outputs).length > 0;
+  const [expanded, setExpanded] = (0, import_react.useState)(false);
+  if (!hasStructuredEntries && !hasRawContent) {
     return null;
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "space-y-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", { className: "text-sm font-semibold uppercase tracking-wide text-slate-300", children: "Expert diagnostics" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-4", children: entries.map(([key, value]) => {
-      const record = value;
-      const agentName = readString(record, "agent") ?? humanizeKey(key);
-      const isSuccess = record.success !== false;
-      const statusLabel = isSuccess ? "Ready" : "Issue";
-      const metaItems = [];
-      const metaSymbol = readString(record, "symbol");
-      if (metaSymbol) {
-        metaItems.push(`Symbol ${metaSymbol.toUpperCase()}`);
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/50", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+      "button",
+      {
+        type: "button",
+        className: "flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold uppercase tracking-wide text-slate-300 transition hover:bg-slate-900",
+        onClick: () => setExpanded((prev) => !prev),
+        "aria-expanded": expanded,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Expert diagnostics" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs font-medium text-slate-400", children: expanded ? "Hide" : "Show" })
+        ]
       }
-      const usage = readRecord(record, "model_usage");
-      const tokens = usage ? readNumber(usage, "total_tokens") ?? readNumber(usage, "output_tokens") : void 0;
-      if (tokens !== void 0) {
-        metaItems.push(`Tokens ${tokens}`);
-      }
-      const generated = record.generated_at ?? record.collected_at ?? record.timestamp;
-      if (generated) {
-        metaItems.push(`Generated ${formatDateTime(generated)}`);
-      }
-      const output = record.agent_output ?? record.agent_result;
-      const renderedOutput = renderValue(output);
-      const fallback = includeRaw && record.raw_text ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { className: "mt-3 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400", children: String(record.raw_text) }) : null;
-      const errorMessage = !isSuccess && record.error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-xs text-rose-200", children: String(record.error) }) : null;
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "space-y-4 rounded-3xl border border-slate-800 bg-slate-900/50 p-5", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-semibold text-white", children: agentName }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs text-slate-400", children: "Specialist diagnostic" })
+    ),
+    expanded ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-4 border-t border-slate-800/70 p-5", children: [
+      hasStructuredEntries ? entries.map(([key, value]) => {
+        const record = value;
+        const agentName = readString(record, "agent") ?? humanizeKey(key);
+        const isSuccess = record.success !== false;
+        const statusLabel = isSuccess ? "Ready" : "Issue";
+        const metaItems = [];
+        const metaSymbol = readString(record, "symbol");
+        if (metaSymbol) {
+          metaItems.push(`Symbol ${metaSymbol.toUpperCase()}`);
+        }
+        const usage = readRecord(record, "model_usage");
+        const tokens = usage ? readNumber(usage, "total_tokens") ?? readNumber(usage, "output_tokens") : void 0;
+        if (tokens !== void 0) {
+          metaItems.push(`Tokens ${tokens}`);
+        }
+        const generated = record.generated_at ?? record.collected_at ?? record.timestamp;
+        if (generated) {
+          metaItems.push(`Generated ${formatDateTime(generated)}`);
+        }
+        const output = record.agent_output ?? record.agent_result;
+        const renderedOutput = renderValue(output);
+        const fallback = includeRaw && record.raw_text ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { className: "mt-3 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400", children: String(record.raw_text) }) : null;
+        const errorMessage = !isSuccess && record.error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-xs text-rose-200", children: String(record.error) }) : null;
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "space-y-4 rounded-3xl border border-slate-800 bg-slate-900/50 p-5", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-semibold text-white", children: agentName }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs text-slate-400", children: "Specialist diagnostic" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Status", value: statusLabel, variant: isSuccess ? "success" : "warning" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Status", value: statusLabel, variant: isSuccess ? "success" : "warning" })
-        ] }),
-        metaItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex flex-wrap gap-2 text-xs text-slate-400", children: metaItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1", children: item }, item)) }) : null,
-        errorMessage,
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-3 text-sm leading-relaxed text-slate-200", children: [
-          renderedOutput,
-          fallback
-        ] })
-      ] }, key);
-    }) })
+          metaItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex flex-wrap gap-2 text-xs text-slate-400", children: metaItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1", children: item }, item)) }) : null,
+          errorMessage,
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-3 text-sm leading-relaxed text-slate-200", children: [
+            renderedOutput,
+            fallback
+          ] })
+        ] }, key);
+      }) : null,
+      hasRawContent ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", { className: "overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400", children: JSON.stringify(outputs, null, 2) }) : null
+    ] }) : null
   ] });
 }
 function EmptyState({ title, description }) {

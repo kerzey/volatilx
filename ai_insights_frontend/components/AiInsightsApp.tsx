@@ -1567,83 +1567,94 @@ function NoTradeCard({ zone }: { zone: unknown }) {
 
 function ExpertDiagnostics({ outputs, includeRaw }: { outputs: Record<string, unknown>; includeRaw: boolean }) {
   const entries = Object.entries(outputs).filter(([, value]) => isRecord(value));
-  if (!entries.length) {
-    if (includeRaw) {
-      return (
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5 text-sm text-slate-200">
-          <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Expert diagnostics</h5>
-          <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400">
-            {JSON.stringify(outputs, null, 2)}
-          </pre>
-        </div>
-      );
-    }
+  const hasStructuredEntries = entries.length > 0;
+  const hasRawContent = includeRaw && Object.keys(outputs).length > 0;
+  const [expanded, setExpanded] = useState(false);
+
+  if (!hasStructuredEntries && !hasRawContent) {
     return null;
   }
 
   return (
-    <section className="space-y-4">
-      <h5 className="text-sm font-semibold uppercase tracking-wide text-slate-300">Expert diagnostics</h5>
-      <div className="space-y-4">
-        {entries.map(([key, value]) => {
-          const record = value as Record<string, unknown>;
-          const agentName = readString(record, "agent") ?? humanizeKey(key);
-          const isSuccess = record.success !== false;
-          const statusLabel = isSuccess ? "Ready" : "Issue";
-          const metaItems: string[] = [];
-          const metaSymbol = readString(record, "symbol");
-          if (metaSymbol) {
-            metaItems.push(`Symbol ${metaSymbol.toUpperCase()}`);
-          }
-          const usage = readRecord(record, "model_usage");
-          const tokens = usage ? readNumber(usage, "total_tokens") ?? readNumber(usage, "output_tokens") : undefined;
-          if (tokens !== undefined) {
-            metaItems.push(`Tokens ${tokens}`);
-          }
-          const generated = record.generated_at ?? record.collected_at ?? record.timestamp;
-          if (generated) {
-            metaItems.push(`Generated ${formatDateTime(generated)}`);
-          }
+    <section className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/50">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold uppercase tracking-wide text-slate-300 transition hover:bg-slate-900"
+        onClick={() => setExpanded((prev) => !prev)}
+        aria-expanded={expanded}
+      >
+        <span>Expert diagnostics</span>
+        <span className="text-xs font-medium text-slate-400">{expanded ? "Hide" : "Show"}</span>
+      </button>
+      {expanded ? (
+        <div className="space-y-4 border-t border-slate-800/70 p-5">
+          {hasStructuredEntries
+            ? entries.map(([key, value]) => {
+                const record = value as Record<string, unknown>;
+                const agentName = readString(record, "agent") ?? humanizeKey(key);
+                const isSuccess = record.success !== false;
+                const statusLabel = isSuccess ? "Ready" : "Issue";
+                const metaItems: string[] = [];
+                const metaSymbol = readString(record, "symbol");
+                if (metaSymbol) {
+                  metaItems.push(`Symbol ${metaSymbol.toUpperCase()}`);
+                }
+                const usage = readRecord(record, "model_usage");
+                const tokens = usage ? readNumber(usage, "total_tokens") ?? readNumber(usage, "output_tokens") : undefined;
+                if (tokens !== undefined) {
+                  metaItems.push(`Tokens ${tokens}`);
+                }
+                const generated = record.generated_at ?? record.collected_at ?? record.timestamp;
+                if (generated) {
+                  metaItems.push(`Generated ${formatDateTime(generated)}`);
+                }
 
-          const output = record.agent_output ?? record.agent_result;
-          const renderedOutput = renderValue(output);
-          const fallback = includeRaw && record.raw_text ? (
-            <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400">
-              {String(record.raw_text)}
+                const output = record.agent_output ?? record.agent_result;
+                const renderedOutput = renderValue(output);
+                const fallback = includeRaw && record.raw_text ? (
+                  <pre className="mt-3 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400">
+                    {String(record.raw_text)}
+                  </pre>
+                ) : null;
+
+                const errorMessage = !isSuccess && record.error ? (
+                  <p className="mt-2 text-xs text-rose-200">{String(record.error)}</p>
+                ) : null;
+
+                return (
+                  <article key={key} className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/50 p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{agentName}</p>
+                        <p className="text-xs text-slate-400">Specialist diagnostic</p>
+                      </div>
+                      <MetricChip label="Status" value={statusLabel} variant={isSuccess ? "success" : "warning"} />
+                    </div>
+                    {metaItems.length ? (
+                      <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                        {metaItems.map((item) => (
+                          <span key={item} className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {errorMessage}
+                    <div className="space-y-3 text-sm leading-relaxed text-slate-200">
+                      {renderedOutput}
+                      {fallback}
+                    </div>
+                  </article>
+                );
+              })
+            : null}
+          {hasRawContent ? (
+            <pre className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-400">
+              {JSON.stringify(outputs, null, 2)}
             </pre>
-          ) : null;
-
-          const errorMessage = !isSuccess && record.error ? (
-            <p className="mt-2 text-xs text-rose-200">{String(record.error)}</p>
-          ) : null;
-
-          return (
-            <article key={key} className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/50 p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-white">{agentName}</p>
-                  <p className="text-xs text-slate-400">Specialist diagnostic</p>
-                </div>
-                <MetricChip label="Status" value={statusLabel} variant={isSuccess ? "success" : "warning"} />
-              </div>
-              {metaItems.length ? (
-                <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-                  {metaItems.map((item) => (
-                    <span key={item} className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              {errorMessage}
-              <div className="space-y-3 text-sm leading-relaxed text-slate-200">
-                {renderedOutput}
-                {fallback}
-              </div>
-            </article>
-          );
-        })}
-      </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
