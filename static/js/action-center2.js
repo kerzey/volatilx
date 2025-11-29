@@ -25772,20 +25772,11 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
     rgba(16,185,129,0.18) 100%)`;
   const renderLabelChip = (marker, extraClass = "") => {
     const tone = toneStyles[marker.tone];
-    const label = marker.label.trim();
-    const lower = label.toLowerCase();
-    const targetIndex = lower.indexOf("target");
-    let lines = [label];
-    if (targetIndex !== -1) {
-      const firstLine = label.slice(0, targetIndex + "target".length).trim();
-      const remainder = label.slice(targetIndex + "target".length).trim();
-      lines = remainder ? [firstLine, remainder] : [label];
-    }
     return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       "span",
       {
-        className: `block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center ${tone.labelChip} ${extraClass}`,
-        children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block leading-tight", children: line }, `${marker.key}-${marker.value}-line-${index}`))
+        className: `block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center leading-tight ${tone.labelChip} ${extraClass}`,
+        children: marker.label
       },
       `${marker.key}-${marker.value}`
     );
@@ -25852,7 +25843,7 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
                       "span",
                       {
                         className: `block w-[2px] rounded-full ${tone.line}`,
-                        style: { height: `${layout.extensionLength + layout.barHeight}px` }
+                        style: { height: `${layout.stackOffset}px` }
                       }
                     )
                   ] })
@@ -25884,13 +25875,13 @@ function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }) {
                 "div",
                 {
                   className: "absolute -translate-x-1/2",
-                  style: { left: `${group.percent}%`, bottom: `${-layout.stackOffset}px` },
+                  style: { left: `${group.percent}%`, top: `${layout.barHeight}px` },
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
                       "span",
                       {
                         className: `block w-[2px] rounded-full ${tone.line}`,
-                        style: { height: `${layout.barHeight + layout.extensionLength}px` }
+                        style: { height: `${layout.stackOffset}px` }
                       }
                     ),
                     renderDefinitionStack(group.markers)

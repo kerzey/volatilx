@@ -414,25 +414,12 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
 
   const renderLabelChip = (marker: Marker, extraClass = "") => {
     const tone = toneStyles[marker.tone];
-    const label = marker.label.trim();
-    const lower = label.toLowerCase();
-    const targetIndex = lower.indexOf("target");
-    let lines: string[] = [label];
-    if (targetIndex !== -1) {
-      const firstLine = label.slice(0, targetIndex + "target".length).trim();
-      const remainder = label.slice(targetIndex + "target".length).trim();
-      lines = remainder ? [firstLine, remainder] : [label];
-    }
     return (
       <span
         key={`${marker.key}-${marker.value}`}
-        className={`block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center ${tone.labelChip} ${extraClass}`}
+        className={`block w-full rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-center leading-tight ${tone.labelChip} ${extraClass}`}
       >
-        {lines.map((line, index) => (
-          <span key={`${marker.key}-${marker.value}-line-${index}`} className="block leading-tight">
-            {line}
-          </span>
-        ))}
+        {marker.label}
       </span>
     );
   };
@@ -502,7 +489,7 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
                       <div className={`${priceChipClass} ${tone.priceText}`}>{formatPrice(group.value)}</div>
                       <span
                         className={`block w-[2px] rounded-full ${tone.line}`}
-                        style={{ height: `${layout.extensionLength + layout.barHeight}px` }}
+                        style={{ height: `${layout.stackOffset}px` }}
                       />
                     </div>
                   </div>
@@ -532,11 +519,11 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
                   <div
                     key={`bottom-${group.value}-${dominantTone}`}
                     className="absolute -translate-x-1/2"
-                    style={{ left: `${group.percent}%`, bottom: `${-layout.stackOffset}px` }}
+                    style={{ left: `${group.percent}%`, top: `${layout.barHeight}px` }}
                   >
                     <span
                       className={`block w-[2px] rounded-full ${tone.line}`}
-                      style={{ height: `${layout.barHeight + layout.extensionLength}px` }}
+                      style={{ height: `${layout.stackOffset}px` }}
                     />
                     {renderDefinitionStack(group.markers)}
                   </div>
