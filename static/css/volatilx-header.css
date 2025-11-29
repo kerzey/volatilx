@@ -33,7 +33,7 @@
     position: relative;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 1.75rem 1.5rem 2.85rem;
+    padding: 1.75rem 1.5rem 1.9rem;
     display: flex;
     flex-direction: column;
     gap: 1.9rem;
@@ -305,7 +305,7 @@
 
 @media (min-width: 1024px) {
     .rc-hero__inner {
-        padding-bottom: 4.25rem;
+        padding-bottom: 2.5rem;
     }
 
     .rc-hero__stats {
