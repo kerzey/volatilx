@@ -24512,6 +24512,7 @@ var STRATEGY_ORDER = [
   { key: "swing_trading", label: "Swing Trading" },
   { key: "longterm_trading", label: "Long-Term" }
 ];
+var METRIC_BADGE_BASE = "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200";
 var BULLISH_ACCENT = "text-emerald-300";
 var BEARISH_ACCENT = "text-rose-300";
 var coerceNumber = (value) => {
@@ -24531,12 +24532,12 @@ var formatPriceValue = (value) => {
   }
   return formatPrice(numeric);
 };
-var formatPercent = (value) => {
+var formatPercent = (value, { allowScaling = true } = {}) => {
   const numeric = coerceNumber(value);
   if (numeric === null) {
     return "\u2014";
   }
-  const percentage = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  const percentage = allowScaling && Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
   const prefix = percentage > 0 ? "+" : "";
   return `${prefix}${percentage.toFixed(2)}%`;
 };
@@ -24652,37 +24653,8 @@ var TradeSetupBlock = ({
 var NoTradeZoneBlock = ({ zones }) => {
   const ranges = formatNoTradeZones(zones);
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs font-semibold uppercase tracking-widest text-amber-300", children: "No-Trade Lane" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs font-semibold uppercase tracking-widest text-amber-300", children: "No-Trade Zone" }),
     ranges.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-3 space-y-2 text-sm text-amber-200", children: ranges.map((range, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: range }, `zone-${index}`)) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-3 text-sm text-amber-200/70", children: "Safe range not defined for this strategy." })
-  ] });
-};
-var MarketPulse = ({ price }) => {
-  if (!price) {
-    return null;
-  }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800 bg-slate-900/40 p-5", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between gap-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Market pulse" }),
-      price.timestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: price.timestamp }) : null
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Timeframe" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: price.timeframe ?? "\u2014" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Close" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: formatPriceValue(price.close) })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Change" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: formatPercent(price.change_pct) })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: "Volume" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-base font-semibold text-slate-100", children: formatVolume(price.volume) })
-      ] })
-    ] })
   ] });
 };
 var ConsensusPanel = ({ consensus }) => {
@@ -24817,29 +24789,65 @@ function ReportCard({ report, isFavorite, pending, onToggleFavorite }) {
   const handleFavoriteToggle = () => {
     onToggleFavorite(report, !isFavorite);
   };
+  const priceMeta = report.price ?? void 0;
+  const priceTimestamp = priceMeta?.timestamp ?? null;
+  const closeNumeric = coerceNumber(priceMeta?.close);
+  const changeNumeric = coerceNumber(priceMeta?.change_pct);
+  const hasVolume = priceMeta?.volume !== void 0 && priceMeta?.volume !== null;
+  const metricBadges = [];
+  if (latestPrice !== void 0 && latestPrice !== null) {
+    metricBadges.push({
+      key: "last",
+      color: "bg-sky-400",
+      label: `Last ${formatPriceValue(latestPrice)}`
+    });
+  }
+  if (closeNumeric !== null) {
+    metricBadges.push({
+      key: "close",
+      color: "bg-indigo-400",
+      label: `Close ${formatPriceValue(priceMeta?.close ?? closeNumeric)}`
+    });
+  }
+  if (changeNumeric !== null) {
+    metricBadges.push({
+      key: "change",
+      color: changeNumeric > 0 ? "bg-emerald-400" : changeNumeric < 0 ? "bg-rose-400" : "bg-slate-500",
+      label: `Change ${formatPercent(changeNumeric, { allowScaling: false })}`
+    });
+  }
+  if (hasVolume) {
+    metricBadges.push({
+      key: "volume",
+      color: "bg-violet-400",
+      label: `Vol ${formatVolume(priceMeta?.volume)}`
+    });
+  }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 shadow-xl shadow-black/40 transition hover:border-slate-700", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex flex-col gap-4 border-b border-slate-800 p-6 md:flex-row md:items-center md:justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-widest text-slate-500", children: "Shared plan" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center gap-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: "text-3xl font-semibold tracking-tight text-slate-50", children: report.symbol_display ?? report.symbol }),
-          latestPrice !== void 0 && latestPrice !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-1.5 w-1.5 rounded-full bg-sky-400", "aria-hidden": "true" }),
-            "Last ",
-            formatPriceValue(latestPrice)
-          ] }) : null
+          metricBadges.map(({ key, color, label }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: METRIC_BADGE_BASE, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `h-1.5 w-1.5 rounded-full ${color}`, "aria-hidden": "true" }),
+            label
+          ] }, key))
         ] }),
         report.generated_display ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: [
           "Generated ",
           report.generated_display
+        ] }) : null,
+        priceTimestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: [
+          "Close as of ",
+          priceTimestamp
         ] }) : null
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavoriteButton, { isFavorite, pending, onClick: handleFavoriteToggle })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-6 p-6", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MarketPulse, { price: report.price }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConsensusPanel, { consensus: report.consensus }),
       strategies.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex flex-col gap-6", children: strategies.map(({ key, label, plan: strategyPlan, summary }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StrategySection, { label, plan: strategyPlan, summary }, key)) }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConsensusPanel, { consensus: report.consensus }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PriceActionPanel, { priceAction: report.price_action })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", { className: "flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 px-6 py-4 text-xs text-slate-500", children: [
@@ -25159,8 +25167,8 @@ function ReportCenterApp({ reports, favorites, meta }) {
   const hasReports = displayedReports.length > 0;
   const activeSymbolLabel = activeSymbol || normalizeSymbol(meta?.selectedSymbol);
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-8", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-inner shadow-black/30", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-4 md:flex-row md:items-center md:justify-between", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between", children: [
         /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs uppercase tracking-widest text-slate-500", children: "Shared intel" }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-2xl font-semibold tracking-tight text-white", children: summaryCopy.headline }),
@@ -25171,7 +25179,7 @@ function ReportCenterApp({ reports, favorites, meta }) {
           summaryCopy.footer
         ] })
       ] }),
-      meta?.excludedReportCount ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("p", { className: "mt-4 text-sm text-amber-300", children: [
+      meta?.excludedReportCount ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("p", { className: "mt-2 px-6 pb-6 text-sm text-amber-300", children: [
         "Holding ",
         meta.excludedReportCount,
         " report",
