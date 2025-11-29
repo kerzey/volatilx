@@ -220,6 +220,16 @@
     flex: 0 0 auto;
 }
 
+.rc-hero__pill-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.rc-hero__pill-link:hover,
+.rc-hero__pill-link:focus {
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
 .rc-hero__pill-dot {
     width: 0.4rem;
     height: 0.4rem;
@@ -234,6 +244,16 @@
     letter-spacing: -0.01em;
     margin: 0;
     flex: 0 1 auto;
+}
+
+.rc-hero__title-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.rc-hero__title-link:hover,
+.rc-hero__title-link:focus {
+    text-decoration: underline;
 }
 
 .rc-hero__description {

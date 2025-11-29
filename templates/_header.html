@@ -1,4 +1,4 @@
-{% macro render_header(page, title, subtitle='', badge=None, stats=None, user_email=None, cta=None) %}
+{% macro render_header(page, title, subtitle='', badge=None, stats=None, user_email=None, cta=None, hero_link=None) %}
     {% set nav_items = [
         {'key': 'analyze', 'href': '/analyze', 'label': 'AI Insights'},
         {'key': 'action-center', 'href': '/action-center', 'label': 'Action Center'},
@@ -44,12 +44,25 @@
             <div class="rc-hero__body{% if has_stats %} rc-hero__body--with-stats{% endif %}">
                 <div class="rc-hero__copy">
                     {% if badge %}
-                        <span class="rc-hero__pill">
-                            <span class="rc-hero__pill-dot" aria-hidden="true"></span>
-                            {{ badge }}
-                        </span>
+                        {% if hero_link %}
+                            <a href="{{ hero_link }}" class="rc-hero__pill rc-hero__pill-link">
+                                <span class="rc-hero__pill-dot" aria-hidden="true"></span>
+                                {{ badge }}
+                            </a>
+                        {% else %}
+                            <span class="rc-hero__pill">
+                                <span class="rc-hero__pill-dot" aria-hidden="true"></span>
+                                {{ badge }}
+                            </span>
+                        {% endif %}
                     {% endif %}
-                    <h1 class="rc-hero__title">{{ title }}</h1>
+                    <h1 class="rc-hero__title">
+                        {% if hero_link %}
+                            <a href="{{ hero_link }}" class="rc-hero__title-link">{{ title }}</a>
+                        {% else %}
+                            {{ title }}
+                        {% endif %}
+                    </h1>
                     {% if subtitle %}
                         <p class="rc-hero__description">{{ subtitle }}</p>
                     {% endif %}
