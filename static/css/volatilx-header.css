@@ -33,10 +33,10 @@
     position: relative;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 2.25rem 1.5rem 3.5rem;
+    padding: 1.75rem 1.5rem 2.85rem;
     display: flex;
     flex-direction: column;
-    gap: 2.5rem;
+    gap: 1.9rem;
 }
 
 .rc-hero__nav {
@@ -186,23 +186,24 @@
 .rc-hero__body {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1.35rem;
     z-index: 5;
 }
 
 .rc-hero__body--with-stats {
-    gap: 2rem;
+    gap: 1.5rem;
 }
 
 .rc-hero__copy {
-    max-width: 540px;
+    max-width: 100%;
     display: flex;
-    flex-direction: column;
-    gap: 1.15rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+    row-gap: 0.6rem;
+    column-gap: 1.5rem;
 }
 
 .rc-hero__pill {
-    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -216,6 +217,7 @@
     border: 1px solid rgba(148, 163, 184, 0.35);
     background: rgba(148, 163, 184, 0.12);
     backdrop-filter: blur(4px);
+    flex: 0 0 auto;
 }
 
 .rc-hero__pill-dot {
@@ -230,13 +232,15 @@
     font-weight: 600;
     letter-spacing: -0.02em;
     margin: 0;
+    flex: 1 1 auto;
 }
 
 .rc-hero__description {
     font-size: 0.95rem;
-    line-height: 1.7;
+    line-height: 1.55;
     color: rgba(226, 232, 240, 0.82);
     margin: 0;
+    flex: 1 1 40ch;
 }
 
 .rc-hero__stats {
@@ -280,7 +284,7 @@
     }
 
     .rc-hero__copy {
-        max-width: 520px;
+        align-items: center;
     }
 
     .rc-hero__stats {
