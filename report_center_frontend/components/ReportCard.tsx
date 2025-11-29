@@ -9,7 +9,6 @@ import type {
 import type {
   ReportCenterConsensus,
   ReportCenterEntry,
-  ReportCenterPrice,
   ReportCenterPriceAction,
   ReportCenterStrategySummary,
 } from "../types";
@@ -19,6 +18,9 @@ const STRATEGY_ORDER: Array<{ key: StrategyKey; label: string }> = [
   { key: "swing_trading", label: "Swing Trading" },
   { key: "longterm_trading", label: "Long-Term" },
 ];
+
+const METRIC_BADGE_BASE =
+  "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200";
 
 const BULLISH_ACCENT = "text-emerald-300";
 const BEARISH_ACCENT = "text-rose-300";
@@ -42,12 +44,12 @@ const formatPriceValue = (value: unknown): string => {
   return formatPrice(numeric);
 };
 
-const formatPercent = (value: unknown): string => {
+const formatPercent = (value: unknown, { allowScaling = true }: { allowScaling?: boolean } = {}): string => {
   const numeric = coerceNumber(value);
   if (numeric === null) {
     return "—";
   }
-  const percentage = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+  const percentage = allowScaling && Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
   const prefix = percentage > 0 ? "+" : "";
   return `${prefix}${percentage.toFixed(2)}%`;
 };
@@ -186,7 +188,7 @@ const NoTradeZoneBlock = ({ zones }: { zones?: NoTradeZone[] }) => {
   const ranges = formatNoTradeZones(zones);
   return (
     <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
-      <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">No-Trade Lane</p>
+      <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">No-Trade Zone</p>
       {ranges.length ? (
         <ul className="mt-3 space-y-2 text-sm text-amber-200">
           {ranges.map((range, index) => (
@@ -197,39 +199,6 @@ const NoTradeZoneBlock = ({ zones }: { zones?: NoTradeZone[] }) => {
         <p className="mt-3 text-sm text-amber-200/70">Safe range not defined for this strategy.</p>
       )}
     </div>
-  );
-};
-
-const MarketPulse = ({ price }: { price?: ReportCenterPrice }) => {
-  if (!price) {
-    return null;
-  }
-
-  return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs uppercase tracking-wide text-slate-500">Market pulse</span>
-        {price.timestamp ? <span className="text-xs text-slate-500">{price.timestamp}</span> : null}
-      </div>
-      <div className="mt-4 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">Timeframe</p>
-          <p className="mt-1 text-base font-semibold text-slate-100">{price.timeframe ?? "—"}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">Close</p>
-          <p className="mt-1 text-base font-semibold text-slate-100">{formatPriceValue(price.close)}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">Change</p>
-          <p className="mt-1 text-base font-semibold text-slate-100">{formatPercent(price.change_pct)}</p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">Volume</p>
-          <p className="mt-1 text-base font-semibold text-slate-100">{formatVolume(price.volume)}</p>
-        </div>
-      </div>
-    </section>
   );
 };
 
@@ -434,6 +403,47 @@ export function ReportCard({ report, isFavorite, pending, onToggleFavorite }: Re
     onToggleFavorite(report, !isFavorite);
   };
 
+  const priceMeta = report.price ?? undefined;
+  const priceTimestamp = priceMeta?.timestamp ?? null;
+  const closeNumeric = coerceNumber(priceMeta?.close);
+  const changeNumeric = coerceNumber(priceMeta?.change_pct);
+  const hasVolume = priceMeta?.volume !== undefined && priceMeta?.volume !== null;
+
+  type MetricBadge = { key: string; color: string; label: string };
+  const metricBadges: MetricBadge[] = [];
+
+  if (latestPrice !== undefined && latestPrice !== null) {
+    metricBadges.push({
+      key: "last",
+      color: "bg-sky-400",
+      label: `Last ${formatPriceValue(latestPrice)}`,
+    });
+  }
+
+  if (closeNumeric !== null) {
+    metricBadges.push({
+      key: "close",
+      color: "bg-indigo-400",
+      label: `Close ${formatPriceValue(priceMeta?.close ?? closeNumeric)}`,
+    });
+  }
+
+  if (changeNumeric !== null) {
+    metricBadges.push({
+      key: "change",
+      color: changeNumeric > 0 ? "bg-emerald-400" : changeNumeric < 0 ? "bg-rose-400" : "bg-slate-500",
+      label: `Change ${formatPercent(changeNumeric, { allowScaling: false })}`,
+    });
+  }
+
+  if (hasVolume) {
+    metricBadges.push({
+      key: "volume",
+      color: "bg-violet-400",
+      label: `Vol ${formatVolume(priceMeta?.volume)}`,
+    });
+  }
+
   return (
     <article className="rounded-3xl border border-slate-800 bg-slate-950/60 shadow-xl shadow-black/40 transition hover:border-slate-700">
       <header className="flex flex-col gap-4 border-b border-slate-800 p-6 md:flex-row md:items-center md:justify-between">
@@ -441,22 +451,23 @@ export function ReportCard({ report, isFavorite, pending, onToggleFavorite }: Re
           <span className="text-xs uppercase tracking-widest text-slate-500">Shared plan</span>
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-3xl font-semibold tracking-tight text-slate-50">{report.symbol_display ?? report.symbol}</h2>
-            {latestPrice !== undefined && latestPrice !== null ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />
-                Last {formatPriceValue(latestPrice)}
+            {metricBadges.map(({ key, color, label }) => (
+              <span key={key} className={METRIC_BADGE_BASE}>
+                <span className={`h-1.5 w-1.5 rounded-full ${color}`} aria-hidden="true" />
+                {label}
               </span>
-            ) : null}
+            ))}
           </div>
           {report.generated_display ? (
             <p className="text-xs uppercase tracking-wide text-slate-500">Generated {report.generated_display}</p>
+          ) : null}
+          {priceTimestamp ? (
+            <p className="text-xs uppercase tracking-wide text-slate-500">Close as of {priceTimestamp}</p>
           ) : null}
         </div>
         <FavoriteButton isFavorite={isFavorite} pending={pending} onClick={handleFavoriteToggle} />
       </header>
       <div className="flex flex-col gap-6 p-6">
-        <MarketPulse price={report.price} />
-        <ConsensusPanel consensus={report.consensus} />
         {strategies.length ? (
           <div className="flex flex-col gap-6">
             {strategies.map(({ key, label, plan: strategyPlan, summary }) => (
@@ -464,6 +475,7 @@ export function ReportCard({ report, isFavorite, pending, onToggleFavorite }: Re
             ))}
           </div>
         ) : null}
+        <ConsensusPanel consensus={report.consensus} />
         <PriceActionPanel priceAction={report.price_action} />
       </div>
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 px-6 py-4 text-xs text-slate-500">

@@ -352,8 +352,8 @@ export function ReportCenterApp({ reports, favorites, meta }: ReportCenterAppPro
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-inner shadow-black/30">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <section>
+        <div className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-2">
             <span className="text-xs uppercase tracking-widest text-slate-500">Shared intel</span>
             <h2 className="text-2xl font-semibold tracking-tight text-white">{summaryCopy.headline}</h2>
@@ -365,7 +365,7 @@ export function ReportCenterApp({ reports, favorites, meta }: ReportCenterAppPro
           </div>
         </div>
         {meta?.excludedReportCount ? (
-          <p className="mt-4 text-sm text-amber-300">
+          <p className="mt-2 px-6 pb-6 text-sm text-amber-300">
             Holding {meta.excludedReportCount} report{meta.excludedReportCount === 1 ? "" : "s"} while they hydrate.
           </p>
         ) : null}
