@@ -25658,22 +25658,18 @@ function NoTradeCard({ zone }) {
     notes.push(zone);
   }
   const noteItems = Array.from(new Set(notes.filter(Boolean)));
-  const hasRange = minValue !== void 0 || maxValue !== void 0;
-  if (!hasRange && !noteItems.length) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanSubsection, { title: "No-trade zone", value: zone });
-  }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: `space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`, children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: `text-xs font-semibold uppercase tracking-wide ${palette.label}`, children: "No-trade zone" }),
-    minValue !== void 0 || maxValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid grid-cols-2 items-end gap-6", children: [
-        minValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold uppercase tracking-wide ${palette.label}`, children: "MIN." }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
-        maxValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold tracking-wide ${palette.label} text-right`, children: "Max" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {})
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold uppercase tracking-wide ${palette.label}`, children: "MIN." }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs font-semibold tracking-wide ${palette.label} text-right`, children: "Max" })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-2 grid grid-cols-2 gap-6", children: [
-        minValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-lg font-semibold ${palette.value}`, children: formatPrice(minValue) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
-        maxValue !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-lg font-semibold ${palette.value} text-right`, children: formatPrice(maxValue) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {})
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-lg font-semibold ${palette.value}`, children: minValue !== void 0 ? formatPrice(minValue) : "\u2014" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-lg font-semibold ${palette.value} text-right`, children: maxValue !== void 0 ? formatPrice(maxValue) : "\u2014" })
       ] })
-    ] }) : null,
+    ] }),
     noteItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `space-y-2 text-sm ${palette.text}`, children: noteItems.map((note, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`, "aria-hidden": "true" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: note })

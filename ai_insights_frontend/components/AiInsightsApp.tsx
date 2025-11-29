@@ -1524,42 +1524,19 @@ function NoTradeCard({ zone }: { zone: unknown }) {
 
   const noteItems = Array.from(new Set(notes.filter(Boolean)));
 
-  const hasRange = minValue !== undefined || maxValue !== undefined;
-  if (!hasRange && !noteItems.length) {
-    return <PlanSubsection title="No-trade zone" value={zone} />;
-  }
-
   return (
     <section className={`space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`}>
       <h6 className={`text-xs font-semibold uppercase tracking-wide ${palette.label}`}>No-trade zone</h6>
-      {minValue !== undefined || maxValue !== undefined ? (
-        <div className={`rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`}>
-          <div className="grid grid-cols-2 items-end gap-6">
-            {minValue !== undefined ? (
-              <span className={`text-xs font-semibold uppercase tracking-wide ${palette.label}`}>MIN.</span>
-            ) : (
-              <span />
-            )}
-            {maxValue !== undefined ? (
-              <span className={`text-xs font-semibold tracking-wide ${palette.label} text-right`}>Max</span>
-            ) : (
-              <span />
-            )}
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-6">
-            {minValue !== undefined ? (
-              <span className={`text-lg font-semibold ${palette.value}`}>{formatPrice(minValue)}</span>
-            ) : (
-              <span />
-            )}
-            {maxValue !== undefined ? (
-              <span className={`text-lg font-semibold ${palette.value} text-right`}>{formatPrice(maxValue)}</span>
-            ) : (
-              <span />
-            )}
-          </div>
+      <div className={`rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`}>
+        <div className="grid grid-cols-2 items-end gap-6">
+          <span className={`text-xs font-semibold uppercase tracking-wide ${palette.label}`}>MIN.</span>
+          <span className={`text-xs font-semibold tracking-wide ${palette.label} text-right`}>Max</span>
         </div>
-      ) : null}
+        <div className="mt-2 grid grid-cols-2 gap-6">
+          <span className={`text-lg font-semibold ${palette.value}`}>{minValue !== undefined ? formatPrice(minValue) : "—"}</span>
+          <span className={`text-lg font-semibold ${palette.value} text-right`}>{maxValue !== undefined ? formatPrice(maxValue) : "—"}</span>
+        </div>
+      </div>
       {noteItems.length ? (
         <ul className={`space-y-2 text-sm ${palette.text}`}>
           {noteItems.map((note, index) => (
