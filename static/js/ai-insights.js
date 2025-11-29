@@ -25183,23 +25183,58 @@ function PriceActionPanel({ analysis }) {
 var TIMEFRAME_METADATA_KEYS = /* @__PURE__ */ new Set([
   "symbol",
   "tested_at",
-  "testedAt",
+  "testedat",
+  "tested_on",
+  "testedon",
   "timestamp",
+  "time_stamp",
   "generated_at",
-  "generatedAt",
+  "generatedat",
+  "generated_on",
+  "generatedon",
   "collected_at",
-  "collectedAt",
+  "collectedat",
   "retrieved_at",
-  "retrievedAt"
+  "retrievedat",
+  "observed_at",
+  "observedat",
+  "captured_at",
+  "capturedat",
+  "evaluation_time",
+  "last_updated",
+  "lastupdated",
+  "updated_at",
+  "updatedat",
+  "as_of",
+  "window_start",
+  "window_end",
+  "timeframe",
+  "market",
+  "instrument"
 ]);
+function isMetadataKey(key) {
+  const normalized = key.toLowerCase();
+  if (TIMEFRAME_METADATA_KEYS.has(normalized)) {
+    return true;
+  }
+  return normalized.endsWith("_timestamp") || normalized.startsWith("timestamp");
+}
+var ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+function isIsoDateString(value) {
+  return ISO_DATE_PATTERN.test(value);
+}
 function TimeframeCard({ timeframe, data }) {
   const record = isRecord(data) ? data : null;
-  const trend = record ? readRecord(record, "trend") : null;
-  const direction = readString(trend, "direction") ?? "Mixed";
-  const trendStrength = trend ? readNumber(trend, "strength") : void 0;
-  const trendConfidence = trend ? readNumber(trend, "confidence") : void 0;
-  const momentumScore = trend ? readNumber(trend, "momentum_score") ?? readNumber(trend, "score") : void 0;
+  const trendRaw = record ? readRecord(record, "trend") : null;
+  const trendSanitized = sanitizeTimeframeRecord(trendRaw);
+  const trendRecord = trendSanitized ?? trendRaw;
+  const direction = readString(trendRecord, "direction") ?? "Mixed";
+  const trendStrength = readNumber(trendRecord, "strength");
+  const trendConfidence = readNumber(trendRecord, "confidence");
+  const momentumScore = readNumber(trendRecord, "momentum_score") ?? readNumber(trendRecord, "momentumScore") ?? readNumber(trendRecord, "score");
+  const entries = record ? Object.entries(record).filter(([key]) => !isMetadataKey(key) && key !== "trend").map(([key, value]) => [key, stripMetadata(value)]).filter(([, value]) => isMeaningfulValue(value)) : [];
   const metrics = [];
+  const usedKeys = /* @__PURE__ */ new Set(["trend"]);
   if (direction && direction !== "Mixed") {
     metrics.push({ label: "Direction", value: direction });
   }
@@ -25212,63 +25247,40 @@ function TimeframeCard({ timeframe, data }) {
   if (momentumScore !== void 0) {
     metrics.push({ label: "Momentum", value: formatNumber(momentumScore, 2) });
   }
-  const consumedKeys = /* @__PURE__ */ new Set(["trend"]);
-  const sanitizedEntries = record ? Object.entries(record).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key) && key !== "trend") : [];
-  for (const [key, value] of sanitizedEntries) {
-    if (consumedKeys.has(key)) {
+  for (const [key, value] of entries) {
+    if (usedKeys.has(key)) {
       continue;
-    }
-    if (typeof value === "number" && Number.isFinite(value)) {
-      metrics.push({ label: humanizeKey(key), value: formatNumber(value, 2) });
-      consumedKeys.add(key);
-      continue;
-    }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed && trimmed.length <= 32) {
-        metrics.push({ label: humanizeKey(key), value: trimmed });
-        consumedKeys.add(key);
-      }
     }
     if (metrics.length >= 6) {
       break;
     }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      metrics.push({ label: humanizeKey(key), value: formatNumber(value, 2) });
+      usedKeys.add(key);
+      continue;
+    }
+    if (typeof value === "string" && value.length <= 32) {
+      metrics.push({ label: humanizeKey(key), value });
+      usedKeys.add(key);
+    }
   }
-  const paragraphEntries = sanitizedEntries.filter(([key, value]) => {
-    if (consumedKeys.has(key)) {
-      return false;
+  const insights = [];
+  for (const [key, value] of entries) {
+    if (usedKeys.has(key)) {
+      continue;
     }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        return false;
-      }
-      consumedKeys.add(key);
-      return true;
+    const insightText = formatInsightValue(value);
+    if (!insightText) {
+      continue;
     }
-    return false;
-  });
-  const listEntries = sanitizedEntries.filter(([key, value]) => {
-    if (consumedKeys.has(key)) {
-      return false;
+    const label = humanizeKey(key);
+    insights.push(label ? `${label}: ${insightText}` : insightText);
+    usedKeys.add(key);
+    if (insights.length >= 6) {
+      break;
     }
-    if (Array.isArray(value) && value.length) {
-      consumedKeys.add(key);
-      return true;
-    }
-    return false;
-  });
-  const nestedEntries = sanitizedEntries.filter(([key, value]) => {
-    if (consumedKeys.has(key)) {
-      return false;
-    }
-    if (isRecord(value)) {
-      consumedKeys.add(key);
-      return true;
-    }
-    return false;
-  });
-  const hasDetails = Boolean(paragraphEntries.length || listEntries.length || nestedEntries.length);
+  }
+  const hasContent = Boolean(metrics.length || insights.length);
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex items-center justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
@@ -25278,19 +25290,11 @@ function TimeframeCard({ timeframe, data }) {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Trend", value: direction })
     ] }),
     metrics.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 grid gap-3 sm:grid-cols-2", children: metrics.slice(0, 6).map((metric) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: metric.label, value: metric.value, compact: true }, metric.label)) }) : null,
-    paragraphEntries.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3 text-sm leading-relaxed text-slate-200", children: paragraphEntries.map(([key, value]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: humanizeKey(key) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-sm text-slate-200", children: String(value) })
-    ] }, key)) }) : null,
-    listEntries.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3", children: listEntries.map(([key, value]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: humanizeKey(key) }),
-      renderListValue(value)
-    ] }, key)) }) : null,
-    nestedEntries.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3 text-sm text-slate-200", children: nestedEntries.map(([key, value]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: humanizeKey(key) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-2 space-y-2 text-sm text-slate-200", children: renderValue(sanitizeTimeframeRecord(value)) })
-    ] }, key)) }) : null,
-    !hasDetails && !metrics.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-4 text-sm text-slate-400", children: "No additional diagnostics shared for this window." }) : null
+    insights.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-4 space-y-2 text-sm text-slate-200", children: insights.slice(0, 6).map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-1.5 w-1.5 rounded-full bg-sky-400", "aria-hidden": "true" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item })
+    ] }, index)) }) : null,
+    !hasContent ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-4 text-sm text-slate-400", children: "No additional diagnostics shared for this window." }) : null
   ] });
 }
 function IntelligencePanel({
@@ -25772,28 +25776,101 @@ function formatTimeframeLabel(value) {
   const plural = Number.isFinite(quantity) && quantity !== 1;
   return `${quantity} ${plural ? `${normalized}s` : normalized}`;
 }
+function isMeaningfulValue(value) {
+  if (value === null || value === void 0) {
+    return false;
+  }
+  if (typeof value === "string") {
+    return Boolean(value.trim());
+  }
+  if (Array.isArray(value)) {
+    return value.some(isMeaningfulValue);
+  }
+  if (isRecord(value)) {
+    return Object.values(value).some(isMeaningfulValue);
+  }
+  return true;
+}
+function stripMetadata(value) {
+  if (Array.isArray(value)) {
+    const cleaned = value.map((item) => stripMetadata(item)).filter((item) => isMeaningfulValue(item));
+    return cleaned.length ? cleaned : null;
+  }
+  if (isRecord(value)) {
+    const result = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (isMetadataKey(key)) {
+        continue;
+      }
+      const cleanedEntry = stripMetadata(entry);
+      if (!isMeaningfulValue(cleanedEntry)) {
+        continue;
+      }
+      result[key] = cleanedEntry;
+    }
+    return Object.keys(result).length ? result : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || isIsoDateString(trimmed)) {
+      return null;
+    }
+    return trimmed.length > 180 ? `${trimmed.slice(0, 177)}...` : trimmed;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return null;
+}
 function sanitizeTimeframeRecord(value) {
   if (!value) {
     return null;
   }
-  const entries = Object.entries(value).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key));
-  if (!entries.length) {
+  const cleaned = stripMetadata(value);
+  return isRecord(cleaned) ? cleaned : null;
+}
+function formatInsightValue(value) {
+  const cleaned = stripMetadata(value);
+  if (!isMeaningfulValue(cleaned)) {
     return null;
   }
-  return Object.fromEntries(entries);
-}
-function renderListValue(value) {
-  if (!value.length) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-400", children: "None provided." });
+  if (typeof cleaned === "string") {
+    return cleaned;
   }
-  const simpleItems = value.every((item) => typeof item === "string" || typeof item === "number" || typeof item === "boolean");
-  if (simpleItems) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "space-y-2 text-sm text-slate-200", children: value.slice(0, 8).map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-1.5 w-1.5 rounded-full bg-sky-400", "aria-hidden": "true" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: String(item) })
-    ] }, index)) });
+  if (typeof cleaned === "number") {
+    return formatNumber(cleaned, 2);
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-2 text-sm text-slate-200", children: value.slice(0, 5).map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rounded-xl border border-slate-800/60 bg-slate-950/60 p-3", children: renderValue(item) }, index)) });
+  if (typeof cleaned === "boolean") {
+    return cleaned ? "Yes" : "No";
+  }
+  if (Array.isArray(cleaned)) {
+    const parts = cleaned.map((item) => formatInsightValue(item)).filter((item) => Boolean(item));
+    if (!parts.length) {
+      return null;
+    }
+    return parts.slice(0, 3).join(" \xB7 ");
+  }
+  if (isRecord(cleaned)) {
+    const parts = [];
+    for (const [key, entry] of Object.entries(cleaned)) {
+      const summary = formatInsightValue(entry);
+      if (!summary) {
+        continue;
+      }
+      parts.push(`${humanizeKey(key)} ${summary}`);
+      if (parts.length >= 3) {
+        break;
+      }
+    }
+    if (!parts.length) {
+      return null;
+    }
+    return parts.join(" \xB7 ");
+  }
+  return null;
 }
 function capitalizeLabel(value) {
   if (value === null || value === void 0) {

@@ -903,25 +903,72 @@ type TimeframeCardProps = { timeframe: string; data: unknown };
 const TIMEFRAME_METADATA_KEYS = new Set<string>([
   "symbol",
   "tested_at",
-  "testedAt",
+  "testedat",
+  "tested_on",
+  "testedon",
   "timestamp",
+  "time_stamp",
   "generated_at",
-  "generatedAt",
+  "generatedat",
+  "generated_on",
+  "generatedon",
   "collected_at",
-  "collectedAt",
+  "collectedat",
   "retrieved_at",
-  "retrievedAt",
+  "retrievedat",
+  "observed_at",
+  "observedat",
+  "captured_at",
+  "capturedat",
+  "evaluation_time",
+  "last_updated",
+  "lastupdated",
+  "updated_at",
+  "updatedat",
+  "as_of",
+  "window_start",
+  "window_end",
+  "timeframe",
+  "market",
+  "instrument",
 ]);
+
+function isMetadataKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  if (TIMEFRAME_METADATA_KEYS.has(normalized)) {
+    return true;
+  }
+  return normalized.endsWith("_timestamp") || normalized.startsWith("timestamp");
+}
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+
+function isIsoDateString(value: string): boolean {
+  return ISO_DATE_PATTERN.test(value);
+}
 
 function TimeframeCard({ timeframe, data }: TimeframeCardProps) {
   const record = isRecord(data) ? (data as Record<string, unknown>) : null;
-  const trend = record ? readRecord(record, "trend") : null;
-  const direction = readString(trend, "direction") ?? "Mixed";
-  const trendStrength = trend ? readNumber(trend, "strength") : undefined;
-  const trendConfidence = trend ? readNumber(trend, "confidence") : undefined;
-  const momentumScore = trend ? readNumber(trend, "momentum_score") ?? readNumber(trend, "score") : undefined;
+  const trendRaw = record ? readRecord(record, "trend") : null;
+  const trendSanitized = sanitizeTimeframeRecord(trendRaw);
+  const trendRecord = trendSanitized ?? trendRaw;
+
+  const direction = readString(trendRecord, "direction") ?? "Mixed";
+  const trendStrength = readNumber(trendRecord, "strength");
+  const trendConfidence = readNumber(trendRecord, "confidence");
+  const momentumScore =
+    readNumber(trendRecord, "momentum_score") ?? readNumber(trendRecord, "momentumScore") ?? readNumber(trendRecord, "score");
+
+  const entries = record
+    ? Object.entries(record)
+        .filter(([key]) => !isMetadataKey(key) && key !== "trend")
+        .map<[string, unknown]>(([key, value]) => [key, stripMetadata(value)])
+        .filter(([, value]) => isMeaningfulValue(value))
+    : [];
 
   const metrics: { label: string; value: string | number | null | undefined }[] = [];
+  const usedKeys = new Set<string>(["trend"]);
+
   if (direction && direction !== "Mixed") {
     metrics.push({ label: "Direction", value: direction });
   }
@@ -935,70 +982,42 @@ function TimeframeCard({ timeframe, data }: TimeframeCardProps) {
     metrics.push({ label: "Momentum", value: formatNumber(momentumScore, 2) });
   }
 
-  const consumedKeys = new Set<string>(["trend"]);
-  const sanitizedEntries = record
-    ? Object.entries(record).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key) && key !== "trend")
-    : [];
-
-  for (const [key, value] of sanitizedEntries) {
-    if (consumedKeys.has(key)) {
+  for (const [key, value] of entries) {
+    if (usedKeys.has(key)) {
       continue;
-    }
-    if (typeof value === "number" && Number.isFinite(value)) {
-      metrics.push({ label: humanizeKey(key), value: formatNumber(value, 2) });
-      consumedKeys.add(key);
-      continue;
-    }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed && trimmed.length <= 32) {
-        metrics.push({ label: humanizeKey(key), value: trimmed });
-        consumedKeys.add(key);
-      }
     }
     if (metrics.length >= 6) {
       break;
     }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      metrics.push({ label: humanizeKey(key), value: formatNumber(value, 2) });
+      usedKeys.add(key);
+      continue;
+    }
+    if (typeof value === "string" && value.length <= 32) {
+      metrics.push({ label: humanizeKey(key), value });
+      usedKeys.add(key);
+    }
   }
 
-  const paragraphEntries = sanitizedEntries.filter(([key, value]) => {
-    if (consumedKeys.has(key)) {
-      return false;
+  const insights: string[] = [];
+  for (const [key, value] of entries) {
+    if (usedKeys.has(key)) {
+      continue;
     }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        return false;
-      }
-      consumedKeys.add(key);
-      return true;
+    const insightText = formatInsightValue(value);
+    if (!insightText) {
+      continue;
     }
-    return false;
-  });
+    const label = humanizeKey(key);
+    insights.push(label ? `${label}: ${insightText}` : insightText);
+    usedKeys.add(key);
+    if (insights.length >= 6) {
+      break;
+    }
+  }
 
-  const listEntries = sanitizedEntries.filter(([key, value]) => {
-    if (consumedKeys.has(key)) {
-      return false;
-    }
-    if (Array.isArray(value) && value.length) {
-      consumedKeys.add(key);
-      return true;
-    }
-    return false;
-  });
-
-  const nestedEntries = sanitizedEntries.filter(([key, value]) => {
-    if (consumedKeys.has(key)) {
-      return false;
-    }
-    if (isRecord(value)) {
-      consumedKeys.add(key);
-      return true;
-    }
-    return false;
-  });
-
-  const hasDetails = Boolean(paragraphEntries.length || listEntries.length || nestedEntries.length);
+  const hasContent = Boolean(metrics.length || insights.length);
 
   return (
     <article className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30">
@@ -1016,39 +1035,17 @@ function TimeframeCard({ timeframe, data }: TimeframeCardProps) {
           ))}
         </div>
       ) : null}
-      {paragraphEntries.length ? (
-        <div className="mt-4 space-y-3 text-sm leading-relaxed text-slate-200">
-          {paragraphEntries.map(([key, value]) => (
-            <section key={key} className="rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3">
-              <h6 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{humanizeKey(key)}</h6>
-              <p className="mt-1 text-sm text-slate-200">{String(value)}</p>
-            </section>
+      {insights.length ? (
+        <ul className="mt-4 space-y-2 text-sm text-slate-200">
+          {insights.slice(0, 6).map((item, index) => (
+            <li key={index} className="flex gap-2">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />
+              <span>{item}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
-      {listEntries.length ? (
-        <div className="mt-4 space-y-3">
-          {listEntries.map(([key, value]) => (
-            <section key={key} className="rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3">
-              <h6 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{humanizeKey(key)}</h6>
-              {renderListValue(value as unknown[])}
-            </section>
-          ))}
-        </div>
-      ) : null}
-      {nestedEntries.length ? (
-        <div className="mt-4 space-y-3 text-sm text-slate-200">
-          {nestedEntries.map(([key, value]) => (
-            <section key={key} className="rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3">
-              <h6 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{humanizeKey(key)}</h6>
-              <div className="mt-2 space-y-2 text-sm text-slate-200">{renderValue(sanitizeTimeframeRecord(value as Record<string, unknown>))}</div>
-            </section>
-          ))}
-        </div>
-      ) : null}
-      {!hasDetails && !metrics.length ? (
-        <p className="mt-4 text-sm text-slate-400">No additional diagnostics shared for this window.</p>
-      ) : null}
+      {!hasContent ? <p className="mt-4 text-sm text-slate-400">No additional diagnostics shared for this window.</p> : null}
     </article>
   );
 }
@@ -1667,41 +1664,108 @@ function formatTimeframeLabel(value: unknown): string {
   return `${quantity} ${plural ? `${normalized}s` : normalized}`;
 }
 
+function isMeaningfulValue(value: unknown): boolean {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === "string") {
+    return Boolean(value.trim());
+  }
+  if (Array.isArray(value)) {
+    return value.some(isMeaningfulValue);
+  }
+  if (isRecord(value)) {
+    return Object.values(value).some(isMeaningfulValue);
+  }
+  return true;
+}
+
+function stripMetadata(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    const cleaned = value
+      .map((item) => stripMetadata(item))
+      .filter((item) => isMeaningfulValue(item));
+    return cleaned.length ? cleaned : null;
+  }
+  if (isRecord(value)) {
+    const result: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (isMetadataKey(key)) {
+        continue;
+      }
+      const cleanedEntry = stripMetadata(entry);
+      if (!isMeaningfulValue(cleanedEntry)) {
+        continue;
+      }
+      result[key] = cleanedEntry;
+    }
+    return Object.keys(result).length ? result : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || isIsoDateString(trimmed)) {
+      return null;
+    }
+    return trimmed.length > 180 ? `${trimmed.slice(0, 177)}...` : trimmed;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return null;
+}
+
 function sanitizeTimeframeRecord(value: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!value) {
     return null;
   }
-  const entries = Object.entries(value).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key));
-  if (!entries.length) {
-    return null;
-  }
-  return Object.fromEntries(entries);
+  const cleaned = stripMetadata(value);
+  return isRecord(cleaned) ? (cleaned as Record<string, unknown>) : null;
 }
 
-function renderListValue(value: unknown[]): React.ReactNode {
-  if (!value.length) {
-    return <p className="text-sm text-slate-400">None provided.</p>;
+function formatInsightValue(value: unknown): string | null {
+  const cleaned = stripMetadata(value);
+  if (!isMeaningfulValue(cleaned)) {
+    return null;
   }
-  const simpleItems = value.every((item) => typeof item === "string" || typeof item === "number" || typeof item === "boolean");
-  if (simpleItems) {
-    return (
-      <ul className="space-y-2 text-sm text-slate-200">
-        {value.slice(0, 8).map((item, index) => (
-          <li key={index} className="flex gap-2">
-            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />
-            <span>{String(item)}</span>
-          </li>
-        ))}
-      </ul>
-    );
+  if (typeof cleaned === "string") {
+    return cleaned;
   }
-  return (
-    <div className="space-y-2 text-sm text-slate-200">
-      {value.slice(0, 5).map((item, index) => (
-        <div key={index} className="rounded-xl border border-slate-800/60 bg-slate-950/60 p-3">{renderValue(item)}</div>
-      ))}
-    </div>
-  );
+  if (typeof cleaned === "number") {
+    return formatNumber(cleaned, 2);
+  }
+  if (typeof cleaned === "boolean") {
+    return cleaned ? "Yes" : "No";
+  }
+  if (Array.isArray(cleaned)) {
+    const parts = cleaned
+      .map((item) => formatInsightValue(item))
+      .filter((item): item is string => Boolean(item));
+    if (!parts.length) {
+      return null;
+    }
+    return parts.slice(0, 3).join(" · ");
+  }
+  if (isRecord(cleaned)) {
+    const parts: string[] = [];
+    for (const [key, entry] of Object.entries(cleaned)) {
+      const summary = formatInsightValue(entry);
+      if (!summary) {
+        continue;
+      }
+      parts.push(`${humanizeKey(key)} ${summary}`);
+      if (parts.length >= 3) {
+        break;
+      }
+    }
+    if (!parts.length) {
+      return null;
+    }
+    return parts.join(" · ");
+  }
+  return null;
 }
 
 function capitalizeLabel(value: unknown): string {
