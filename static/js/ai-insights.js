@@ -24990,7 +24990,7 @@ function SymbolSuggestions({
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
     "div",
     {
-      className: "absolute z-20 mt-2 w-full rounded-2xl border border-slate-900 bg-slate-950 p-2 shadow-2xl shadow-black/60",
+      className: "absolute z-20 mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950/95 p-2 shadow-2xl shadow-black/70",
       role: "listbox",
       "aria-label": "Ticker suggestions",
       children: suggestions.map((entry, index) => {
@@ -24999,15 +24999,15 @@ function SymbolSuggestions({
           "button",
           {
             type: "button",
-            className: "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm transition " + (isActive ? "border-sky-500/50 bg-sky-500/15 text-sky-100" : "border-transparent text-slate-100 hover:border-slate-700 hover:bg-slate-900/70"),
+            className: "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-sm transition " + (isActive ? "border-sky-500/50 bg-sky-500/20 text-sky-100" : "border-slate-800/60 bg-slate-900/80 text-slate-200 hover:border-slate-700 hover:bg-slate-900"),
             role: "option",
             "aria-selected": isActive,
             onMouseEnter: () => onHighlight(index),
             onMouseDown: (event) => event.preventDefault(),
             onClick: () => onSelect(entry),
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-semibold tracking-tight text-slate-50", children: entry.ticker.toUpperCase() }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-400", children: entry.company })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "min-w-[64px] shrink-0 font-semibold tracking-tight text-slate-50", children: entry.ticker.toUpperCase() }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "truncate text-left text-xs text-slate-300", children: entry.company })
             ]
           },
           `${entry.ticker}-${entry.company}`
