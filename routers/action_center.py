@@ -480,25 +480,6 @@ async def action_center_page(
 
     primary_dashboard = dashboards[0] if dashboards else None
 
-    dashboards_json = json.dumps(
-        [
-            {
-                "symbol": dash["symbol"],
-                "symbol_display": dash.get("symbol_display", dash["symbol"]),
-                "symbol_canonical": dash.get("symbol_canonical"),
-                "is_favorited": dash["is_favorited"],
-                "strategy_summary": dash["strategy_summary"],
-                "error_message": dash["error_message"],
-                "action_data": dash["action_data"],
-                "report_blob": dash["report_blob"],
-                "timeframe": dash.get("timeframe", timeframe_slug),
-                "intent": dash.get("intent", intent_slug),
-            }
-            for dash in dashboards
-        ],
-        separators=(",", ":"),
-    )
-
     principal_plan_payload = principal_plan_map.get(primary_symbol_sanitized)
     principal_plan_json = (
         json.dumps(principal_plan_payload, separators=(",", ":"))
@@ -528,7 +509,6 @@ async def action_center_page(
         "timeframe": timeframe_slug,
         "intent": intent_slug,
         "dashboards": dashboards,
-        "dashboards_json": dashboards_json,
         "primary_dashboard": primary_dashboard,
         "latest_report_blob": primary_dashboard["report_blob"] if primary_dashboard else None,
         "is_favorited": primary_dashboard["is_favorited"] if primary_dashboard else primary_is_favorite,
