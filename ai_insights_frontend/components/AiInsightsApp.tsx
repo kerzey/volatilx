@@ -823,11 +823,10 @@ function PriceActionPanel({ analysis }: { analysis: AnalyzeState }) {
       <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-white">{analysis.symbol} · Price action</h3>
+            <h3 className="text-lg font-semibold text-white">Price action</h3>
             <p className="text-sm text-slate-300">{summaryMessage}</p>
           </div>
-          <div className="grid gap-3 text-sm text-slate-200 sm:grid-cols-3">
-            <MetricTile label="Generated" value={formatDateTime(generatedAt)} variant="solid" />
+          <div className="grid gap-3 text-sm text-slate-200 sm:grid-cols-2">
             <MetricTile label="Spot price" value={formatPrice(latestPrice)} variant="solid" />
             <MetricTile label="Pipeline" value={success ? "Ready" : "Issue"} variant={success ? "solid" : "warning"} />
           </div>
@@ -878,16 +877,7 @@ function PriceActionPanel({ analysis }: { analysis: AnalyzeState }) {
       {perTimeframe ? (
         <section className="grid gap-4 lg:grid-cols-2">
           {Object.entries(perTimeframe).map(([timeframe, data]) => (
-            <article key={timeframe} className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30">
-              <header className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400">{formatTimeframeLabel(timeframe)}</p>
-                  <p className="text-sm font-semibold text-white">Structure snapshot</p>
-                </div>
-                <MetricChip label="Trend" value={readString(readRecord(data as Record<string, unknown>, "trend"), "direction") ?? "Mixed"} />
-              </header>
-              <div className="mt-4 space-y-3 text-sm text-slate-200">{renderValue(data)}</div>
-            </article>
+            <TimeframeCard key={timeframe} timeframe={timeframe} data={data} />
           ))}
         </section>
       ) : null}
@@ -905,6 +895,161 @@ function PriceActionPanel({ analysis }: { analysis: AnalyzeState }) {
 
       <LegalNote />
     </div>
+  );
+}
+
+type TimeframeCardProps = { timeframe: string; data: unknown };
+
+const TIMEFRAME_METADATA_KEYS = new Set<string>([
+  "symbol",
+  "tested_at",
+  "testedAt",
+  "timestamp",
+  "generated_at",
+  "generatedAt",
+  "collected_at",
+  "collectedAt",
+  "retrieved_at",
+  "retrievedAt",
+]);
+
+function TimeframeCard({ timeframe, data }: TimeframeCardProps) {
+  const record = isRecord(data) ? (data as Record<string, unknown>) : null;
+  const trend = record ? readRecord(record, "trend") : null;
+  const direction = readString(trend, "direction") ?? "Mixed";
+  const trendStrength = trend ? readNumber(trend, "strength") : undefined;
+  const trendConfidence = trend ? readNumber(trend, "confidence") : undefined;
+  const momentumScore = trend ? readNumber(trend, "momentum_score") ?? readNumber(trend, "score") : undefined;
+
+  const metrics: { label: string; value: string | number | null | undefined }[] = [];
+  if (direction && direction !== "Mixed") {
+    metrics.push({ label: "Direction", value: direction });
+  }
+  if (trendStrength !== undefined) {
+    metrics.push({ label: "Strength", value: formatPercent(trendStrength) });
+  }
+  if (trendConfidence !== undefined) {
+    metrics.push({ label: "Confidence", value: formatPercent(trendConfidence) });
+  }
+  if (momentumScore !== undefined) {
+    metrics.push({ label: "Momentum", value: formatNumber(momentumScore, 2) });
+  }
+
+  const consumedKeys = new Set<string>(["trend"]);
+  const sanitizedEntries = record
+    ? Object.entries(record).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key) && key !== "trend")
+    : [];
+
+  for (const [key, value] of sanitizedEntries) {
+    if (consumedKeys.has(key)) {
+      continue;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      metrics.push({ label: humanizeKey(key), value: formatNumber(value, 2) });
+      consumedKeys.add(key);
+      continue;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed && trimmed.length <= 32) {
+        metrics.push({ label: humanizeKey(key), value: trimmed });
+        consumedKeys.add(key);
+      }
+    }
+    if (metrics.length >= 6) {
+      break;
+    }
+  }
+
+  const paragraphEntries = sanitizedEntries.filter(([key, value]) => {
+    if (consumedKeys.has(key)) {
+      return false;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return false;
+      }
+      consumedKeys.add(key);
+      return true;
+    }
+    return false;
+  });
+
+  const listEntries = sanitizedEntries.filter(([key, value]) => {
+    if (consumedKeys.has(key)) {
+      return false;
+    }
+    if (Array.isArray(value) && value.length) {
+      consumedKeys.add(key);
+      return true;
+    }
+    return false;
+  });
+
+  const nestedEntries = sanitizedEntries.filter(([key, value]) => {
+    if (consumedKeys.has(key)) {
+      return false;
+    }
+    if (isRecord(value)) {
+      consumedKeys.add(key);
+      return true;
+    }
+    return false;
+  });
+
+  const hasDetails = Boolean(paragraphEntries.length || listEntries.length || nestedEntries.length);
+
+  return (
+    <article className="rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30">
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-400">{formatTimeframeLabel(timeframe)}</p>
+          <p className="text-sm font-semibold text-white">Timeframe signals</p>
+        </div>
+        <MetricChip label="Trend" value={direction} />
+      </header>
+      {metrics.length ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {metrics.slice(0, 6).map((metric) => (
+            <MetricTile key={metric.label} label={metric.label} value={metric.value} compact />
+          ))}
+        </div>
+      ) : null}
+      {paragraphEntries.length ? (
+        <div className="mt-4 space-y-3 text-sm leading-relaxed text-slate-200">
+          {paragraphEntries.map(([key, value]) => (
+            <section key={key} className="rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3">
+              <h6 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{humanizeKey(key)}</h6>
+              <p className="mt-1 text-sm text-slate-200">{String(value)}</p>
+            </section>
+          ))}
+        </div>
+      ) : null}
+      {listEntries.length ? (
+        <div className="mt-4 space-y-3">
+          {listEntries.map(([key, value]) => (
+            <section key={key} className="rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3">
+              <h6 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{humanizeKey(key)}</h6>
+              {renderListValue(value as unknown[])}
+            </section>
+          ))}
+        </div>
+      ) : null}
+      {nestedEntries.length ? (
+        <div className="mt-4 space-y-3 text-sm text-slate-200">
+          {nestedEntries.map(([key, value]) => (
+            <section key={key} className="rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3">
+              <h6 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{humanizeKey(key)}</h6>
+              <div className="mt-2 space-y-2 text-sm text-slate-200">{renderValue(sanitizeTimeframeRecord(value as Record<string, unknown>))}</div>
+            </section>
+          ))}
+        </div>
+      ) : null}
+      {!hasDetails && !metrics.length ? (
+        <p className="mt-4 text-sm text-slate-400">No additional diagnostics shared for this window.</p>
+      ) : null}
+    </article>
   );
 }
 
@@ -1520,6 +1665,43 @@ function formatTimeframeLabel(value: unknown): string {
   const normalized = lookup[unitRaw] || lookup[unitRaw.slice(0, 2)] || lookup[unitRaw.charAt(0)] || unitRaw.toUpperCase();
   const plural = Number.isFinite(quantity) && quantity !== 1;
   return `${quantity} ${plural ? `${normalized}s` : normalized}`;
+}
+
+function sanitizeTimeframeRecord(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!value) {
+    return null;
+  }
+  const entries = Object.entries(value).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key));
+  if (!entries.length) {
+    return null;
+  }
+  return Object.fromEntries(entries);
+}
+
+function renderListValue(value: unknown[]): React.ReactNode {
+  if (!value.length) {
+    return <p className="text-sm text-slate-400">None provided.</p>;
+  }
+  const simpleItems = value.every((item) => typeof item === "string" || typeof item === "number" || typeof item === "boolean");
+  if (simpleItems) {
+    return (
+      <ul className="space-y-2 text-sm text-slate-200">
+        {value.slice(0, 8).map((item, index) => (
+          <li key={index} className="flex gap-2">
+            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />
+            <span>{String(item)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <div className="space-y-2 text-sm text-slate-200">
+      {value.slice(0, 5).map((item, index) => (
+        <div key={index} className="rounded-xl border border-slate-800/60 bg-slate-950/60 p-3">{renderValue(item)}</div>
+      ))}
+    </div>
+  );
 }
 
 function capitalizeLabel(value: unknown): string {

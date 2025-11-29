@@ -25139,14 +25139,10 @@ function PriceActionPanel({ analysis }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-6", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { className: "rounded-3xl border border-slate-800 bg-slate-900/60 p-6", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { className: "text-lg font-semibold text-white", children: [
-          analysis.symbol,
-          " \xB7 Price action"
-        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-lg font-semibold text-white", children: "Price action" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-300", children: summaryMessage })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-3 text-sm text-slate-200 sm:grid-cols-3", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Generated", value: formatDateTime(generatedAt), variant: "solid" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "grid gap-3 text-sm text-slate-200 sm:grid-cols-2", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Spot price", value: formatPrice(latestPrice), variant: "solid" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: "Pipeline", value: success ? "Ready" : "Issue", variant: success ? "solid" : "warning" })
       ] })
@@ -25176,21 +25172,125 @@ function PriceActionPanel({ analysis }) {
         ] }, index)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 text-sm text-slate-400", children: "No shared support or resistance levels detected." }) })
       ] })
     ] }) : null,
-    perTimeframe ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { className: "grid gap-4 lg:grid-cols-2", children: Object.entries(perTimeframe).map(([timeframe, data]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex items-center justify-between", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-400", children: formatTimeframeLabel(timeframe) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-semibold text-white", children: "Structure snapshot" })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Trend", value: readString(readRecord(data, "trend"), "direction") ?? "Mixed" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3 text-sm text-slate-200", children: renderValue(data) })
-    ] }, timeframe)) }) : null,
+    perTimeframe ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { className: "grid gap-4 lg:grid-cols-2", children: Object.entries(perTimeframe).map(([timeframe, data]) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TimeframeCard, { timeframe, data }, timeframe)) }) : null,
     errors && errors.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-100", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { className: "font-semibold uppercase tracking-wide", children: "Data warnings" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "mt-2 space-y-1 text-xs", children: errors.map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: String(item) }, index)) })
     ] }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LegalNote, {})
+  ] });
+}
+var TIMEFRAME_METADATA_KEYS = /* @__PURE__ */ new Set([
+  "symbol",
+  "tested_at",
+  "testedAt",
+  "timestamp",
+  "generated_at",
+  "generatedAt",
+  "collected_at",
+  "collectedAt",
+  "retrieved_at",
+  "retrievedAt"
+]);
+function TimeframeCard({ timeframe, data }) {
+  const record = isRecord(data) ? data : null;
+  const trend = record ? readRecord(record, "trend") : null;
+  const direction = readString(trend, "direction") ?? "Mixed";
+  const trendStrength = trend ? readNumber(trend, "strength") : void 0;
+  const trendConfidence = trend ? readNumber(trend, "confidence") : void 0;
+  const momentumScore = trend ? readNumber(trend, "momentum_score") ?? readNumber(trend, "score") : void 0;
+  const metrics = [];
+  if (direction && direction !== "Mixed") {
+    metrics.push({ label: "Direction", value: direction });
+  }
+  if (trendStrength !== void 0) {
+    metrics.push({ label: "Strength", value: formatPercent(trendStrength) });
+  }
+  if (trendConfidence !== void 0) {
+    metrics.push({ label: "Confidence", value: formatPercent(trendConfidence) });
+  }
+  if (momentumScore !== void 0) {
+    metrics.push({ label: "Momentum", value: formatNumber(momentumScore, 2) });
+  }
+  const consumedKeys = /* @__PURE__ */ new Set(["trend"]);
+  const sanitizedEntries = record ? Object.entries(record).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key) && key !== "trend") : [];
+  for (const [key, value] of sanitizedEntries) {
+    if (consumedKeys.has(key)) {
+      continue;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      metrics.push({ label: humanizeKey(key), value: formatNumber(value, 2) });
+      consumedKeys.add(key);
+      continue;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed && trimmed.length <= 32) {
+        metrics.push({ label: humanizeKey(key), value: trimmed });
+        consumedKeys.add(key);
+      }
+    }
+    if (metrics.length >= 6) {
+      break;
+    }
+  }
+  const paragraphEntries = sanitizedEntries.filter(([key, value]) => {
+    if (consumedKeys.has(key)) {
+      return false;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return false;
+      }
+      consumedKeys.add(key);
+      return true;
+    }
+    return false;
+  });
+  const listEntries = sanitizedEntries.filter(([key, value]) => {
+    if (consumedKeys.has(key)) {
+      return false;
+    }
+    if (Array.isArray(value) && value.length) {
+      consumedKeys.add(key);
+      return true;
+    }
+    return false;
+  });
+  const nestedEntries = sanitizedEntries.filter(([key, value]) => {
+    if (consumedKeys.has(key)) {
+      return false;
+    }
+    if (isRecord(value)) {
+      consumedKeys.add(key);
+      return true;
+    }
+    return false;
+  });
+  const hasDetails = Boolean(paragraphEntries.length || listEntries.length || nestedEntries.length);
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-900/50 p-5 shadow-inner shadow-black/30", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-wide text-slate-400", children: formatTimeframeLabel(timeframe) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm font-semibold text-white", children: "Timeframe signals" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricChip, { label: "Trend", value: direction })
+    ] }),
+    metrics.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 grid gap-3 sm:grid-cols-2", children: metrics.slice(0, 6).map((metric) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricTile, { label: metric.label, value: metric.value, compact: true }, metric.label)) }) : null,
+    paragraphEntries.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3 text-sm leading-relaxed text-slate-200", children: paragraphEntries.map(([key, value]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: humanizeKey(key) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-1 text-sm text-slate-200", children: String(value) })
+    ] }, key)) }) : null,
+    listEntries.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3", children: listEntries.map(([key, value]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: humanizeKey(key) }),
+      renderListValue(value)
+    ] }, key)) }) : null,
+    nestedEntries.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 space-y-3 text-sm text-slate-200", children: nestedEntries.map(([key, value]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rounded-2xl border border-slate-800/70 bg-slate-950/50 p-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: "text-xs font-semibold uppercase tracking-wide text-slate-400", children: humanizeKey(key) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-2 space-y-2 text-sm text-slate-200", children: renderValue(sanitizeTimeframeRecord(value)) })
+    ] }, key)) }) : null,
+    !hasDetails && !metrics.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-4 text-sm text-slate-400", children: "No additional diagnostics shared for this window." }) : null
   ] });
 }
 function IntelligencePanel({
@@ -25671,6 +25771,29 @@ function formatTimeframeLabel(value) {
   const normalized = lookup[unitRaw] || lookup[unitRaw.slice(0, 2)] || lookup[unitRaw.charAt(0)] || unitRaw.toUpperCase();
   const plural = Number.isFinite(quantity) && quantity !== 1;
   return `${quantity} ${plural ? `${normalized}s` : normalized}`;
+}
+function sanitizeTimeframeRecord(value) {
+  if (!value) {
+    return null;
+  }
+  const entries = Object.entries(value).filter(([key]) => !TIMEFRAME_METADATA_KEYS.has(key));
+  if (!entries.length) {
+    return null;
+  }
+  return Object.fromEntries(entries);
+}
+function renderListValue(value) {
+  if (!value.length) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-400", children: "None provided." });
+  }
+  const simpleItems = value.every((item) => typeof item === "string" || typeof item === "number" || typeof item === "boolean");
+  if (simpleItems) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "space-y-2 text-sm text-slate-200", children: value.slice(0, 8).map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "mt-1 h-1.5 w-1.5 rounded-full bg-sky-400", "aria-hidden": "true" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: String(item) })
+    ] }, index)) });
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "space-y-2 text-sm text-slate-200", children: value.slice(0, 5).map((item, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rounded-xl border border-slate-800/60 bg-slate-950/60 p-3", children: renderValue(item) }, index)) });
 }
 function capitalizeLabel(value) {
   if (value === null || value === void 0) {
