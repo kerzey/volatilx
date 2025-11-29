@@ -8,8 +8,10 @@ html {
 }
 body {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-  background: #f9fafe;
-  color: #25233a;
+  background: radial-gradient(140% 120% at 15% -20%, rgba(14, 165, 233, 0.12), transparent 55%),
+    radial-gradient(120% 100% at 90% -10%, rgba(56, 189, 248, 0.1), transparent 65%),
+    linear-gradient(180deg, #020617 0%, #0f172a 55%, #020617 100%);
+  color: #e2e8f0;
   min-height: 100vh;
 }
 
