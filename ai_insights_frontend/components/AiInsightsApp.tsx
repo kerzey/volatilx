@@ -1511,12 +1511,42 @@ function NoTradeCard({ zone }: { zone: unknown }) {
       }
     }
   } else if (Array.isArray(zone)) {
-    const numericValues = zone.map((item) => toNumber(item)).filter((value): value is number => value !== undefined);
-    if (numericValues.length) {
-      minValue = Math.min(...numericValues);
-      maxValue = Math.max(...numericValues);
+    const objectItems = zone.filter((item): item is Record<string, unknown> => isRecord(item));
+    for (const record of objectItems) {
+      if (minValue === undefined) {
+        minValue = readNumber(record, "min") ?? readNumber(record, "lower") ?? readNumber(record, "low") ?? readNumber(record, "floor") ?? readNumber(record, "min_value");
+      }
+      if (maxValue === undefined) {
+        maxValue = readNumber(record, "max") ?? readNumber(record, "upper") ?? readNumber(record, "high") ?? readNumber(record, "ceiling") ?? readNumber(record, "max_value");
+      }
+      const label = readString(record, "label");
+      if (label) {
+        notes.push(label);
+      }
+      const recordDescription = readString(record, "description") ?? readString(record, "notes");
+      if (recordDescription) {
+        notes.push(recordDescription);
+      }
     }
-    const textValues = zone.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+
+    if (minValue === undefined || maxValue === undefined) {
+      const numericValues = zone
+        .map((item) => toNumber(item))
+        .filter((value): value is number => value !== undefined);
+      if (numericValues.length) {
+        if (minValue === undefined) {
+          minValue = Math.min(...numericValues);
+        }
+        if (maxValue === undefined) {
+          maxValue = Math.max(...numericValues);
+        }
+      }
+    }
+
+    const textValues = zone
+      .filter((item) => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
     notes.push(...textValues);
   } else if (typeof zone === "string") {
     if (!minValue || !maxValue) {
