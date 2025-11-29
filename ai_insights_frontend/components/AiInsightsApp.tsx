@@ -40,6 +40,7 @@ type ErrorMeta = {
 
 const MAX_SUGGESTIONS = 9;
 const LEGAL_NOTE = "This content is for informational purposes only and does not constitute financial advice.";
+const SESSION_STORAGE_KEY = "aiInsights:lastAnalysis";
 
 export function AiInsightsApp({ bootstrap }: { bootstrap: AiInsightsBootstrap }) {
   const symbolCatalogs = bootstrap.symbolCatalogs ?? {};
@@ -62,6 +63,7 @@ export function AiInsightsApp({ bootstrap }: { bootstrap: AiInsightsBootstrap })
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
 
   const hideSuggestionsTimeout = useRef<number | null>(null);
+  const hasHydratedFromSession = useRef(false);
 
   const suggestions = useMemo(() => {
     const catalog = Array.isArray(symbolCatalogs[market]) ? (symbolCatalogs[market] as SymbolCatalogEntry[]) : [];
@@ -77,12 +79,83 @@ export function AiInsightsApp({ bootstrap }: { bootstrap: AiInsightsBootstrap })
   }, [usePrincipalPlan]);
 
   useEffect(() => {
+    if (hasHydratedFromSession.current) {
+      return;
+    }
+    if (typeof window === "undefined") {
+      return;
+    }
+    const stored = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!stored) {
+      hasHydratedFromSession.current = true;
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored) as Record<string, unknown>;
+      const storedAnalysis = parsed.analysis;
+      const storedSymbol = typeof parsed.symbol === "string" ? parsed.symbol : "";
+      const storedMarket = parsed.market === "crypto" ? "crypto" : (parsed.market === "equity" ? "equity" : initialMarket);
+      const storedUseAi = parsed.useAiSummary === true;
+      const storedUsePrincipal = parsed.usePrincipalPlan === true;
+      const storedIncludeRaw = parsed.includePrincipalRaw === true;
+      const storedStatus = parsed.status === "success" ? "success" : status;
+      const storedActiveTab = parsed.activeTab === "priceAction" || parsed.activeTab === "intelligence" ? parsed.activeTab : "technical";
+      const storedSymbolMessage = typeof parsed.symbolMessage === "string" ? parsed.symbolMessage : null;
+
+      if (storedSymbol) {
+        setSymbol(storedSymbol.toUpperCase());
+      }
+      setMarket(storedMarket);
+      setUseAiSummary(storedUseAi);
+      setUsePrincipalPlan(storedUsePrincipal);
+      setIncludePrincipalRaw(storedUsePrincipal ? storedIncludeRaw : false);
+      if (storedStatus === "success" && storedAnalysis && isRecord(storedAnalysis)) {
+        setAnalysis(storedAnalysis as AnalyzeState);
+        setStatus("success");
+        if (storedSymbolMessage) {
+          setSymbolMessage(storedSymbolMessage);
+        }
+        setActiveTab(storedActiveTab);
+      }
+    } catch (error) {
+      console.warn("[AiInsights] Failed to restore session state", error);
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } finally {
+      hasHydratedFromSession.current = true;
+    }
+  }, [initialMarket, status]);
+
+  useEffect(() => {
     return () => {
       if (hideSuggestionsTimeout.current !== null) {
         window.clearTimeout(hideSuggestionsTimeout.current);
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (status === "success" && analysis) {
+      const payload = {
+        analysis,
+        symbol,
+        market,
+        status,
+        symbolMessage,
+        useAiSummary,
+        usePrincipalPlan,
+        includePrincipalRaw,
+        activeTab,
+      };
+      try {
+        window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.warn("[AiInsights] Failed to persist session state", error);
+      }
+    }
+  }, [analysis, symbol, market, status, symbolMessage, useAiSummary, usePrincipalPlan, includePrincipalRaw, activeTab]);
 
   const availableTabs = useMemo<TabDefinition[]>(() => {
     const tabs: TabDefinition[] = [{ id: "technical", label: "Technical" }];
@@ -1325,19 +1398,19 @@ function TradeSetupCard({ title, tone, setup }: { title: string; tone: TradeTone
 
   const rows: { key: string; label: string; value: string }[] = [];
   if (entry !== undefined) {
-    rows.push({ key: "entry", label: "Entry", value: formatPrice(entry) });
+    rows.push({ key: "entry", label: "ENTRY", value: formatPrice(entry) });
   }
   if (targets[0] !== undefined) {
-    rows.push({ key: "target-0", label: `${formatOrdinal(0)} target`, value: formatPrice(targets[0]) });
+    rows.push({ key: "target-0", label: `${formatOrdinal(0).toUpperCase()} TARGET`, value: formatPrice(targets[0]) });
   }
   if (stop !== undefined) {
-    rows.push({ key: "stop", label: "Stop", value: formatPrice(stop) });
+    rows.push({ key: "stop", label: "STOP", value: formatPrice(stop) });
   }
   if (targets[1] !== undefined) {
-    rows.push({ key: "target-1", label: `${formatOrdinal(1)} target`, value: formatPrice(targets[1]) });
+    rows.push({ key: "target-1", label: `${formatOrdinal(1).toUpperCase()} TARGET`, value: formatPrice(targets[1]) });
   }
   if (riskReward !== undefined) {
-    rows.push({ key: "risk-reward", label: "Risk / Reward", value: formatNumber(riskReward, 2) });
+    rows.push({ key: "risk-reward", label: "RISK / REWARD", value: formatNumber(riskReward, 2) });
   }
 
   const extraTargets = targets.slice(2);
@@ -1372,9 +1445,9 @@ function TradeSetupCard({ title, tone, setup }: { title: string; tone: TradeTone
       {rows.length ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {rows.map((row) => (
-            <div key={row.key} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`}>
-              <span className={`text-xs uppercase tracking-wide ${palette.label}`}>{row.label}</span>
-              <span className={`text-sm font-semibold ${palette.value}`}>{row.value}</span>
+            <div key={row.key} className={`space-y-1 rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`}>
+              <span className={`block text-[11px] font-semibold uppercase tracking-wide ${palette.label}`}>{row.label}</span>
+              <span className={`block text-lg font-semibold ${palette.value}`}>{row.value}</span>
             </div>
           ))}
         </div>
@@ -1395,13 +1468,13 @@ function TradeSetupCard({ title, tone, setup }: { title: string; tone: TradeTone
 
 function NoTradeCard({ zone }: { zone: unknown }) {
   const palette = {
-    container: "border-amber-500/40 bg-amber-500/10",
-    label: "text-amber-200",
-    value: "text-amber-100",
-    detailBorder: "border-amber-500/40",
-    detailBg: "bg-amber-500/20",
-    bullet: "bg-amber-400",
-    text: "text-amber-100",
+    container: "border-slate-600/60 bg-slate-950/70",
+    label: "text-slate-300",
+    value: "text-slate-100",
+    detailBorder: "border-slate-600/60",
+    detailBg: "bg-slate-900/70",
+    bullet: "bg-slate-400",
+    text: "text-slate-200",
   };
 
   let minValue: number | undefined;
@@ -1458,23 +1531,25 @@ function NoTradeCard({ zone }: { zone: unknown }) {
 
   const rows: { key: string; label: string; value: string }[] = [];
   if (minValue !== undefined) {
-    rows.push({ key: "min", label: "Min", value: formatPrice(minValue) });
+    rows.push({ key: "min", label: "MIN.", value: formatPrice(minValue) });
   }
   if (maxValue !== undefined) {
-    rows.push({ key: "max", label: "Max", value: formatPrice(maxValue) });
+    rows.push({ key: "max", label: "MAX", value: formatPrice(maxValue) });
   }
 
   return (
     <section className={`space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`}>
       <h6 className={`text-xs font-semibold uppercase tracking-wide ${palette.label}`}>No-trade zone</h6>
       {rows.length ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {rows.map((row) => (
-            <div key={row.key} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`}>
-              <span className={`text-xs uppercase tracking-wide ${palette.label}`}>{row.label}</span>
-              <span className={`text-sm font-semibold ${palette.value}`}>{row.value}</span>
-            </div>
-          ))}
+        <div className={`rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`}>
+          <div className="grid grid-cols-2 gap-6">
+            {rows.map((row) => (
+              <div key={row.key} className="space-y-1">
+                <span className={`block text-[11px] font-semibold uppercase tracking-wide ${palette.label}`}>{row.label}</span>
+                <span className={`block text-lg font-semibold ${palette.value}`}>{row.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
       {noteItems.length ? (
@@ -1884,7 +1959,12 @@ function formatPrice(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "N/A";
   }
-  return `$${value.toFixed(2)}`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 function formatPercent(value: unknown, digits = 2): string {

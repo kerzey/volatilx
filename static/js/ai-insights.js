@@ -24493,6 +24493,7 @@ var import_react = __toESM(require_react());
 var import_jsx_runtime = __toESM(require_jsx_runtime());
 var MAX_SUGGESTIONS = 9;
 var LEGAL_NOTE = "This content is for informational purposes only and does not constitute financial advice.";
+var SESSION_STORAGE_KEY = "aiInsights:lastAnalysis";
 function AiInsightsApp({ bootstrap }) {
   const symbolCatalogs = bootstrap.symbolCatalogs ?? {};
   const initialMarket = symbolCatalogs.crypto && Array.isArray(symbolCatalogs.crypto) ? "equity" : "equity";
@@ -24512,6 +24513,7 @@ function AiInsightsApp({ bootstrap }) {
   const [suggestionsOpen, setSuggestionsOpen] = (0, import_react.useState)(false);
   const [activeSuggestion, setActiveSuggestion] = (0, import_react.useState)(-1);
   const hideSuggestionsTimeout = (0, import_react.useRef)(null);
+  const hasHydratedFromSession = (0, import_react.useRef)(false);
   const suggestions = (0, import_react.useMemo)(() => {
     const catalog = Array.isArray(symbolCatalogs[market]) ? symbolCatalogs[market] : [];
     return filterSymbolCatalog(catalog, symbol);
@@ -24523,12 +24525,80 @@ function AiInsightsApp({ bootstrap }) {
     }
   }, [usePrincipalPlan]);
   (0, import_react.useEffect)(() => {
+    if (hasHydratedFromSession.current) {
+      return;
+    }
+    if (typeof window === "undefined") {
+      return;
+    }
+    const stored = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!stored) {
+      hasHydratedFromSession.current = true;
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      const storedAnalysis = parsed.analysis;
+      const storedSymbol = typeof parsed.symbol === "string" ? parsed.symbol : "";
+      const storedMarket = parsed.market === "crypto" ? "crypto" : parsed.market === "equity" ? "equity" : initialMarket;
+      const storedUseAi = parsed.useAiSummary === true;
+      const storedUsePrincipal = parsed.usePrincipalPlan === true;
+      const storedIncludeRaw = parsed.includePrincipalRaw === true;
+      const storedStatus = parsed.status === "success" ? "success" : status;
+      const storedActiveTab = parsed.activeTab === "priceAction" || parsed.activeTab === "intelligence" ? parsed.activeTab : "technical";
+      const storedSymbolMessage = typeof parsed.symbolMessage === "string" ? parsed.symbolMessage : null;
+      if (storedSymbol) {
+        setSymbol(storedSymbol.toUpperCase());
+      }
+      setMarket(storedMarket);
+      setUseAiSummary(storedUseAi);
+      setUsePrincipalPlan(storedUsePrincipal);
+      setIncludePrincipalRaw(storedUsePrincipal ? storedIncludeRaw : false);
+      if (storedStatus === "success" && storedAnalysis && isRecord(storedAnalysis)) {
+        setAnalysis(storedAnalysis);
+        setStatus("success");
+        if (storedSymbolMessage) {
+          setSymbolMessage(storedSymbolMessage);
+        }
+        setActiveTab(storedActiveTab);
+      }
+    } catch (error2) {
+      console.warn("[AiInsights] Failed to restore session state", error2);
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } finally {
+      hasHydratedFromSession.current = true;
+    }
+  }, [initialMarket, status]);
+  (0, import_react.useEffect)(() => {
     return () => {
       if (hideSuggestionsTimeout.current !== null) {
         window.clearTimeout(hideSuggestionsTimeout.current);
       }
     };
   }, []);
+  (0, import_react.useEffect)(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (status === "success" && analysis) {
+      const payload = {
+        analysis,
+        symbol,
+        market,
+        status,
+        symbolMessage,
+        useAiSummary,
+        usePrincipalPlan,
+        includePrincipalRaw,
+        activeTab
+      };
+      try {
+        window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
+      } catch (error2) {
+        console.warn("[AiInsights] Failed to persist session state", error2);
+      }
+    }
+  }, [analysis, symbol, market, status, symbolMessage, useAiSummary, usePrincipalPlan, includePrincipalRaw, activeTab]);
   const availableTabs = (0, import_react.useMemo)(() => {
     const tabs = [{ id: "technical", label: "Technical" }];
     if (analysis?.priceAction) {
@@ -25492,19 +25562,19 @@ function TradeSetupCard({ title, tone, setup }) {
   const targets = extractTradeTargets(setup);
   const rows = [];
   if (entry !== void 0) {
-    rows.push({ key: "entry", label: "Entry", value: formatPrice(entry) });
+    rows.push({ key: "entry", label: "ENTRY", value: formatPrice(entry) });
   }
   if (targets[0] !== void 0) {
-    rows.push({ key: "target-0", label: `${formatOrdinal(0)} target`, value: formatPrice(targets[0]) });
+    rows.push({ key: "target-0", label: `${formatOrdinal(0).toUpperCase()} TARGET`, value: formatPrice(targets[0]) });
   }
   if (stop !== void 0) {
-    rows.push({ key: "stop", label: "Stop", value: formatPrice(stop) });
+    rows.push({ key: "stop", label: "STOP", value: formatPrice(stop) });
   }
   if (targets[1] !== void 0) {
-    rows.push({ key: "target-1", label: `${formatOrdinal(1)} target`, value: formatPrice(targets[1]) });
+    rows.push({ key: "target-1", label: `${formatOrdinal(1).toUpperCase()} TARGET`, value: formatPrice(targets[1]) });
   }
   if (riskReward !== void 0) {
-    rows.push({ key: "risk-reward", label: "Risk / Reward", value: formatNumber(riskReward, 2) });
+    rows.push({ key: "risk-reward", label: "RISK / REWARD", value: formatNumber(riskReward, 2) });
   }
   const extraTargets = targets.slice(2);
   const notes = [];
@@ -25528,9 +25598,9 @@ function TradeSetupCard({ title, tone, setup }) {
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: `space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`, children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: `text-xs font-semibold uppercase tracking-wide ${palette.header}`, children: title }),
-    rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 sm:grid-cols-2", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs uppercase tracking-wide ${palette.label}`, children: row.label }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-sm font-semibold ${palette.value}`, children: row.value })
+    rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 sm:grid-cols-2", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `space-y-1 rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `block text-[11px] font-semibold uppercase tracking-wide ${palette.label}`, children: row.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `block text-lg font-semibold ${palette.value}`, children: row.value })
     ] }, row.key)) }) : null,
     noteItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `mt-2 space-y-2 text-sm ${palette.text}`, children: noteItems.map((note, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`, "aria-hidden": "true" }),
@@ -25540,13 +25610,13 @@ function TradeSetupCard({ title, tone, setup }) {
 }
 function NoTradeCard({ zone }) {
   const palette = {
-    container: "border-amber-500/40 bg-amber-500/10",
-    label: "text-amber-200",
-    value: "text-amber-100",
-    detailBorder: "border-amber-500/40",
-    detailBg: "bg-amber-500/20",
-    bullet: "bg-amber-400",
-    text: "text-amber-100"
+    container: "border-slate-600/60 bg-slate-950/70",
+    label: "text-slate-300",
+    value: "text-slate-100",
+    detailBorder: "border-slate-600/60",
+    detailBg: "bg-slate-900/70",
+    bullet: "bg-slate-400",
+    text: "text-slate-200"
   };
   let minValue;
   let maxValue;
@@ -25594,17 +25664,17 @@ function NoTradeCard({ zone }) {
   }
   const rows = [];
   if (minValue !== void 0) {
-    rows.push({ key: "min", label: "Min", value: formatPrice(minValue) });
+    rows.push({ key: "min", label: "MIN.", value: formatPrice(minValue) });
   }
   if (maxValue !== void 0) {
-    rows.push({ key: "max", label: "Max", value: formatPrice(maxValue) });
+    rows.push({ key: "max", label: "MAX", value: formatPrice(maxValue) });
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: `space-y-4 rounded-3xl border p-5 shadow-inner shadow-black/30 ${palette.container}`, children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h6", { className: `text-xs font-semibold uppercase tracking-wide ${palette.label}`, children: "No-trade zone" }),
-    rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-3 sm:grid-cols-2", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `flex items-center justify-between rounded-2xl border px-4 py-3 ${palette.detailBorder} ${palette.detailBg}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-xs uppercase tracking-wide ${palette.label}`, children: row.label }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `text-sm font-semibold ${palette.value}`, children: row.value })
-    ] }, row.key)) }) : null,
+    rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `rounded-2xl border px-4 py-4 ${palette.detailBorder} ${palette.detailBg}`, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid grid-cols-2 gap-6", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-1", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `block text-[11px] font-semibold uppercase tracking-wide ${palette.label}`, children: row.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `block text-lg font-semibold ${palette.value}`, children: row.value })
+    ] }, row.key)) }) }) : null,
     noteItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `space-y-2 text-sm ${palette.text}`, children: noteItems.map((note, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "flex gap-2", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `mt-1 h-1.5 w-1.5 rounded-full ${palette.bullet}`, "aria-hidden": "true" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: note })
@@ -25935,7 +26005,12 @@ function formatPrice(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "N/A";
   }
-  return `$${value.toFixed(2)}`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
 }
 function formatPercent(value, digits = 2) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
