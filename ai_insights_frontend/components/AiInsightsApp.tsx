@@ -1519,6 +1519,20 @@ function NoTradeCard({ zone }: { zone: unknown }) {
     const textValues = zone.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
     notes.push(...textValues);
   } else if (typeof zone === "string") {
+    if (!minValue || !maxValue) {
+      const matches = zone.match(/-?\d[\d,]*(?:\.\d+)?/g) ?? [];
+      const numericMatches = matches
+        .map((token) => toNumber(token))
+        .filter((value): value is number => value !== undefined);
+      if (numericMatches.length) {
+        if (minValue === undefined) {
+          minValue = Math.min(...numericMatches);
+        }
+        if (maxValue === undefined) {
+          maxValue = Math.max(...numericMatches);
+        }
+      }
+    }
     notes.push(zone);
   }
 

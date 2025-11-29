@@ -25655,6 +25655,18 @@ function NoTradeCard({ zone }) {
     const textValues = zone.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean);
     notes.push(...textValues);
   } else if (typeof zone === "string") {
+    if (!minValue || !maxValue) {
+      const matches = zone.match(/-?\d[\d,]*(?:\.\d+)?/g) ?? [];
+      const numericMatches = matches.map((token) => toNumber(token)).filter((value) => value !== void 0);
+      if (numericMatches.length) {
+        if (minValue === void 0) {
+          minValue = Math.min(...numericMatches);
+        }
+        if (maxValue === void 0) {
+          maxValue = Math.max(...numericMatches);
+        }
+      }
+    }
     notes.push(zone);
   }
   const noteItems = Array.from(new Set(notes.filter(Boolean)));
