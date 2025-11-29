@@ -1865,10 +1865,8 @@ function readNumber(source: Record<string, unknown> | null | undefined, key: str
     return value;
   }
   if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
+    const parsed = toNumber(value);
+    return parsed;
   }
   return undefined;
 }

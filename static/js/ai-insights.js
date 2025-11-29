@@ -25928,10 +25928,8 @@ function readNumber(source, key) {
     return value;
   }
   if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
+    const parsed = toNumber(value);
+    return parsed;
   }
   return void 0;
 }
