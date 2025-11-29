@@ -360,8 +360,8 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 py-10 text-slate-50">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6">
+    <div className="min-h-screen bg-transparent py-10 text-slate-50">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 rounded-[32px] border border-white/5 bg-slate-950/60 px-6 py-10 shadow-[0_25px_80px_rgba(2,6,23,0.6)] backdrop-blur">
         <PlanSwitcher
           options={normalizedOptions}
           activeSymbol={activeOption?.symbol ?? plan.symbol}

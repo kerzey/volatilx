@@ -26879,7 +26879,7 @@ function ActionCenterPage({ plan, initialStrategy, planOptions = [] }) {
     }),
     [activePlan.latest_price, selectedIntent, strategyPlan, tradeState]
   );
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "min-h-screen bg-slate-950 py-10 text-slate-50", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mx-auto flex max-w-7xl flex-col gap-8 px-6", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "min-h-screen bg-transparent py-10 text-slate-50", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mx-auto flex max-w-7xl flex-col gap-8 rounded-[32px] border border-white/5 bg-slate-950/60 px-6 py-10 shadow-[0_25px_80px_rgba(2,6,23,0.6)] backdrop-blur", children: [
     /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       PlanSwitcher,
       {
