@@ -6,20 +6,25 @@
     <title>VolatilX - Settings</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/css/volatilx-header.css">
+    <link rel="stylesheet" href="/static/css/subscription.css">
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BC00YPJSRJ"></script>
     <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-BC00YPJSRJ');
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-BC00YPJSRJ');
     </script>
 </head>
-<body class="settings-page">
+<body class="settings-page bg-slate-950 text-slate-100 font-sans antialiased">
     {% from "_header.html" import render_header %}
     {% set header_user_email = user.email if user and user.email else None %}
     {% set member_since = user.created_at.strftime('%B %d, %Y') if user and user.created_at else 'N/A' %}
     {% set auth_label = (user.oauth_provider.title() + ' OAuth') if user and user.oauth_provider else 'Email &amp; Password' %}
+    {% set primary_email = user.email if user and user.email else 'N/A' %}
+    {% set stripe_customer = user.stripe_customer_id if user and user.stripe_customer_id else 'Pending' %}
+    {% set is_verified = user.is_verified if user else False %}
+    {% set checkout_state = request.query_params.get('checkout') %}
     {{ render_header(
         page='settings',
         title='Account Settings',
@@ -33,381 +38,197 @@
         user_email=header_user_email
     ) }}
 
-    <div class="container">
-        <div class="settings-panel">
-            <h1 class="panel-title">Account Settings</h1>
+    <main class="relative isolate">
+        <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+            <div class="absolute -left-24 top-40 h-96 w-96 rounded-full bg-sky-500/15 blur-3xl"></div>
+            <div class="absolute right-10 top-0 h-[28rem] w-[28rem] rounded-full bg-emerald-500/10 blur-3xl"></div>
+            <div class="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-3xl"></div>
+        </div>
 
-            <section class="section">
-                <h2 class="section-title">Account Information</h2>
-                <p class="section-description">Your account details and status</p>
-                <div class="user-info">
-                    <p><strong>Email:</strong> {{ user.email }}</p>
-                    <p><strong>Account Status:</strong> <span class="status-indicator status-active"></span>Active</p>
-                    <p><strong>Member Since:</strong> {{ user.created_at.strftime('%B %d, %Y') if user.created_at else 'N/A' }}</p>
+        <div class="mx-auto max-w-7xl px-6 pb-20 pt-12 lg:pb-28">
+            {% if checkout_state == 'success' %}
+                <div class="mb-8 rounded-3xl border border-emerald-500/40 bg-emerald-500/10 px-6 py-5 text-sm font-medium text-emerald-100 shadow-inner shadow-black/30" role="status">
+                    Subscription updated. You will receive a confirmation email shortly.
                 </div>
-            </section>
-
-            <section class="section" id="subscriptionSection">
-                <h2 class="section-title">Subscription Plans</h2>
-                <p class="section-description">Choose a plan to unlock monthly AI agent strategy runs. Upgrade anytime.</p>
-
-                <div class="subscription-status" id="subscriptionStatus">
-                    <strong>Current Plan</strong>
-                    <div id="subscriptionStatusValue">Loading subscription details…</div>
+            {% elif checkout_state == 'cancel' %}
+                <div class="mb-8 rounded-3xl border border-amber-500/40 bg-amber-500/10 px-6 py-5 text-sm font-medium text-amber-100 shadow-inner shadow-black/30" role="status">
+                    Checkout canceled. Your existing plan remains active.
                 </div>
+            {% endif %}
 
-                <div class="subscription-message" id="subscriptionMessage" role="alert" aria-live="polite"></div>
+            <div class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+                <section class="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-8 shadow-2xl shadow-black/35">
+                    <header class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h1 class="text-xl font-semibold text-white">Account Information</h1>
+                            <p class="text-sm text-slate-300">Your VolatilX profile snapshot.</p>
+                        </div>
+                        <span class="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-100">
+                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-300" aria-hidden="true"></span>
+                            Active
+                        </span>
+                    </header>
+                    <dl class="mt-6 grid gap-6 text-sm text-slate-200 sm:grid-cols-2">
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Email</dt>
+                            <dd class="text-base font-medium text-white">{{ primary_email }}</dd>
+                        </div>
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Member since</dt>
+                            <dd class="text-base font-medium text-white">{{ member_since }}</dd>
+                        </div>
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Authentication</dt>
+                            <dd class="text-base font-medium text-white">{{ auth_label | safe }}</dd>
+                        </div>
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Stripe customer</dt>
+                            <dd class="text-base font-medium text-white">{{ stripe_customer }}</dd>
+                        </div>
+                    </dl>
+                </section>
 
-                <div class="plan-grid" id="planGrid">
-                    <div class="plan-grid-empty">Loading plans…</div>
-                </div>
-            </section>
+                <section class="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-8 shadow-2xl shadow-black/35">
+                    <header class="flex flex-col gap-2">
+                        <h2 class="text-xl font-semibold text-white">Security &amp; Verification</h2>
+                        <p class="text-sm text-slate-300">Keep your credentials resilient.</p>
+                    </header>
+                    <div class="mt-6 space-y-6 text-sm text-slate-200">
+                        <div class="flex items-start justify-between gap-6">
+                            <div>
+                                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Authentication method</p>
+                                <p class="mt-1 text-base font-medium text-white">{{ auth_label | safe }}</p>
+                            </div>
+                            <span class="inline-flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-sky-100">Secure</span>
+                        </div>
+                        <div class="flex items-start justify-between gap-6">
+                            <div>
+                                <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Account verification</p>
+                                {% if is_verified %}
+                                    <p class="mt-1 text-base font-medium text-emerald-200">Verified</p>
+                                    <p class="mt-2 text-xs text-slate-400">Two-factor prompts are delivered to your primary contact method.</p>
+                                {% else %}
+                                    <p class="mt-1 text-base font-medium text-amber-200">Not Verified</p>
+                                    <p class="mt-2 text-xs text-slate-400">Complete verification to unlock automated billing and rapid response support.</p>
+                                {% endif %}
+                            </div>
+                            {% if is_verified %}
+                                <span class="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-100">Ready</span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-amber-100">Action needed</span>
+                            {% endif %}
+                        </div>
+                        <div class="rounded-2xl border border-slate-800/70 bg-slate-950/80 px-5 py-4 text-xs text-slate-300">
+                            Refresh your API secrets from the developer console whenever you rotate exchange keys. VolatilX invalidates stale secrets instantly to keep your desk insulated.
+                        </div>
+                    </div>
+                </section>
+            </div>
 
-            <section class="section">
-                <h2 class="section-title">AI Analysis</h2>
-                <p class="section-description">AI-powered investment analysis status</p>
-
-                <div class="info-box">
-                    <h4>✅ AI Analysis Available</h4>
-                    <p>AI-powered investment analysis is enabled for all users.</p>
-                    <p>Get detailed market insights, risk assessments, and trading recommendations powered by advanced AI.</p>
-                    <p><strong>Features included:</strong></p>
-                    <ul class="info-list">
-                        <li>Market position assessment</li>
-                        <li>Short-term and long-term strategies</li>
-                        <li>Risk analysis and mitigation</li>
-                        <li>Actionable trading recommendations</li>
+            <div class="mt-6 grid gap-6 lg:grid-cols-2">
+                <section class="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-8 shadow-xl shadow-black/30">
+                    <header class="flex flex-col gap-2">
+                        <h2 class="text-lg font-semibold text-white">AI Analysis</h2>
+                        <p class="text-sm text-slate-300">Principal-agent orchestration is online.</p>
+                    </header>
+                    <ul class="mt-6 space-y-3 text-sm text-slate-200">
+                        <li class="flex items-start gap-3">
+                            <span class="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
+                            Market position assessment across preferred instruments.
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true"></span>
+                            Strategy blends generated by the principal agent and validated by specialists.
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-1 h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden="true"></span>
+                            Risk envelopes updated with every run so you can adjust capital swiftly.
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-1 h-1.5 w-1.5 rounded-full bg-rose-400" aria-hidden="true"></span>
+                            Playbook-ready execution notes spanning intraday to weekly horizons.
+                        </li>
                     </ul>
-                </div>
+                    <div class="mt-6 inline-flex items-center gap-3 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-100">
+                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-300" aria-hidden="true"></span>
+                        Ready to deploy
+                    </div>
+                </section>
 
-                <div class="status-row">
-                    <span class="status-indicator status-active"></span>
-                    <strong>AI Analysis: Ready to use</strong>
+                <section class="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-8 shadow-xl shadow-black/30">
+                    <header class="flex flex-col gap-2">
+                        <h2 class="text-lg font-semibold text-white">Trading Preferences</h2>
+                        <p class="text-sm text-slate-300">Current thresholds used by automated diagnostics.</p>
+                    </header>
+                    <dl class="mt-6 grid gap-5 text-sm text-slate-200 sm:grid-cols-2">
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Buy threshold</dt>
+                            <dd class="text-base font-medium text-white">70% confidence</dd>
+                        </div>
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Sell threshold</dt>
+                            <dd class="text-base font-medium text-white">70% confidence</dd>
+                        </div>
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Analysis mode</dt>
+                            <dd class="text-base font-medium text-white">High confidence only</dd>
+                        </div>
+                        <div class="space-y-1">
+                            <dt class="text-xs uppercase tracking-[0.3em] text-slate-400">Timeframes</dt>
+                            <dd class="text-base font-medium text-white">1m · 5m · 15m · 30m · 1h · 1d · 1wk</dd>
+                        </div>
+                    </dl>
+                    <p class="mt-6 rounded-2xl border border-slate-800/70 bg-slate-950/80 px-5 py-4 text-xs text-slate-300">
+                        Contact support to calibrate thresholds against a custom risk model or to enable experimental agents.
+                    </p>
+                </section>
+            </div>
+
+            <section id="subscriptionSection" class="mt-12 space-y-6 rounded-3xl border border-slate-800/60 bg-slate-950/70 px-8 py-10 shadow-2xl shadow-black/40">
+                <header class="flex flex-col gap-3 text-center">
+                    <div class="inline-flex items-center gap-2 self-center rounded-full border border-slate-700/60 bg-slate-900/70 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.4em] text-slate-200/90">
+                        <span class="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true"></span>
+                        Billing Console
+                    </div>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white">Subscription plans engineered for your desk</h2>
+                    <p class="mx-auto max-w-3xl text-sm leading-relaxed text-slate-300">
+                        Compare allocation, throughput, and concierge access. Swap tiers instantly without losing your analysis history.
+                    </p>
+                </header>
+
+                <div id="subscriptionRoot" class="min-h-[240px]">
+                    <div class="rounded-3xl border border-slate-800/70 bg-slate-950/80 p-10 text-center text-sm text-slate-300 shadow-inner shadow-black/30">
+                        Loading billing console…
+                    </div>
                 </div>
+                <noscript>
+                    <p class="rounded-3xl border border-rose-500/40 bg-rose-500/10 px-5 py-4 text-center text-sm text-rose-100">
+                        Enable JavaScript to manage subscription plans from this console.
+                    </p>
+                </noscript>
             </section>
 
-            <section class="section">
-                <h2 class="section-title">Trading Preferences</h2>
-                <p class="section-description">Customize your trading analysis settings</p>
-                <div class="info-box">
-                    <h4>📊 Current Settings</h4>
-                    <p><strong>Buy Threshold:</strong> 70% confidence</p>
-                    <p><strong>Sell Threshold:</strong> 70% confidence</p>
-                    <p><strong>Analysis Mode:</strong> High confidence only</p>
-                    <p><strong>Timeframes:</strong> 1m, 5m, 15m, 30m, 1h, 1d, 1wk</p>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2 class="section-title">Security</h2>
-                <p class="section-description">Account security and authentication</p>
-                <div class="user-info">
-                    <p><strong>Authentication Method:</strong>
-                        {% if user.oauth_provider %}
-                            {{ user.oauth_provider.title() }} OAuth
-                        {% else %}
-                            Email & Password
-                        {% endif %}
-                    </p>
-                    <p><strong>Account Verified:</strong>
-                        {% if user.is_verified %}
-                            <span class="verified">✓ Verified</span>
-                        {% else %}
-                            <span class="not-verified">✗ Not Verified</span>
-                        {% endif %}
-                    </p>
+            <section class="mt-10 rounded-3xl border border-slate-800/60 bg-slate-950/70 p-8 shadow-xl shadow-black/35">
+                <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="max-w-3xl space-y-3">
+                        <h3 class="text-lg font-semibold text-white">Need a bespoke rollout?</h3>
+                        <p class="text-sm text-slate-300">
+                            Our concierge team can stage custom integrations, add team-wide access, and deliver quarterly agent briefings. Use the contact widget to schedule a call within 48 hours.
+                        </p>
+                    </div>
+                    <div class="inline-flex items-center gap-2 self-start rounded-full border border-rose-500/40 bg-rose-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-rose-100">
+                        <span class="h-1.5 w-1.5 rounded-full bg-rose-300" aria-hidden="true"></span>
+                        Concierge desk
+                    </div>
                 </div>
             </section>
         </div>
-    </div>
+    </main>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-    const planGrid = document.getElementById('planGrid');
-    const statusValue = document.getElementById('subscriptionStatusValue');
-    const messageBox = document.getElementById('subscriptionMessage');
-    const subscriptionSection = document.getElementById('subscriptionSection');
-    const priceFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-
-    const PLAN_META = {
-        alpha: {
-            themeClass: 'plan-card--alpha',
-            logo: '/static/Alpha.PNG',
-            tagline: 'Silver-tier intelligence for confident entries.',
-            features: [
-                'Multi-timeframe AI technical breakdowns',
-                'Access to principal agent trade plans',
-                'Email support during market hours',
-            ],
-            badge: 'Starter',
-            ctaLabel: 'Activate Alpha',
-        },
-        sigma: {
-            themeClass: 'plan-card--sigma',
-            logo: '/static/Sigma.PNG',
-            tagline: 'Gold coverage for active swing & day traders.',
-            features: [
-                'Expanded monthly AI run allowance',
-                'Priority queueing around market opens',
-                'Advanced price-action scenario modeling',
-            ],
-            badge: 'Most Popular',
-            ctaLabel: 'Upgrade to Sigma',
-        },
-        omega: {
-            themeClass: 'plan-card--omega',
-            logo: '/static/Omega.PNG',
-            tagline: 'Black titanium access for elite strategy teams.',
-            features: [
-                'Maximum monthly AI collaborations included',
-                'Early access to experimental VolatilX agents',
-                'Concierge research and quarterly briefings',
-            ],
-            badge: 'Elite',
-            ctaLabel: 'Go Omega',
-            note: 'Includes executive briefings and roadmap previews.',
-        },
-    };
-
-    function setMessage(text, tone = 'error') {
-        const toneColors = {
-            error: '#c0392b',
-            success: '#2e7d32',
-            info: '#2c3e50',
-        };
-        messageBox.textContent = text || '';
-        messageBox.style.color = toneColors[tone] || toneColors.error;
-    }
-
-    function escapeHtml(value) {
-        if (value === null || value === undefined) {
-            return '';
-        }
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function formatPrice(cents) {
-        return priceFormatter.format((cents || 0) / 100);
-    }
-
-    function formatStatus(status) {
-        if (!status) {
-            return 'unknown';
-        }
-        return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-
-    function formatDate(value) {
-        if (!value) {
-            return 'N/A';
-        }
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) {
-            return 'N/A';
-        }
-        return date.toLocaleString();
-    }
-
-    function renderSubscriptionStatus(subscription) {
-        if (!subscription || !subscription.plan) {
-            statusValue.textContent = 'No active subscription. Select a plan below to enable AI agent runs.';
-            return;
-        }
-
-        const parts = [
-            `${subscription.plan.name} · ${formatStatus(subscription.status)}`,
-            `Runs left: ${subscription.runs_remaining ?? 'N/A'}`,
-            `Renews: ${formatDate(subscription.current_period_end)}`,
-        ];
-        statusValue.textContent = parts.join(' | ');
-    }
-
-    function createPlanCard(plan, isCurrent) {
-        const card = document.createElement('div');
-        card.className = 'plan-card';
-
-        const slug = (plan.slug || '').toLowerCase();
-        const meta = PLAN_META[slug] || {};
-
-        if (meta.themeClass) {
-            card.classList.add(meta.themeClass);
-        }
-        if (isCurrent) {
-            card.classList.add('plan-card--current');
-        }
-
-        const planName = escapeHtml(plan.name || 'VolatilX Plan');
-        const badgeLabel = isCurrent ? 'Current plan' : meta.badge;
-        const badgeMarkup = badgeLabel ? `<span class="plan-card__badge">${escapeHtml(badgeLabel)}</span>` : '';
-        const taglineMarkup = meta.tagline ? `<p class="plan-card__tagline">${escapeHtml(meta.tagline)}</p>` : '';
-        const descriptionSource = plan.description || meta.description || '';
-        const descriptionMarkup = descriptionSource
-            ? `<p class="plan-card__description">${escapeHtml(descriptionSource).replace(/\n/g, '<br>')}</p>`
-            : '';
-        const featuresHtml = (meta.features || [])
-            .map((feature) => `<li>${escapeHtml(feature)}</li>`)
-            .join('');
-        const noteMarkup = meta.note ? `<div class="plan-card__note">${escapeHtml(meta.note)}</div>` : '';
-        const runsLabel = `${escapeHtml(String(plan.ai_runs_included ?? '0'))} AI agent runs monthly`;
-
-        card.innerHTML = `
-            <div class="plan-card__header">
-                ${meta.logo ? `<div class="plan-card__logo"><img src="${meta.logo}" alt="${planName} logo"></div>` : ''}
-                <div class="plan-card__title">
-                    <span class="plan-card__name">${planName}</span>
-                    ${taglineMarkup}
-                </div>
-                ${badgeMarkup}
-            </div>
-            <div class="plan-card__price">${formatPrice(plan.monthly_price_cents)} <span>/ month</span></div>
-            <div class="plan-card__runs">${runsLabel}</div>
-            ${descriptionMarkup}
-            ${featuresHtml ? `<ul class="plan-card__features">${featuresHtml}</ul>` : ''}
-            ${noteMarkup}
-        `;
-
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'plan-button';
-
-        if (!plan.stripe_price_configured) {
-            button.textContent = 'Unavailable';
-            button.disabled = true;
-        } else if (isCurrent) {
-            button.textContent = 'Current Plan';
-            button.disabled = true;
-        } else {
-            button.textContent = meta.ctaLabel || 'Select Plan';
-            button.addEventListener('click', () => startCheckout(plan.slug, button));
-        }
-
-        card.appendChild(button);
-        return card;
-    }
-
-    function renderPlans(plans, subscription) {
-        planGrid.innerHTML = '';
-        if (!plans || plans.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'plan-grid-empty';
-            empty.textContent = 'No plans are available right now. Please check back later.';
-            planGrid.appendChild(empty);
-            return;
-        }
-
-        const currentSlug = subscription && subscription.plan ? subscription.plan.slug : null;
-        const order = ['alpha', 'sigma', 'omega'];
-        const sortedPlans = [...plans].sort((a, b) => {
-            const aSlug = (a.slug || '').toLowerCase();
-            const bSlug = (b.slug || '').toLowerCase();
-            const aIndex = order.indexOf(aSlug);
-            const bIndex = order.indexOf(bSlug);
-            const safeA = aIndex === -1 ? order.length : aIndex;
-            const safeB = bIndex === -1 ? order.length : bIndex;
-            if (safeA === safeB) {
-                return (a.monthly_price_cents || 0) - (b.monthly_price_cents || 0);
-            }
-            return safeA - safeB;
-        });
-
-        sortedPlans.forEach((plan) => {
-            const isCurrent = currentSlug === plan.slug;
-            const card = createPlanCard(plan, isCurrent);
-            planGrid.appendChild(card);
-        });
-    }
-
-    async function startCheckout(planSlug, trigger) {
-        if (!planSlug) {
-            return;
-        }
-
-        const originalText = trigger.textContent;
-        trigger.disabled = true;
-        trigger.textContent = 'Redirecting…';
-        setMessage('');
-
-        try {
-            const response = await fetch('/api/billing/checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ plan_slug: planSlug }),
-            });
-
-            if (!response.ok) {
-                const errorPayload = await response.json().catch(() => ({}));
-                const detail = errorPayload.detail || 'Unable to start checkout. Please try again.';
-                throw new Error(detail);
-            }
-
-            const data = await response.json();
-            if (data.checkout_url) {
-                window.location.href = data.checkout_url;
-                return;
-            }
-
-            throw new Error('Checkout session did not return a redirect URL.');
-        } catch (error) {
-            setMessage(error.message || 'Billing error. Please try again later.');
-        } finally {
-            trigger.disabled = false;
-            trigger.textContent = originalText;
-        }
-    }
-
-    function focusBillingTabIfNeeded(subscription) {
-        const params = new URLSearchParams(window.location.search);
-        const selectedTab = params.get('tab');
-        if (!selectedTab || selectedTab.toLowerCase() !== 'billing' || !subscriptionSection) {
-            return;
-        }
-
-        setTimeout(() => {
-            subscriptionSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 150);
-
-        subscriptionSection.classList.add('section--spotlight');
-        setTimeout(() => subscriptionSection.classList.remove('section--spotlight'), 1800);
-
-        if (!subscription || !subscription.plan) {
-            setMessage('Choose a plan to unlock premium AI strategies.', 'info');
-        }
-    }
-
-    async function loadBilling() {
-        try {
-            const response = await fetch('/api/billing/plans');
-            if (!response.ok) {
-                throw new Error('Failed to load subscription plans.');
-            }
-
-            const data = await response.json();
-            renderSubscriptionStatus(data.current_subscription);
-            renderPlans(data.plans, data.current_subscription);
-            setMessage('');
-            focusBillingTabIfNeeded(data.current_subscription);
-        } catch (error) {
-            setMessage(error.message || 'Unexpected error loading billing information.');
-            planGrid.innerHTML = '';
-            const empty = document.createElement('div');
-            empty.className = 'plan-grid-empty';
-            empty.textContent = 'Unable to load plans at this time.';
-            planGrid.appendChild(empty);
-            statusValue.textContent = 'Billing information is currently unavailable.';
-            focusBillingTabIfNeeded(null);
-        }
-    }
-
-    loadBilling();
-    });
+    <script id="subscriptionBootstrap" type="application/json">
+        {{ {'currentSubscription': None} | tojson | safe }}
     </script>
+    <script type="module" src="/static/js/subscription.js"></script>
     {% include "_contact_widget.html" %}
 </body>
 </html>

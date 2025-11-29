@@ -6,6 +6,7 @@ module.exports = {
     "./report_center_frontend/**/*.{ts,tsx}",
     "./signin_frontend/**/*.{ts,tsx}",
     "./ai_insights_frontend/**/*.{ts,tsx}",
+    "./subscription_frontend/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {},

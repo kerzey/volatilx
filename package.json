@@ -7,7 +7,8 @@
     "build:report-center": "tailwindcss -c tailwind.config.js -i ./report_center_frontend/tailwind.css -o ./static/css/report-center.css --minify && node scripts/build-report-center-frontend.mjs",
     "build:signin": "tailwindcss -c tailwind.config.js -i ./signin_frontend/tailwind.css -o ./static/css/signin.css --minify && node scripts/build-signin-frontend.mjs",
     "build:ai-insights": "tailwindcss -c tailwind.config.js -i ./ai_insights_frontend/tailwind.css -o ./static/css/ai-insights.css --minify && node scripts/build-ai-insights-frontend.mjs",
-    "build:web": "npm run build:action-center2 && npm run build:report-center && npm run build:signin && npm run build:ai-insights"
+    "build:subscription": "tailwindcss -c tailwind.config.js -i ./subscription_frontend/tailwind.css -o ./static/css/subscription.css --minify && node scripts/build-subscription-frontend.mjs",
+    "build:web": "npm run build:action-center2 && npm run build:report-center && npm run build:signin && npm run build:ai-insights && npm run build:subscription"
   },
   "dependencies": {
     "react": "^18.3.1",
