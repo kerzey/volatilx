@@ -404,7 +404,6 @@ export function ReportCard({ report, isFavorite, pending, onToggleFavorite }: Re
   };
 
   const priceMeta = report.price ?? undefined;
-  const priceTimestamp = priceMeta?.timestamp ?? null;
   const closeNumeric = coerceNumber(priceMeta?.close);
   const changeNumeric = coerceNumber(priceMeta?.change_pct);
   const hasVolume = priceMeta?.volume !== undefined && priceMeta?.volume !== null;
@@ -447,25 +446,19 @@ export function ReportCard({ report, isFavorite, pending, onToggleFavorite }: Re
   return (
     <article className="rounded-3xl border border-slate-800 bg-slate-950/60 shadow-xl shadow-black/40 transition hover:border-slate-700">
       <header className="flex flex-col gap-4 border-b border-slate-800 p-6 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           <span className="text-xs uppercase tracking-widest text-slate-500">Shared plan</span>
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-50">{report.symbol_display ?? report.symbol}</h2>
-            {metricBadges.map(({ key, color, label }) => (
-              <span key={key} className={METRIC_BADGE_BASE}>
-                <span className={`h-1.5 w-1.5 rounded-full ${color}`} aria-hidden="true" />
-                {label}
-              </span>
-            ))}
-          </div>
-          {report.generated_display ? (
-            <p className="text-xs uppercase tracking-wide text-slate-500">Generated {report.generated_display}</p>
-          ) : null}
-          {priceTimestamp ? (
-            <p className="text-xs uppercase tracking-wide text-slate-500">Close as of {priceTimestamp}</p>
-          ) : null}
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-50">{report.symbol_display ?? report.symbol}</h2>
         </div>
-        <FavoriteButton isFavorite={isFavorite} pending={pending} onClick={handleFavoriteToggle} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {metricBadges.map(({ key, color, label }) => (
+            <span key={key} className={METRIC_BADGE_BASE}>
+              <span className={`h-1.5 w-1.5 rounded-full ${color}`} aria-hidden="true" />
+              {label}
+            </span>
+          ))}
+          <FavoriteButton isFavorite={isFavorite} pending={pending} onClick={handleFavoriteToggle} />
+        </div>
       </header>
       <div className="flex flex-col gap-6 p-6">
         {strategies.length ? (

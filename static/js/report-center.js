@@ -24790,7 +24790,6 @@ function ReportCard({ report, isFavorite, pending, onToggleFavorite }) {
     onToggleFavorite(report, !isFavorite);
   };
   const priceMeta = report.price ?? void 0;
-  const priceTimestamp = priceMeta?.timestamp ?? null;
   const closeNumeric = coerceNumber(priceMeta?.close);
   const changeNumeric = coerceNumber(priceMeta?.change_pct);
   const hasVolume = priceMeta?.volume !== void 0 && priceMeta?.volume !== null;
@@ -24825,25 +24824,17 @@ function ReportCard({ report, isFavorite, pending, onToggleFavorite }) {
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: "rounded-3xl border border-slate-800 bg-slate-950/60 shadow-xl shadow-black/40 transition hover:border-slate-700", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "flex flex-col gap-4 border-b border-slate-800 p-6 md:flex-row md:items-center md:justify-between", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-2", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs uppercase tracking-widest text-slate-500", children: "Shared plan" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center gap-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: "text-3xl font-semibold tracking-tight text-slate-50", children: report.symbol_display ?? report.symbol }),
-          metricBadges.map(({ key, color, label }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: METRIC_BADGE_BASE, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `h-1.5 w-1.5 rounded-full ${color}`, "aria-hidden": "true" }),
-            label
-          ] }, key))
-        ] }),
-        report.generated_display ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: [
-          "Generated ",
-          report.generated_display
-        ] }) : null,
-        priceTimestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-xs uppercase tracking-wide text-slate-500", children: [
-          "Close as of ",
-          priceTimestamp
-        ] }) : null
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: "text-3xl font-semibold tracking-tight text-slate-50", children: report.symbol_display ?? report.symbol })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavoriteButton, { isFavorite, pending, onClick: handleFavoriteToggle })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center justify-end gap-3", children: [
+        metricBadges.map(({ key, color, label }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: METRIC_BADGE_BASE, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `h-1.5 w-1.5 rounded-full ${color}`, "aria-hidden": "true" }),
+          label
+        ] }, key)),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavoriteButton, { isFavorite, pending, onClick: handleFavoriteToggle })
+      ] })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col gap-6 p-6", children: [
       strategies.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex flex-col gap-6", children: strategies.map(({ key, label, plan: strategyPlan, summary }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StrategySection, { label, plan: strategyPlan, summary }, key)) }) : null,
