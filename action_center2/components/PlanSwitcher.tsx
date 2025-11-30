@@ -119,60 +119,68 @@ function FavoritesDropdown({ favorites, loading, onSelect, onRemoveFavorite }: F
     };
   }, [open]);
 
-  const list = useMemo(() => {
-    return favorites.slice().sort((a, b) => a.label.localeCompare(b.label));
-  }, [favorites]);
+  const list = useMemo(() => favorites.slice().sort((a, b) => a.label.localeCompare(b.label)), [favorites]);
+  const buttonLabel = `*Favorites${list.length ? `(${list.length})` : ""}`;
 
   return (
     <div className="relative self-start sm:self-auto" ref={menuRef}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-100 transition hover:border-amber-300 hover:bg-amber-400/20"
+        className="inline-flex items-center rounded-full border border-amber-400/40 bg-transparent px-3 py-1 text-xs font-semibold text-amber-200 transition hover:text-amber-100"
         aria-expanded={open}
       >
-        <span aria-hidden="true">★</span>
-        Favorites{list.length ? ` (${list.length})` : ""}
+        {buttonLabel}
       </button>
       {open ? (
-        <div className="absolute right-0 z-10 mt-2 w-64 rounded-2xl border border-slate-800/80 bg-slate-950/95 shadow-2xl shadow-black/50">
+        <div className="absolute right-0 z-20 mt-2 w-64 rounded-2xl border border-slate-800 bg-slate-950/95 p-2 shadow-2xl shadow-black/70">
           {loading ? (
-            <div className="px-4 py-3 text-xs text-slate-400">Loading favorites…</div>
+            <div className="px-3 py-2 text-xs text-slate-400">Loading favorites…</div>
           ) : list.length ? (
-            <ul className="divide-y divide-slate-800/70 text-sm">
-              {list.map((entry) => (
-                <li key={entry.canonical} className="flex items-center gap-3 px-4 py-2">
-                  <button
-                    type="button"
-                    className={`flex-1 text-left transition ${entry.isTracked ? "text-slate-100 hover:text-white" : "cursor-not-allowed text-slate-500"}`}
-                    onClick={() => {
-                      if (!entry.isTracked) {
-                        return;
-                      }
-                      onSelect(entry.symbol);
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="font-semibold">{entry.label}</span>
-                    {!entry.isTracked ? (
-                      <span className="mt-0.5 block text-[10px] uppercase tracking-wide text-slate-500">Not loaded</span>
-                    ) : null}
-                  </button>
-                  {onRemoveFavorite ? (
+            <ul className="space-y-2">
+              {list.map((entry) => {
+                const baseClasses = "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-sm transition";
+                const stateClasses = entry.isTracked
+                  ? "border-slate-800/60 bg-slate-900/80 text-slate-100 hover:border-slate-700 hover:bg-slate-900"
+                  : "cursor-not-allowed border-slate-900 bg-slate-950 text-slate-500";
+
+                return (
+                  <li key={entry.canonical} className="flex items-center gap-2">
                     <button
                       type="button"
-                      className="text-[11px] font-semibold uppercase tracking-wide text-rose-200 transition hover:text-rose-100 disabled:opacity-50"
-                      onClick={() => onRemoveFavorite(entry.symbol)}
-                      disabled={entry.isPending}
+                      className={baseClasses + " " + stateClasses}
+                      onClick={() => {
+                        if (!entry.isTracked) {
+                          return;
+                        }
+                        onSelect(entry.symbol);
+                        setOpen(false);
+                      }}
                     >
-                      {entry.isPending ? "…" : "Unfavorite"}
+                      <span className="font-semibold">{entry.label}</span>
+                      {!entry.isTracked ? (
+                        <span className="text-[10px] uppercase tracking-wide text-rose-300">Not loaded</span>
+                      ) : null}
                     </button>
-                  ) : null}
-                </li>
-              ))}
+                    {onRemoveFavorite ? (
+                      <button
+                        type="button"
+                        className="text-[11px] font-semibold uppercase tracking-wide text-rose-200 transition hover:text-rose-100 disabled:opacity-50"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRemoveFavorite(entry.symbol);
+                        }}
+                        disabled={entry.isPending}
+                      >
+                        {entry.isPending ? "…" : "Unfavorite"}
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
-            <div className="px-4 py-3 text-xs text-slate-400">No favorites saved yet.</div>
+            <div className="px-3 py-2 text-xs text-slate-400">No favorites saved yet.</div>
           )}
         </div>
       ) : null}
