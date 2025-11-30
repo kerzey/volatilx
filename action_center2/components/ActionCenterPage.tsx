@@ -37,6 +37,30 @@ type FavoriteRecord = {
   label: string;
 };
 
+type LivePriceSnapshot = {
+  symbol?: string;
+  price?: number;
+  bid?: number;
+  ask?: number;
+  timestamp?: string;
+  received_at?: string;
+  source?: string;
+  market?: string;
+};
+
+type LivePriceMeta = {
+  timestamp?: string;
+  source?: string;
+  market?: string;
+  error?: boolean;
+};
+
+declare global {
+  interface Window {
+    __ACTION_CENTER_PRICE_OVERRIDES__?: Record<string, LivePriceSnapshot>;
+  }
+}
+
 const SANITIZE_PATTERN = /[^A-Z0-9.\-]/g;
 const CANONICAL_PATTERN = /[^A-Z0-9]/g;
 
@@ -60,6 +84,7 @@ const canonicalizeSymbolValue = (value: unknown): string => {
 };
 
 const STORAGE_KEY = "volatilx:action-center:selections";
+const LIVE_PRICE_POLL_MS = 5000;
 
 const isStrategyKey = (value: unknown): value is StrategyKey =>
   typeof value === "string" && STRATEGY_KEYS.includes(value as StrategyKey);
@@ -203,6 +228,9 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     initialSelectionsRef.current = readPersistedSelections();
   }
   const initialSelections = initialSelectionsRef.current ?? { perSymbol: {} };
+  const priceSnapshotsRef = useRef<Record<string, LivePriceSnapshot>>(
+    (typeof window !== "undefined" && window.__ACTION_CENTER_PRICE_OVERRIDES__) || {},
+  );
 
   const [activeSymbol, setActiveSymbol] = useState<string>(initialSelections.activeSymbol || plan.symbol);
   const [symbolPrefs, setSymbolPrefs] = useState<Record<string, PersistedSymbolPrefs>>(initialSelections.perSymbol);
@@ -455,8 +483,104 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     [activeSymbol, normalizedOptions],
   );
 
+  const getMarketForSymbol = useCallback((symbol?: string) => {
+    if (!symbol) {
+      return undefined;
+    }
+    const key = sanitizeSymbolValue(symbol);
+    if (!key) {
+      return undefined;
+    }
+    return priceSnapshotsRef.current[key]?.market;
+  }, []);
+
   const activePlan = activeOption?.plan ?? plan;
   const activePrefs = symbolPrefs[activeSymbol] ?? {};
+
+  const baseLatestPrice = typeof activePlan?.latest_price === "number" ? activePlan.latest_price : null;
+  const [livePrice, setLivePrice] = useState<number | null>(baseLatestPrice);
+  const [livePriceMeta, setLivePriceMeta] = useState<LivePriceMeta | null>(null);
+
+  useEffect(() => {
+    setLivePrice(baseLatestPrice);
+    setLivePriceMeta(null);
+  }, [baseLatestPrice, activeOption?.symbol]);
+
+  const effectiveLatestPrice = useMemo(() => {
+    if (typeof livePrice === "number" && Number.isFinite(livePrice)) {
+      return livePrice;
+    }
+    if (typeof baseLatestPrice === "number" && Number.isFinite(baseLatestPrice)) {
+      return baseLatestPrice;
+    }
+    return 0;
+  }, [baseLatestPrice, livePrice]);
+
+  useEffect(() => {
+    const symbol = activeOption?.symbol;
+    if (!symbol) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let timerId: number | undefined;
+
+    const poll = async () => {
+      const params = new URLSearchParams({ symbol });
+      const derivedMarket = getMarketForSymbol(symbol);
+      if (derivedMarket) {
+        params.set("market", derivedMarket);
+      }
+
+      try {
+        const response = await fetch(`/api/live-price?${params.toString()}`, { credentials: "same-origin" });
+        if (cancelled) {
+          return;
+        }
+
+        if (response.status === 202) {
+          setLivePriceMeta((prev) => ({ ...(prev ?? {}), market: derivedMarket ?? prev?.market }));
+        } else if (response.ok) {
+          const data = await response.json();
+          if (cancelled) {
+            return;
+          }
+          if (typeof data.price === "number") {
+            setLivePrice(data.price);
+            setLivePriceMeta({
+              timestamp: data.timestamp || data.received_at,
+              source: data.source || "live-feed",
+              market: data.market || derivedMarket,
+            });
+            const key = sanitizeSymbolValue(symbol);
+            if (key) {
+              priceSnapshotsRef.current[key] = {
+                ...priceSnapshotsRef.current[key],
+                market: data.market || derivedMarket || priceSnapshotsRef.current[key]?.market,
+              };
+            }
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLivePriceMeta((prev) => ({ ...(prev ?? {}), error: true }));
+        }
+      } finally {
+        if (!cancelled) {
+          timerId = window.setTimeout(poll, LIVE_PRICE_POLL_MS);
+        }
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timerId) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [activeOption?.symbol, getMarketForSymbol]);
 
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyKey>(() => {
     if (activePrefs.strategy && activePlan.strategies[activePrefs.strategy]) {

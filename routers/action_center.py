@@ -25,7 +25,7 @@ from app import (
     _ensure_equity_stream_symbols,
     _fetch_latest_action_report,
     _get_live_stream,
-    _resolve_rest_prices,
+    _build_price_overrides,
     _serialize_subscription,
     templates,
 )
@@ -459,7 +459,7 @@ async def action_center_page(
         symbol_order = [primary_symbol_sanitized]
 
     price_symbols: Set[str] = set(symbol_order)
-    price_overrides = await _resolve_rest_prices(price_symbols)
+    price_overrides = await _build_price_overrides(request.app, price_symbols)
 
     for sym in symbol_order:
         symbol_display_map.setdefault(sym, sym)
@@ -516,7 +516,8 @@ async def action_center_page(
         "favorite_symbols_canonical": sorted(favorite_canonical_set),
         "favorite_crypto_symbols": favorite_crypto_symbols,
         "live_price_enabled": live_price_available,
-        "rest_price_overrides": price_overrides,
+        "price_overrides": price_overrides,
+        "price_overrides_json": json.dumps(price_overrides, separators=(",", ":")) if price_overrides else None,
         "principal_plan": principal_plan_payload,
         "principal_plan_json": principal_plan_json,
         "principal_plan_map_json": principal_plan_map_json,
@@ -531,6 +532,7 @@ async def action_center_api(
     symbol: str,
     timeframe: str = "day",
     intent: str = "buy",
+    request: Request,
     user: User = Depends(get_current_user_sync),
 ):
     subscription, allowed = _check_report_center_access(user)
@@ -559,7 +561,7 @@ async def action_center_api(
         )
 
     strategy_key = STRATEGY_KEY_BY_TIMEFRAME[timeframe_slug]
-    price_overrides = await _resolve_rest_prices({sanitized_symbol})
+    price_overrides = await _build_price_overrides(request.app, {sanitized_symbol})
     payload = _derive_action_center_view(
         report,
         strategy_key=strategy_key,

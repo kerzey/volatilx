@@ -56,6 +56,9 @@
     {% if principal_plan_order_json %}
     <script id="actionCenterPrincipalPlanOrder" type="application/json">{{ principal_plan_order_json | safe }}</script>
     {% endif %}
+    {% if price_overrides_json %}
+    <script id="actionCenterPriceSnapshots" type="application/json">{{ price_overrides_json | safe }}</script>
+    {% endif %}
     {% if principal_plan_json or principal_plan_map_json %}
     <script>
     (function () {
@@ -89,6 +92,17 @@
             } catch (error) {
                 console.warn('Failed to parse Action Center plan order payload', error);
                 planOrder = [];
+            }
+        }
+
+        var priceSnapshots = {};
+        var priceSource = document.getElementById('actionCenterPriceSnapshots');
+        if (priceSource) {
+            try {
+                priceSnapshots = JSON.parse(priceSource.textContent || '{}');
+            } catch (error) {
+                console.warn('Failed to parse Action Center price snapshots', error);
+                priceSnapshots = {};
             }
         }
 
@@ -140,6 +154,7 @@
         }
 
         window.__ACTION_CENTER_PRINCIPAL_PLAN_OPTIONS__ = planOptions;
+        window.__ACTION_CENTER_PRICE_OVERRIDES__ = priceSnapshots;
     }());
     </script>
     {% endif %}

@@ -1071,6 +1071,77 @@ async def _resolve_rest_prices(symbols: Iterable[str]) -> Dict[str, Dict[str, An
     return results
 
 
+async def _collect_live_prices(app: FastAPI, symbols: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+    sanitized_symbols = {_sanitize_symbol(sym) for sym in symbols if _sanitize_symbol(sym)}
+    if not sanitized_symbols:
+        return {}
+
+    results: Dict[str, Dict[str, Any]] = {}
+
+    async def _snapshot(
+        targets: Set[str],
+        ensure_func: Callable[[FastAPI, Iterable[str]], Awaitable[None]],
+        stream_getter: Callable[[FastAPI], Optional[LivePriceStream]],
+        market_label: str,
+    ) -> None:
+        if not targets:
+            return
+        try:
+            await ensure_func(app, targets)
+        except Exception:
+            return
+        stream = stream_getter(app)
+        if not stream:
+            return
+        try:
+            await stream.ready(timeout=2.0)
+        except Exception:
+            pass
+        for symbol in targets:
+            update = stream.get_latest(symbol)
+            if not update:
+                continue
+            payload = update.to_dict()
+            price = payload.get("last_trade_price")
+            if price is None:
+                continue
+            results[symbol] = {
+                "symbol": payload.get("symbol", symbol),
+                "price": price,
+                "bid": payload.get("bid_price"),
+                "ask": payload.get("ask_price"),
+                "timestamp": payload.get("last_trade_timestamp"),
+                "volume": payload.get("volume"),
+                "source": payload.get("source") or "alpaca-live",
+                "received_at": payload.get("received_at"),
+                "market": market_label,
+            }
+
+    equity_targets = _filter_symbols_for_market(sanitized_symbols, "equity")
+    crypto_targets = _filter_symbols_for_market(sanitized_symbols, "crypto")
+
+    await asyncio.gather(
+        _snapshot(equity_targets, _ensure_equity_stream_symbols, _get_live_stream, "equity"),
+        _snapshot(crypto_targets, _ensure_crypto_stream_symbols, _get_crypto_stream, "crypto"),
+    )
+
+    return results
+
+
+async def _build_price_overrides(app: FastAPI, symbols: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+    sanitized_symbols = {_sanitize_symbol(sym) for sym in symbols if _sanitize_symbol(sym)}
+    if not sanitized_symbols:
+        return {}
+
+    live_payloads = await _collect_live_prices(app, sanitized_symbols)
+    missing = sanitized_symbols - set(live_payloads.keys())
+    rest_payloads = await _resolve_rest_prices(missing) if missing else {}
+
+    combined = dict(rest_payloads)
+    combined.update(live_payloads)
+    return combined
+
+
  
 def _ensure_trial_subscription(session: Session, user: User) -> None:
     """Provision a complimentary trial subscription when none exists."""
