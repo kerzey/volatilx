@@ -32,6 +32,33 @@ type PersistedSelections = {
   perSymbol: Record<string, PersistedSymbolPrefs>;
 };
 
+type FavoriteRecord = {
+  symbol: string;
+  label: string;
+};
+
+const SANITIZE_PATTERN = /[^A-Z0-9.\-]/g;
+const CANONICAL_PATTERN = /[^A-Z0-9]/g;
+
+const sanitizeSymbolValue = (value: unknown): string => {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim().toUpperCase();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.replace(SANITIZE_PATTERN, "").slice(0, 24);
+};
+
+const canonicalizeSymbolValue = (value: unknown): string => {
+  const sanitized = sanitizeSymbolValue(value);
+  if (!sanitized) {
+    return "";
+  }
+  return sanitized.replace(CANONICAL_PATTERN, "");
+};
+
 const STORAGE_KEY = "volatilx:action-center:selections";
 
 const isStrategyKey = (value: unknown): value is StrategyKey =>
@@ -179,6 +206,26 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
 
   const [activeSymbol, setActiveSymbol] = useState<string>(initialSelections.activeSymbol || plan.symbol);
   const [symbolPrefs, setSymbolPrefs] = useState<Record<string, PersistedSymbolPrefs>>(initialSelections.perSymbol);
+  const [favoriteMap, setFavoriteMap] = useState<Map<string, FavoriteRecord>>(() => {
+    const initial = new Map<string, FavoriteRecord>();
+    normalizedOptions.forEach((option) => {
+      if (!option?.symbol || !option.isFavorite) {
+        return;
+      }
+      const sanitized = sanitizeSymbolValue(option.symbol);
+      const canonical = canonicalizeSymbolValue(option.symbol);
+      if (!sanitized || !canonical) {
+        return;
+      }
+      initial.set(canonical, {
+        symbol: sanitized,
+        label: option.symbolDisplay || sanitized,
+      });
+    });
+    return initial;
+  });
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoritePending, setFavoritePending] = useState<Set<string>>(() => new Set());
 
   const handleAlertsChange = useCallback(
     (symbolKey: string, activeAlerts: string[]) => {
@@ -209,6 +256,174 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
       });
     },
     [setSymbolPrefs],
+  );
+
+  const optionLabelLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+    normalizedOptions.forEach((option) => {
+      const canonical = canonicalizeSymbolValue(option.symbol);
+      if (!canonical) {
+        return;
+      }
+      lookup.set(canonical, option.symbolDisplay || option.symbol);
+    });
+    return lookup;
+  }, [normalizedOptions]);
+
+  useEffect(() => {
+    setFavoriteMap((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      normalizedOptions.forEach((option) => {
+        const canonical = canonicalizeSymbolValue(option.symbol);
+        const sanitized = sanitizeSymbolValue(option.symbol);
+        if (!canonical || !sanitized) {
+          return;
+        }
+        const preferredLabel = option.symbolDisplay || sanitized;
+        const existing = next.get(canonical);
+        if (option.isFavorite && !existing) {
+          next.set(canonical, { symbol: sanitized, label: preferredLabel });
+          changed = true;
+        } else if (existing && existing.label !== preferredLabel) {
+          next.set(canonical, { ...existing, label: preferredLabel });
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [normalizedOptions]);
+
+  const loadFavorites = useCallback(async () => {
+    setFavoritesLoading(true);
+    try {
+      const response = await fetch("/api/action-center/favorites", { credentials: "same-origin" });
+      if (!response.ok) {
+        throw new Error(`Failed to load favorites (status ${response.status})`);
+      }
+      const data = await response.json();
+      if (!data || !Array.isArray(data.symbols)) {
+        return;
+      }
+      setFavoriteMap(() => {
+        const next = new Map<string, FavoriteRecord>();
+        data.symbols.forEach((entry: unknown) => {
+          const sanitized = sanitizeSymbolValue(entry);
+          const canonical = canonicalizeSymbolValue(entry);
+          if (!sanitized || !canonical) {
+            return;
+          }
+          const label = optionLabelLookup.get(canonical) ?? sanitized;
+          next.set(canonical, { symbol: sanitized, label });
+        });
+        return next;
+      });
+    } catch (error) {
+      console.warn("[ActionCenter] Failed to load favorites", error);
+    } finally {
+      setFavoritesLoading(false);
+    }
+  }, [optionLabelLookup]);
+
+  useEffect(() => {
+    loadFavorites();
+  }, [loadFavorites]);
+
+  const markFavoritePending = useCallback((canonical: string, active: boolean) => {
+    if (!canonical) {
+      return;
+    }
+    setFavoritePending((prev) => {
+      const next = new Set(prev);
+      if (active) {
+        next.add(canonical);
+      } else {
+        next.delete(canonical);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleRemoveFavorite = useCallback(
+    async (symbol: string) => {
+      const sanitized = sanitizeSymbolValue(symbol);
+      const canonical = canonicalizeSymbolValue(symbol);
+      if (!sanitized || !canonical) {
+        return;
+      }
+      markFavoritePending(canonical, true);
+      try {
+        const response = await fetch("/api/action-center/favorites", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({ symbol: sanitized, follow: false }),
+        });
+        if (!response.ok) {
+          throw new Error(`Favorite toggle failed with status ${response.status}`);
+        }
+        setFavoriteMap((prev) => {
+          if (!prev.has(canonical)) {
+            return prev;
+          }
+          const next = new Map(prev);
+          next.delete(canonical);
+          return next;
+        });
+      } catch (error) {
+        console.warn("[ActionCenter] Unable to remove favorite", error);
+        window.alert("Unable to remove symbol from favorites. Please try again.");
+      } finally {
+        markFavoritePending(canonical, false);
+      }
+    },
+    [markFavoritePending],
+  );
+
+  const favoriteEntries = useMemo(() => {
+    const entries = Array.from(favoriteMap.entries()).map(([canonical, record]) => ({
+      canonical,
+      symbol: record.symbol,
+      label: optionLabelLookup.get(canonical) ?? record.label ?? record.symbol,
+      isTracked: optionLabelLookup.has(canonical),
+      isPending: favoritePending.has(canonical),
+    }));
+    return entries.sort((a, b) => a.label.localeCompare(b.label));
+  }, [favoriteMap, favoritePending, optionLabelLookup]);
+
+  const planSwitcherOptions = useMemo(
+    () =>
+      normalizedOptions.map((option) => {
+        const canonical = canonicalizeSymbolValue(option.symbol);
+        if (!canonical) {
+          return option;
+        }
+        const isFavorite = favoriteMap.has(canonical);
+        if ((option.isFavorite ?? false) === isFavorite) {
+          return option;
+        }
+        return {
+          ...option,
+          isFavorite,
+        };
+      }),
+    [favoriteMap, normalizedOptions],
+  );
+
+  const handleSelectSymbolFromSwitcher = useCallback(
+    (symbol: string) => {
+      if (!symbol) {
+        return;
+      }
+      const matched = normalizedOptions.find((option) => option.symbol === symbol);
+      if (!matched || matched.symbol === activeSymbol) {
+        return;
+      }
+      setActiveSymbol(matched.symbol);
+    },
+    [activeSymbol, normalizedOptions],
   );
 
   useEffect(() => {
@@ -363,9 +578,12 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     <div className="min-h-screen bg-transparent py-10 text-slate-50">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 rounded-[32px] border border-white/5 bg-slate-950/60 px-6 py-10 shadow-[0_25px_80px_rgba(2,6,23,0.6)] backdrop-blur">
         <PlanSwitcher
-          options={normalizedOptions}
+          options={planSwitcherOptions}
           activeSymbol={activeOption?.symbol ?? plan.symbol}
-          onSelect={setActiveSymbol}
+          onSelect={handleSelectSymbolFromSwitcher}
+          favorites={favoriteEntries}
+          favoritesLoading={favoritesLoading}
+          onRemoveFavorite={handleRemoveFavorite}
         />
         <TradeStateHeader
           symbol={activeOption?.symbolDisplay ?? activePlan.symbol}
