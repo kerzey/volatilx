@@ -917,6 +917,18 @@ def _get_crypto_stream(app: FastAPI) -> Optional[LiveCryptoStream]:
     return stream
 
 
+async def _shutdown_stream_attr(app: FastAPI, attr_name: str, label: str) -> None:
+    stream = getattr(app.state, attr_name, None)
+    if not stream:
+        return
+    try:
+        await stream.stop()
+    except Exception as exc:  # pragma: no cover - defensive cleanup
+        logger.debug("%s cleanup during startup failed: %s", label, exc)
+    finally:
+        setattr(app.state, attr_name, None)
+
+
 async def _fetch_rest_live_price(symbol: str) -> Optional[Dict[str, Any]]:
     api_key = os.getenv("ALPACA_API_KEY")
     api_secret = os.getenv("ALPACA_SECRET_KEY")
@@ -1236,6 +1248,8 @@ async def lifespan(app: FastAPI):
         # Try to create tables anyway
         from db import Base, engine
         Base.metadata.create_all(bind=engine)
+    await _shutdown_stream_attr(app, "live_price_stream", "Live price stream")
+    await _shutdown_stream_attr(app, "live_crypto_stream", "Live crypto stream")
     if ENABLE_LIVE_PRICE_STREAM:
         try:
             live_stream = LivePriceStream()

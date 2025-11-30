@@ -254,16 +254,35 @@ class LivePriceStream:
                 await self._consume()
             except LivePriceHandshakeError as exc:
                 self._handshake_failures += 1
-                logger.error("Live price stream handshake failed (%d/%d): %s", self._handshake_failures, self._handshake_failure_limit, exc)
+                error_text = str(exc)
+                logger.error(
+                    "Live price stream handshake failed (%d/%d): %s",
+                    self._handshake_failures,
+                    self._handshake_failure_limit,
+                    error_text,
+                )
+
+                if "connection limit exceeded" in error_text.lower() and self._feed != "iex":
+                    logger.warning(
+                        "Alpaca rejected the SIP feed connection limit; downgrading live price stream feed to IEX."
+                    )
+                    self._feed = "iex"
+                    self._handshake_failures = 0
+                    backoff = self._reconnect_min
+                    await asyncio.sleep(min(5.0, self._reconnect_min))
+                    continue
+
                 should_disable = False
-                if "unauthorized" in str(exc).lower() or "forbidden" in str(exc).lower():
+                lowered = error_text.lower()
+                if "unauthorized" in lowered or "forbidden" in lowered:
                     should_disable = True
                 elif self._handshake_failures >= self._handshake_failure_limit:
                     should_disable = True
+
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, self._reconnect_max)
                 if should_disable:
-                    self._disabled_reason = str(exc)
+                    self._disabled_reason = error_text
                     self._disabled_notice_logged = False
                     logger.error("Disabling live price stream after handshake failures: %s", self._disabled_reason)
                     break
