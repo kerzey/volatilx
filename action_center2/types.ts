@@ -105,3 +105,22 @@ export type ActionSummary = {
   confidenceLabel: string;
   confidenceScore: number;
 };
+
+export type LivePriceSnapshot = {
+  symbol?: string;
+  price?: number;
+  bid?: number;
+  ask?: number;
+  timestamp?: string;
+  received_at?: string;
+  source?: string;
+  market?: string;
+};
+
+export type LivePriceMeta = {
+  timestamp?: string;
+  received_at?: string;
+  source?: string;
+  market?: string;
+  error?: boolean;
+};

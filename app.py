@@ -261,6 +261,31 @@ _all_favorite_symbols = all_favorite_symbols
 _is_symbol_favorited = is_symbol_favorited
 
 
+def _market_symbol_lookup(market: str) -> Dict[str, str]:
+    market_key = (market or "").strip().lower()
+    if not market_key:
+        return {}
+    try:
+        ticker_map = get_ticker_map(market_key)
+    except ValueError:
+        return {}
+
+    lookup: Dict[str, str] = {}
+    for ticker in ticker_map.keys():
+        sanitized = _sanitize_symbol(ticker)
+        if sanitized:
+            lookup[sanitized] = ticker.upper()
+    return lookup
+
+
+def _resolve_market_symbol(symbol: str, market: str) -> str:
+    sanitized = _sanitize_symbol(symbol)
+    if not sanitized:
+        return ""
+    lookup = _market_symbol_lookup((market or "").strip().lower())
+    return lookup.get(sanitized, sanitized)
+
+
 def _safe_float(value: Any) -> Optional[float]:
     """Backward-compatible shim for numeric conversion."""
 
@@ -854,13 +879,21 @@ class _PooledSubscriptionRegistry:
             )
             return
 
+        subscribe_targets = {
+            _resolve_market_symbol(symbol, self._market) or symbol
+            for symbol in additions
+        }
+        subscribe_targets = {symbol for symbol in subscribe_targets if symbol}
+        if not subscribe_targets:
+            return
+
         try:
-            await target_stream.subscribe(additions)
+            await target_stream.subscribe(subscribe_targets)
         except Exception as exc:  # pragma: no cover - runtime safety
             logger.debug(
                 "Failed to subscribe pooled %s symbols %s: %s",
                 self._market,
-                sorted(additions),
+                sorted(subscribe_targets),
                 exc,
             )
 
@@ -985,8 +1018,9 @@ async def _fetch_rest_crypto_price(symbol: str) -> Optional[Dict[str, Any]]:
     if not api_key or not api_secret:
         return None
 
+    native_symbol = _resolve_market_symbol(symbol, "crypto") or symbol.upper()
     url = f"{ALPACA_DATA_REST_URL}/v1beta3/crypto/{ALPACA_CRYPTO_REST_MARKET}/latest/trades"
-    params = {"symbols": symbol.upper()}
+    params = {"symbols": native_symbol}
     if ALPACA_CRYPTO_REST_FEED:
         params["feed"] = ALPACA_CRYPTO_REST_FEED
     timeout = aiohttp.ClientTimeout(total=5)
@@ -1004,7 +1038,7 @@ async def _fetch_rest_crypto_price(symbol: str) -> Optional[Dict[str, Any]]:
             if response.status == 200:
                 payload = await response.json()
                 trades = (payload.get("trades") or {}) if isinstance(payload, dict) else {}
-                trade = trades.get(symbol.upper()) or trades.get(symbol)
+                trade = trades.get(native_symbol) or trades.get(symbol.upper()) or trades.get(symbol)
                 if trade is None:
                     for key, candidate in trades.items():
                         if _sanitize_symbol(key) == symbol.upper():
@@ -1098,7 +1132,8 @@ async def _collect_live_prices(app: FastAPI, symbols: Iterable[str]) -> Dict[str
         except Exception:
             pass
         for symbol in targets:
-            update = stream.get_latest(symbol)
+            native_symbol = _resolve_market_symbol(symbol, market_label) or symbol
+            update = stream.get_latest(native_symbol)
             if not update:
                 continue
             payload = update.to_dict()
@@ -1106,7 +1141,8 @@ async def _collect_live_prices(app: FastAPI, symbols: Iterable[str]) -> Dict[str
             if price is None:
                 continue
             results[symbol] = {
-                "symbol": payload.get("symbol", symbol),
+                "symbol": symbol,
+                "stream_symbol": payload.get("symbol", native_symbol),
                 "price": price,
                 "bid": payload.get("bid_price"),
                 "ask": payload.get("ask_price"),

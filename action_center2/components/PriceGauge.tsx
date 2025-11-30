@@ -1,8 +1,9 @@
-import { NoTradeZone, TradeSetup } from "../types";
+import { NoTradeZone, TradeSetup, LivePriceMeta } from "../types";
 import { formatPrice } from "../utils/planMath";
 
 export type PriceGaugeProps = {
   latestPrice: number;
+  liveMeta?: LivePriceMeta | null;
   buySetup: TradeSetup;
   sellSetup: TradeSetup;
   noTradeZones: NoTradeZone[];
@@ -73,6 +74,53 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 const toNumber = (value: number | string | null | undefined): number => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : NaN;
+};
+
+const formatRelativeTimestamp = (timestamp?: string) => {
+  if (!timestamp) {
+    return null;
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const diffSeconds = Math.abs(diffMs) / 1000;
+  if (diffSeconds < 5) {
+    return "just now";
+  }
+  if (diffSeconds < 60) {
+    return `${Math.round(diffSeconds)}s ago`;
+  }
+  const diffMinutes = diffSeconds / 60;
+  if (diffMinutes < 60) {
+    return `${Math.round(diffMinutes)}m ago`;
+  }
+  const diffHours = diffMinutes / 60;
+  if (diffHours < 24) {
+    return `${Math.round(diffHours)}h ago`;
+  }
+  return date.toLocaleString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const formatSourceLabel = (source?: string) => {
+  if (!source) {
+    return null;
+  }
+  const cleaned = source.replace(/[_-]+/g, " ").trim();
+  if (!cleaned) {
+    return null;
+  }
+  return cleaned
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };
 
 const buildMarkerGroups = (markers: Marker[], minBound: number, maxBound: number): MarkerGroup[] => {
@@ -189,7 +237,28 @@ const mapPercentToDisplay = (percent: number, source: MarkerGroup[], target: Mar
   return clamp(targetPercents[lastIndex] + (100 - targetPercents[lastIndex]) * ratio, 0, 100);
 };
 
-export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
+export function PriceGauge({ latestPrice, liveMeta, buySetup, sellSetup, noTradeZones }: PriceGaugeProps) {
+  const metaTimestamp = liveMeta?.timestamp || liveMeta?.received_at;
+  const metaRelative = formatRelativeTimestamp(metaTimestamp || undefined) ?? null;
+  const metaTitle = metaTimestamp || undefined;
+  const sourceLabel = formatSourceLabel(liveMeta?.source);
+  const marketLabel = liveMeta?.market ? liveMeta.market.toUpperCase() : null;
+
+  let statusLabel = "Last Trade";
+  let statusDetail: string | null = null;
+
+  if (!liveMeta) {
+    statusLabel = "Last Report Price";
+    statusDetail = "Waiting for live feed";
+  } else if (liveMeta.error) {
+    statusLabel = "Live Feed Paused";
+    statusDetail = "Retrying connection";
+  } else {
+    statusLabel = marketLabel ? `${marketLabel} Feed` : "Live Price";
+    const detailParts = [sourceLabel, metaRelative].filter((value): value is string => Boolean(value));
+    statusDetail = detailParts.join(" • ") || null;
+  }
+
   const normalizedSellTargets = Array.isArray(sellSetup?.targets)
     ? [...sellSetup.targets].map(toNumber).filter((value) => Number.isFinite(value)).sort((a, b) => a - b)
     : [];
@@ -435,8 +504,13 @@ export function PriceGauge({ latestPrice, buySetup, sellSetup, noTradeZones }: P
           <p className="text-sm text-slate-400">Track plan levels and see where price is leaning right now.</p>
         </div>
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Last Trade</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">{statusLabel}</p>
           <p className="text-lg font-semibold text-slate-100">{formatPrice(latestPrice)}</p>
+          {statusDetail && (
+            <p className="mt-1 text-[11px] font-medium text-slate-500" title={metaTitle}>
+              {statusDetail}
+            </p>
+          )}
         </div>
       </header>
 

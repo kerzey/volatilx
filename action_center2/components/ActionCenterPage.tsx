@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PrincipalPlan, PrincipalPlanOption, StrategyKey, StrategyPlan, TradeIntent } from "../types";
+import {
+  PrincipalPlan,
+  PrincipalPlanOption,
+  StrategyKey,
+  StrategyPlan,
+  TradeIntent,
+  LivePriceSnapshot,
+  LivePriceMeta,
+} from "../types";
 import { deriveTradeState, buildAlertSuggestions, deriveActionSummary } from "../utils/planMath";
 import { TradeStateHeader } from "./TradeStateHeader";
 import { StrategySelector } from "./StrategySelector";
@@ -35,24 +43,6 @@ type PersistedSelections = {
 type FavoriteRecord = {
   symbol: string;
   label: string;
-};
-
-type LivePriceSnapshot = {
-  symbol?: string;
-  price?: number;
-  bid?: number;
-  ask?: number;
-  timestamp?: string;
-  received_at?: string;
-  source?: string;
-  market?: string;
-};
-
-type LivePriceMeta = {
-  timestamp?: string;
-  source?: string;
-  market?: string;
-  error?: boolean;
 };
 
 declare global {
@@ -549,6 +539,7 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
             setLivePrice(data.price);
             setLivePriceMeta({
               timestamp: data.timestamp || data.received_at,
+              received_at: data.received_at,
               source: data.source || "live-feed",
               market: data.market || derivedMarket,
             });
@@ -683,14 +674,14 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     () =>
       deriveTradeState({
         plan: strategyPlan,
-        latestPrice: activePlan.latest_price,
+        latestPrice: effectiveLatestPrice,
       }),
-    [activePlan.latest_price, strategyPlan],
+    [effectiveLatestPrice, strategyPlan],
   );
 
   const alertSuggestions = useMemo(
-    () => buildAlertSuggestions(activePlan.latest_price, strategyPlan),
-    [activePlan.latest_price, strategyPlan],
+    () => buildAlertSuggestions(effectiveLatestPrice, strategyPlan),
+    [effectiveLatestPrice, strategyPlan],
   );
 
   const actionSummary = useMemo(
@@ -698,10 +689,10 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
       deriveActionSummary({
         strategy: strategyPlan,
         tradeState,
-        latestPrice: activePlan.latest_price,
+        latestPrice: effectiveLatestPrice,
         intent: selectedIntent,
       }),
-    [activePlan.latest_price, selectedIntent, strategyPlan, tradeState],
+    [effectiveLatestPrice, selectedIntent, strategyPlan, tradeState],
   );
 
   return (
@@ -717,7 +708,7 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
         />
         <TradeStateHeader
           symbol={activeOption?.symbolDisplay ?? activePlan.symbol}
-          latestPrice={activePlan.latest_price}
+          latestPrice={effectiveLatestPrice}
           generatedAt={activePlan.generated_display}
           tradeState={tradeState}
           strategy={selectedStrategy}
@@ -729,18 +720,19 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
         </div>
         <ActionSummaryPanel summary={actionSummary} />
         <PriceGauge
-          latestPrice={activePlan.latest_price}
+          latestPrice={effectiveLatestPrice}
+          liveMeta={livePriceMeta}
           buySetup={strategyPlan.buy_setup}
           sellSetup={strategyPlan.sell_setup}
           noTradeZones={strategyPlan.no_trade_zone ?? []}
         />
         <ScenarioCards plan={strategyPlan} />
-        <PnLPreview plan={strategyPlan} latestPrice={activePlan.latest_price} />
+        <PnLPreview plan={strategyPlan} latestPrice={effectiveLatestPrice} />
         <div className="grid gap-6 xl:grid-cols-2">
           <AlertsList
             alerts={alertSuggestions}
             symbol={activeSymbol}
-            latestPrice={activePlan.latest_price}
+            latestPrice={effectiveLatestPrice}
             initialActiveAlerts={activePrefs.alerts ?? []}
             onActiveAlertsChange={(ids) => handleAlertsChange(activeSymbol, ids)}
           />
