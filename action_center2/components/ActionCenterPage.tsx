@@ -344,13 +344,14 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
     });
   }, []);
 
-  const handleRemoveFavorite = useCallback(
-    async (symbol: string) => {
+  const handleToggleFavorite = useCallback(
+    async (symbol: string, follow: boolean) => {
       const sanitized = sanitizeSymbolValue(symbol);
       const canonical = canonicalizeSymbolValue(symbol);
       if (!sanitized || !canonical) {
         return;
       }
+
       markFavoritePending(canonical, true);
       try {
         const response = await fetch("/api/action-center/favorites", {
@@ -359,27 +360,31 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
             "Content-Type": "application/json",
           },
           credentials: "same-origin",
-          body: JSON.stringify({ symbol: sanitized, follow: false }),
+          body: JSON.stringify({ symbol: sanitized, follow }),
         });
         if (!response.ok) {
           throw new Error(`Favorite toggle failed with status ${response.status}`);
         }
         setFavoriteMap((prev) => {
-          if (!prev.has(canonical)) {
-            return prev;
-          }
           const next = new Map(prev);
-          next.delete(canonical);
+          if (follow) {
+            const nextLabel = optionLabelLookup.get(canonical) ?? sanitized;
+            next.set(canonical, { symbol: sanitized, label: nextLabel });
+          } else {
+            next.delete(canonical);
+          }
           return next;
         });
       } catch (error) {
-        console.warn("[ActionCenter] Unable to remove favorite", error);
-        window.alert("Unable to remove symbol from favorites. Please try again.");
+        console.warn("[ActionCenter] Unable to toggle favorite", error);
+        window.alert(
+          follow ? "Unable to add symbol to favorites. Please try again." : "Unable to remove symbol from favorites. Please try again.",
+        );
       } finally {
         markFavoritePending(canonical, false);
       }
     },
-    [markFavoritePending],
+    [markFavoritePending, optionLabelLookup],
   );
 
   const favoriteEntries = useMemo(() => {
@@ -389,6 +394,7 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
       label: optionLabelLookup.get(canonical) ?? record.label ?? record.symbol,
       isTracked: optionLabelLookup.has(canonical),
       isPending: favoritePending.has(canonical),
+      isFavorite: true,
     }));
     return entries.sort((a, b) => a.label.localeCompare(b.label));
   }, [favoriteMap, favoritePending, optionLabelLookup]);
@@ -583,7 +589,7 @@ export function ActionCenterPage({ plan, initialStrategy, planOptions = [] }: Ac
           onSelect={handleSelectSymbolFromSwitcher}
           favorites={favoriteEntries}
           favoritesLoading={favoritesLoading}
-          onRemoveFavorite={handleRemoveFavorite}
+          onToggleFavorite={handleToggleFavorite}
         />
         <TradeStateHeader
           symbol={activeOption?.symbolDisplay ?? activePlan.symbol}
