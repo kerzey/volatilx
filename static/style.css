@@ -239,19 +239,20 @@ body:not(.action-center-page--react) #action-center2-root {
 }
 
 .plan-card__logo {
-  width: 84px;
-  height: 84px;
+  width: 76px;
+  height: 76px;
   border-radius: 999px;
   background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
 }
 
 .plan-card__logo img {
-  width: 64px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
   object-fit: contain;
 }
 

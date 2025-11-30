@@ -55,6 +55,8 @@ const PLAN_META: Record<string, PlanMeta> = {
       "Priority queueing near market opens",
       "Advanced price-action scenario modeling",
       "Expanded monthly AI run allowance",
+      "Action Center tactical cockpit unlocked for live pivots",
+      "Report Center intelligence briefs included every session",
     ],
     logo: "/static/Sigma.PNG",
     cardTone: "border-emerald-400/40 bg-slate-950/70",
@@ -70,6 +72,8 @@ const PLAN_META: Record<string, PlanMeta> = {
       "Maximum monthly AI collaborations included",
       "Early access to experimental agents",
       "Quarterly concierge research briefings",
+      "Action Center premium overlays with concierge routing",
+      "Report Center pro dossiers with export-ready data",
     ],
     logo: "/static/Omega.PNG",
     cardTone: "border-amber-400/40 bg-slate-950/70",
@@ -194,8 +198,8 @@ function PlanCard({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           {meta.logo ? (
-            <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_18px_28px_rgba(2,6,23,0.35)]">
-              <img src={meta.logo} alt="" className="h-12 w-12 object-contain" loading="lazy" />
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-[0_14px_26px_rgba(2,6,23,0.35)]">
+              <img src={meta.logo} alt="" className="h-10 w-10 object-contain" loading="lazy" />
             </span>
           ) : null}
           <div className="flex flex-col">
