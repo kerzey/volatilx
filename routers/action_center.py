@@ -529,10 +529,10 @@ async def action_center_page(
 
 @router.get("/api/action-center")
 async def action_center_api(
+    request: Request,
     symbol: str,
     timeframe: str = "day",
     intent: str = "buy",
-    request: Request,
     user: User = Depends(get_current_user_sync),
 ):
     subscription, allowed = _check_report_center_access(user)
