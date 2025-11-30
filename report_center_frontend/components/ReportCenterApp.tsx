@@ -316,63 +316,19 @@ export function ReportCenterApp({ reports, favorites, meta }: ReportCenterAppPro
     [symbolMap],
   );
 
-  const summaryCopy = useMemo(() => {
-    const dateLabel = meta?.selectedDateLabel || "today";
-    const focusSymbol = activeSymbol || null;
-    const visibleCount = visibleReports.length;
-    const displayedCount = Math.min(visibleCount, MAX_VISIBLE_REPORTS);
-    const maxReports = meta?.maxReports ?? "?";
-    const hasMore = visibleCount > displayedCount;
-
-    const headline = focusSymbol
-      ? `${focusSymbol} game plan`
-      : `${displayedCount || "No"} active coverage`;
-
-    const subtitleParts: string[] = [];
-    subtitleParts.push(`Generated ${dateLabel}`);
-    if (focusSymbol) {
-      subtitleParts.push("Tap another ticker to pivot instantly");
-    } else {
-      subtitleParts.push("Broad-read across tracked symbols");
-    }
-
-    const footer = hasMore
-      ? `Showing ${displayedCount} of ${visibleCount} drops · window max ${maxReports}`
-      : `${displayedCount} drop${displayedCount === 1 ? "" : "s"} locked · window max ${maxReports}`;
-
-    return {
-      headline,
-      subtitle: subtitleParts.join(" · "),
-      footer,
-    };
-  }, [activeSymbol, meta?.maxReports, meta?.selectedDateLabel, visibleReports.length]);
-
   const hasReports = displayedReports.length > 0;
   const activeSymbolLabel = activeSymbol || normalizeSymbol(meta?.selectedSymbol);
 
   return (
     <div className="flex flex-col gap-8">
-      <section>
-        <div className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-2">
-            <span className="text-xs uppercase tracking-widest text-slate-500">Shared intel</span>
-            <h2 className="text-2xl font-semibold tracking-tight text-white">{summaryCopy.headline}</h2>
-            <p className="text-sm leading-relaxed text-slate-300">{summaryCopy.subtitle}</p>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200">
-            <span className="h-2 w-2 rounded-full bg-sky-400" aria-hidden="true" />
-            {summaryCopy.footer}
-          </div>
-        </div>
-        {meta?.excludedReportCount ? (
-          <p className="mt-2 px-6 pb-6 text-sm text-amber-300">
-            Holding {meta.excludedReportCount} report{meta.excludedReportCount === 1 ? "" : "s"} while they hydrate.
-          </p>
-        ) : null}
-      </section>
-
       {planOptions.length ? (
         <ReportPlanSwitcher options={planOptions} activeSymbol={activeSymbol} onSelect={handleSelectSymbol} />
+      ) : null}
+
+      {meta?.excludedReportCount ? (
+        <p className="px-1 text-sm text-amber-300">
+          Holding {meta.excludedReportCount} report{meta.excludedReportCount === 1 ? "" : "s"} while they hydrate.
+        </p>
       ) : null}
 
       {!hasReports ? (
