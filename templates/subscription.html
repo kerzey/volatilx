@@ -239,6 +239,11 @@
                     body: JSON.stringify({ plan_slug: planSlug }),
                 });
 
+                if (response.status === 401) {
+                    window.location.href = '/signin?next=%2Fsubscribe';
+                    return;
+                }
+
                 if (!response.ok) {
                     const errorPayload = await response.json().catch(() => ({}));
                     const detail = errorPayload.detail || 'Unable to start checkout. Please try again.';

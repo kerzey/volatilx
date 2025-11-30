@@ -108,6 +108,15 @@ def get_current_user_sync(request: Request) -> User:
     except Exception as e:
         raise HTTPException(status_code=401, detail="Authentication failed")
 
+
+def get_optional_user(request: Request) -> Optional[User]:
+    """Return the current user when authenticated, otherwise None."""
+
+    try:
+        return get_current_user_sync(request)
+    except HTTPException:
+        return None
+
 # Keep these for FastAPI Users routers (they won't be used for /analyze)
 async def get_user_db():
     db = SessionLocal()

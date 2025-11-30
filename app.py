@@ -42,6 +42,7 @@ from user import (
     get_user_manager,
     init_db,
     get_current_user_sync,
+    get_optional_user,
 )
 from db import SessionLocal
 from billing import (
@@ -2195,10 +2196,14 @@ async def submit_contact_request(request: Request, background_tasks: BackgroundT
 
 
 @app.get("/subscribe", response_class=HTMLResponse)
-async def subscribe_page(request: Request, user: User = Depends(get_current_user_sync)):
-    logger.info("User %s (%s) opened subscription page", user.id, user.email)
-    with SessionLocal() as session:
-        subscription = _find_relevant_subscription(session, user.id)
+async def subscribe_page(request: Request, user: Optional[User] = Depends(get_optional_user)):
+    subscription = None
+    if user:
+        logger.info("User %s (%s) opened subscription page", user.id, user.email)
+        with SessionLocal() as session:
+            subscription = _find_relevant_subscription(session, user.id)
+    else:
+        logger.info("Guest visitor opened subscription page")
 
     context = {
         "request": request,
@@ -3484,7 +3489,7 @@ def structure_trading_data_for_ai(result_data: any, symbol: str) -> dict:
 
 
 @app.get("/api/billing/plans")
-async def list_subscription_plans(user: User = Depends(get_current_user_sync)):
+async def list_subscription_plans(user: Optional[User] = Depends(get_optional_user)):
     with SessionLocal() as session:
         plans = (
             session.query(SubscriptionPlan)
@@ -3492,12 +3497,12 @@ async def list_subscription_plans(user: User = Depends(get_current_user_sync)):
             .order_by(SubscriptionPlan.monthly_price_cents.asc())
             .all()
         )
-        current_subscription = _find_relevant_subscription(session, user.id)
+        current_subscription = _find_relevant_subscription(session, user.id) if user else None
 
     payload = {
         "plans": [_serialize_plan(plan) for plan in plans],
         "currency": "usd",
-        "current_subscription": _serialize_subscription(current_subscription),
+        "current_subscription": _serialize_subscription(current_subscription) if current_subscription else None,
     }
     return JSONResponse(content=payload)
 
