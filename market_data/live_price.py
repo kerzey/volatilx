@@ -262,18 +262,26 @@ class LivePriceStream:
                     error_text,
                 )
 
-                if "connection limit exceeded" in error_text.lower() and self._feed != "iex":
-                    logger.warning(
-                        "Alpaca rejected the SIP feed connection limit; downgrading live price stream feed to IEX."
-                    )
-                    self._feed = "iex"
-                    self._handshake_failures = 0
-                    backoff = self._reconnect_min
-                    await asyncio.sleep(min(5.0, self._reconnect_min))
-                    continue
+                lowered = error_text.lower()
+                connection_limited = "connection limit exceeded" in lowered
+                if connection_limited and self._feed != "iex":
+                    if self._feed.startswith("crypto"):
+                        logger.warning(
+                            "Alpaca crypto stream connection limit hit; waiting for existing sessions to close before retrying."
+                        )
+                    else:
+                        logger.warning(
+                            "Alpaca rejected the SIP feed connection limit; downgrading live price stream feed to IEX."
+                        )
+                        self._feed = "iex"
+                        if self._version != "v2":
+                            self._version = "v2"
+                        self._handshake_failures = 0
+                        backoff = self._reconnect_min
+                        await asyncio.sleep(min(5.0, self._reconnect_min))
+                        continue
 
                 should_disable = False
-                lowered = error_text.lower()
                 if "unauthorized" in lowered or "forbidden" in lowered:
                     should_disable = True
                 elif self._handshake_failures >= self._handshake_failure_limit:
