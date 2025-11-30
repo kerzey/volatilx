@@ -7,6 +7,7 @@ type FavoriteMenuEntry = {
   label: string;
   isTracked: boolean;
   isPending: boolean;
+  isFavorite: boolean;
 };
 
 export type PlanSwitcherProps = {
@@ -15,7 +16,7 @@ export type PlanSwitcherProps = {
   onSelect: (symbol: string) => void;
   favorites?: FavoriteMenuEntry[];
   favoritesLoading?: boolean;
-  onRemoveFavorite?: (symbol: string) => void;
+  onToggleFavorite?: (symbol: string, follow: boolean) => void;
 };
 
 export function PlanSwitcher({
@@ -24,10 +25,10 @@ export function PlanSwitcher({
   onSelect,
   favorites = [],
   favoritesLoading = false,
-  onRemoveFavorite,
+  onToggleFavorite,
 }: PlanSwitcherProps) {
   const hasTrackedOptions = options.length > 1;
-  const hasFavoritesContext = favorites.length > 0 || favoritesLoading || Boolean(onRemoveFavorite);
+  const hasFavoritesContext = favorites.length > 0 || favoritesLoading || Boolean(onToggleFavorite);
   if (!hasTrackedOptions && !hasFavoritesContext) {
     return null;
   }
@@ -68,12 +69,7 @@ export function PlanSwitcher({
           )}
         </div>
         {hasFavoritesContext ? (
-          <FavoritesDropdown
-            favorites={favorites}
-            loading={favoritesLoading}
-            onSelect={onSelect}
-            onRemoveFavorite={onRemoveFavorite}
-          />
+          <FavoritesDropdown favorites={favorites} loading={favoritesLoading} onToggleFavorite={onToggleFavorite} />
         ) : null}
       </div>
     </div>
@@ -83,13 +79,13 @@ export function PlanSwitcher({
 type FavoritesDropdownProps = {
   favorites: FavoriteMenuEntry[];
   loading: boolean;
-  onSelect: (symbol: string) => void;
-  onRemoveFavorite?: (symbol: string) => void;
+  onToggleFavorite?: (symbol: string, follow: boolean) => void;
 };
 
-function FavoritesDropdown({ favorites, loading, onSelect, onRemoveFavorite }: FavoritesDropdownProps) {
+function FavoritesDropdown({ favorites, loading, onToggleFavorite }: FavoritesDropdownProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [visibleEntries, setVisibleEntries] = useState<FavoriteMenuEntry[]>(favorites);
 
   useEffect(() => {
     if (!open || typeof document === "undefined") {
@@ -119,8 +115,26 @@ function FavoritesDropdown({ favorites, loading, onSelect, onRemoveFavorite }: F
     };
   }, [open]);
 
-  const list = useMemo(() => favorites.slice().sort((a, b) => a.label.localeCompare(b.label)), [favorites]);
-  const buttonLabel = `*Favorites${list.length ? `(${list.length})` : ""}`;
+  useEffect(() => {
+    if (!open) {
+      setVisibleEntries(favorites);
+    }
+  }, [favorites, open]);
+
+  const list = useMemo(() => visibleEntries.slice().sort((a, b) => a.label.localeCompare(b.label)), [visibleEntries]);
+  const buttonLabel = `*Favorites${favorites.length ? `(${favorites.length})` : ""}`;
+
+  const handleToggle = (entry: FavoriteMenuEntry) => {
+    const nextFollow = !entry.isFavorite;
+    setVisibleEntries((prev) =>
+      prev.map((item) =>
+        item.canonical === entry.canonical
+          ? { ...item, isFavorite: nextFollow }
+          : item,
+      ),
+    );
+    onToggleFavorite?.(entry.symbol, nextFollow);
+  };
 
   return (
     <div className="relative self-start sm:self-auto" ref={menuRef}>
@@ -142,39 +156,29 @@ function FavoritesDropdown({ favorites, loading, onSelect, onRemoveFavorite }: F
                 const baseClasses = "flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-sm transition";
                 const stateClasses = entry.isTracked
                   ? "border-slate-800/60 bg-slate-900/80 text-slate-100 hover:border-slate-700 hover:bg-slate-900"
-                  : "cursor-not-allowed border-slate-900 bg-slate-950 text-slate-500";
+                  : "border-slate-900 bg-slate-950 text-slate-500 hover:border-slate-800";
+                const starClasses = entry.isFavorite ? "text-amber-300" : "text-slate-600";
 
                 return (
-                  <li key={entry.canonical} className="flex items-center gap-2">
+                  <li key={entry.canonical}>
                     <button
                       type="button"
-                      className={baseClasses + " " + stateClasses}
-                      onClick={() => {
-                        if (!entry.isTracked) {
-                          return;
-                        }
-                        onSelect(entry.symbol);
-                        setOpen(false);
-                      }}
+                      className={`${baseClasses} ${stateClasses}`}
+                      onClick={() => handleToggle(entry)}
                     >
-                      <span className="font-semibold">{entry.label}</span>
-                      {!entry.isTracked ? (
-                        <span className="text-[10px] uppercase tracking-wide text-rose-300">Not loaded</span>
-                      ) : null}
+                      <span aria-hidden="true" className={`text-base ${starClasses}`}>
+                        ★
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{entry.label}</span>
+                        {!entry.isTracked ? (
+                          <span className="text-[10px] uppercase tracking-wide text-rose-300">Not loaded</span>
+                        ) : null}
+                      </div>
+                      <span className="ml-auto text-[10px] uppercase tracking-wide text-slate-500">
+                        {entry.isPending ? "Saving…" : entry.isFavorite ? "Favorited" : "Removed"}
+                      </span>
                     </button>
-                    {onRemoveFavorite ? (
-                      <button
-                        type="button"
-                        className="text-[11px] font-semibold uppercase tracking-wide text-rose-200 transition hover:text-rose-100 disabled:opacity-50"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRemoveFavorite(entry.symbol);
-                        }}
-                        disabled={entry.isPending}
-                      >
-                        {entry.isPending ? "…" : "Unfavorite"}
-                      </button>
-                    ) : null}
                   </li>
                 );
               })}
