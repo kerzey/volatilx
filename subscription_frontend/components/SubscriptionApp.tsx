@@ -194,8 +194,8 @@ function PlanCard({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           {meta.logo ? (
-            <span className="inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-slate-900/80">
-              <img src={meta.logo} alt="" className="h-full w-full object-contain" loading="lazy" />
+            <span className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_18px_28px_rgba(2,6,23,0.35)]">
+              <img src={meta.logo} alt="" className="h-12 w-12 object-contain" loading="lazy" />
             </span>
           ) : null}
           <div className="flex flex-col">
